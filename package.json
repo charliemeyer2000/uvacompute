@@ -6,7 +6,11 @@
   "scripts": {
     "build": "turbo build",
     "lint": "turbo lint",
-    "dev": "turbo dev"
+    "dev": "turbo dev",
+    "check-types": "turbo check-types"
   },
-  "packageManager": "pnpm@10.0.0"
+  "packageManager": "pnpm@10.0.0",
+  "devDependencies": {
+    "turbo": "^2.5.5"
+  }
 }
