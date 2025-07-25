@@ -1,16 +1,12 @@
 {
-  "name": "turborepo-empty-starter",
+  "name": "uvacompute",
   "version": "1.0.0",
   "private": true,
-  "description": "An empty Turborepo starter",
-  "main": "index.js",
+  "description": "your friendly local compute cluster",
   "scripts": {
     "build": "turbo build",
     "lint": "turbo lint",
     "dev": "turbo dev"
   },
-  "keywords": [],
-  "author": "tknickman",
-  "license": "ISC",
-  "packageManager": "pnpm@7.30.5"
+  "packageManager": "pnpm@10.0.0"
 }
