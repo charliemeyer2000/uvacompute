@@ -7,10 +7,17 @@
     "build": "turbo build",
     "lint": "turbo lint",
     "dev": "turbo dev",
-    "check-types": "turbo check-types"
+    "check-types": "turbo check-types",
+    "prepare": "husky"
+  },
+  "lint-staged": {
+    "**/*": "prettier --write --ignore-unknown"
   },
   "packageManager": "pnpm@10.0.0",
   "devDependencies": {
+    "husky": "^9.1.7",
+    "lint-staged": "^16.1.2",
+    "prettier": "^3.6.2",
     "turbo": "^2.5.5"
   }
 }
