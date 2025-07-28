@@ -11,14 +11,10 @@ function main() {
     .description("uvacompute cli");
   registerLoginCommand(program);
 
-  // interactive mode for dev with watch mode
+  // ONLY add interactive functionality in development
   if (process.env.NODE_ENV === "development") {
     program.option("-i, --interactive", "run in interactive mode");
-  }
 
-  const isDevelopment = process.env.NODE_ENV === "development";
-
-  if (isDevelopment) {
     const hasInteractiveFlag =
       process.argv.includes("--interactive") || process.argv.includes("-i");
     const shouldRunInteractive = hasInteractiveFlag || process.argv.length <= 2;
@@ -29,11 +25,8 @@ function main() {
     }
   }
 
-  if (process.argv.length <= 2) {
-    program.help();
-  } else {
-    program.parse(process.argv);
-  }
+  // Production behavior: normal CLI only
+  program.parse(process.argv);
 }
 
 main();
