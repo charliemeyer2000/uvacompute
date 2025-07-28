@@ -77,37 +77,7 @@ jobs:
           echo "Contents of ./dist:"
           find ./dist -type f -ls || echo "No files found"
 
-      - name: Upload to website
-        run: |
-          mkdir -p ./apps/site/public/downloads/cli/latest
-          mkdir -p ./apps/site/public/downloads/cli/v${{ steps.version.outputs.version }}
-
-          # Copy files if they exist
-          if [ -f "./dist/uvacompute-linux/uvacompute-linux" ]; then
-            cp ./dist/uvacompute-linux/uvacompute-linux ./apps/site/public/downloads/cli/latest/
-            cp ./dist/uvacompute-linux/uvacompute-linux ./apps/site/public/downloads/cli/v${{ steps.version.outputs.version }}/
-            echo "✓ Linux binary copied"
-          else
-            echo "⚠️ Linux binary not found"
-          fi
-
-          if [ -f "./dist/uvacompute-macos/uvacompute-macos" ]; then
-            cp ./dist/uvacompute-macos/uvacompute-macos ./apps/site/public/downloads/cli/latest/
-            cp ./dist/uvacompute-macos/uvacompute-macos ./apps/site/public/downloads/cli/v${{ steps.version.outputs.version }}/
-            echo "✓ macOS binary copied"
-          else
-            echo "⚠️ macOS binary not found"
-          fi
-
-          if [ -f "./dist/uvacompute-windows.exe/uvacompute-windows.exe" ]; then
-            cp ./dist/uvacompute-windows.exe/uvacompute-windows.exe ./apps/site/public/downloads/cli/latest/
-            cp ./dist/uvacompute-windows.exe/uvacompute-windows.exe ./apps/site/public/downloads/cli/v${{ steps.version.outputs.version }}/
-            echo "✓ Windows binary copied"
-          else
-            echo "⚠️ Windows binary not found"
-          fi
-
-      - name: Create Release (for private tracking)
+      - name: Create Release with binaries
         uses: softprops/action-gh-release@v2
         with:
           tag_name: cli-v${{ steps.version.outputs.version }}
@@ -117,11 +87,3 @@ jobs:
             ./dist/uvacompute-macos/uvacompute-macos
             ./dist/uvacompute-windows.exe/uvacompute-windows.exe
           generate_release_notes: true
-
-      - name: Commit and push updated binaries
-        run: |
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
-          git add ./apps/site/public/downloads/
-          git commit -m "Update CLI binaries v${{ steps.version.outputs.version }}" || exit 0
-          git push
