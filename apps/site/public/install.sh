@@ -102,8 +102,7 @@ if [ -f "${TARGET_FILE}" ]; then
     # Check if the target directory is already in PATH
     if echo ":${PATH}:" | grep -q ":${TARGET_DIR}:"; then
         echo ""
-        printf "\033[0;32m✓ '${TARGET_DIR}' is already in your PATH.\033[0m\n"
-        printf "\033[0;32m✓ You can now use the '${BINARY_NAME}' command!\033[0m\n"
+        printf "\033[0;32m✓ Installation complete! The '${BINARY_NAME}' command is ready to use.\033[0m\n"
         printf "\033[0;32m\nTo get started, run: '${BINARY_NAME} login'\033[0m\n"
     else
         # Provide instructions for adding the target directory to the PATH.
