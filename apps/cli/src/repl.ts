@@ -68,7 +68,10 @@ export function startInteractiveMode() {
   });
 
   rl.on("close", () => {
-    process.exit(0);
+    // Don't exit the process in development watch mode
+    if (process.env.NODE_ENV !== "development") {
+      process.exit(0);
+    }
   });
 
   // Handle Ctrl+C gracefully
