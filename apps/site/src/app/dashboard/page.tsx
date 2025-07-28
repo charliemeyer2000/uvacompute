@@ -37,7 +37,7 @@ export default function Page() {
         <div className="text-xl font-semibold">{user?.name || "No Name"}</div>
         <div className="text-gray-500 text-sm">ID: {user?.id || "N/A"}</div>
         <button
-          onClick={() => authClient.signOut()}
+          onClick={async () => await authClient.signOut()}
           className="mt-4 px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition"
         >
           Sign out
