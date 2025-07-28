@@ -26,6 +26,18 @@ export const betterAuth = ba({
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
     },
   },
+  trustedOrigins: [
+    "uvacompute.com",
+    "www.uvacompute.com",
+    "preview.uvacompute.com",
+    "www.preview.uvacompute.com",
+    "https://uvacompute.com",
+    "https://www.uvacompute.com",
+    "https://preview.uvacompute.com",
+    "https://www.preview.uvacompute.com",
+    "https://www.preview.uvacompute.com",
+    "http://localhost:3000",
+  ],
 });
 
 export const authClient = createAuthClient({
