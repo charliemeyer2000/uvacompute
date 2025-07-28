@@ -58,17 +58,9 @@ fi
 # Set up temporary directory for download
 TMPDIR=$(mktemp -d) || { echo "Failed to create temporary directory"; exit 1; }
 
-# Check if a version is provided as an argument or environment variable
-if [ -n "${UVA_CLI_VERSION}" ]; then
-    VERSION="${UVA_CLI_VERSION}"
-    DOWNLOAD_URL="$BASE_URL/downloads/cli/v$VERSION/$BINARY_FILE"
-elif [ $# -eq 0 ]; then
-    DOWNLOAD_URL="$BASE_URL/downloads/cli/latest/$BINARY_FILE"
-else
-    VERSION=$1
-    echo "Downloading version $VERSION"
-    DOWNLOAD_URL="$BASE_URL/downloads/cli/v$VERSION/$BINARY_FILE"
-fi
+# For now, we only support latest version via API
+# Version support can be added later if needed
+DOWNLOAD_URL="$BASE_URL/api/downloads/cli/latest/$BINARY_FILE"
 
 # Download the 'uva' CLI binary from the specified URL.
 echo "Downloading '${BINARY_NAME}' CLI binary..."
