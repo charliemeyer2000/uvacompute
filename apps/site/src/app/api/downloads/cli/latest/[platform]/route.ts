@@ -5,9 +5,9 @@ const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { platform: string } },
+  { params }: { params: Promise<{ platform: string }> },
 ) {
-  const { platform } = params;
+  const { platform } = await params;
 
   // Map platform to binary name
   const binaryMap: Record<string, string> = {
