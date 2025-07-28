@@ -1,0 +1,104 @@
+name: Build and Deploy CLI
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: linux-x64
+            artifact: uvacompute-linux
+          - os: macos-latest
+            target: darwin-x64
+            artifact: uvacompute-macos
+          - os: windows-latest
+            target: win32-x64
+            artifact: uvacompute-windows.exe
+
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+
+      - name: Install dependencies
+        run: bun install
+        working-directory: ./apps/cli
+
+      - name: Extract version
+        id: version
+        run: |
+          if [[ "${{ runner.os }}" == "Windows" ]]; then
+            VERSION=$(cat ./apps/cli/package.json | jq -r '.version')
+            echo "version=$VERSION" >> $GITHUB_OUTPUT
+          else
+            VERSION=$(cat ./apps/cli/package.json | jq -r '.version')
+            echo "version=$VERSION" >> $GITHUB_OUTPUT
+          fi
+        shell: bash
+
+      - name: Build binary
+        run: bun build --compile ./index.ts --outfile ./dist/${{ matrix.artifact }}
+        working-directory: ./apps/cli
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: ./apps/cli/dist/${{ matrix.artifact }}
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract version
+        id: version
+        run: |
+          VERSION=$(cat ./apps/cli/package.json | jq -r '.version')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./dist
+
+      - name: Create Release (for private tracking)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: cli-v${{ steps.version.outputs.version }}
+          name: CLI v${{ steps.version.outputs.version }}
+          files: |
+            ./dist/uvacompute-linux/uvacompute-linux
+            ./dist/uvacompute-macos/uvacompute-macos
+            ./dist/uvacompute-windows/uvacompute-windows.exe
+          generate_release_notes: true
+
+      - name: Upload to website
+        run: |
+          mkdir -p ./apps/site/public/downloads/cli/latest
+          cp ./dist/uvacompute-linux/uvacompute-linux ./apps/site/public/downloads/cli/latest/
+          cp ./dist/uvacompute-macos/uvacompute-macos ./apps/site/public/downloads/cli/latest/
+          cp ./dist/uvacompute-windows/uvacompute-windows.exe ./apps/site/public/downloads/cli/latest/
+
+          mkdir -p ./apps/site/public/downloads/cli/v${{ steps.version.outputs.version }}
+          cp ./dist/uvacompute-linux/uvacompute-linux ./apps/site/public/downloads/cli/v${{ steps.version.outputs.version }}/
+          cp ./dist/uvacompute-macos/uvacompute-macos ./apps/site/public/downloads/cli/v${{ steps.version.outputs.version }}/
+          cp ./dist/uvacompute-windows/uvacompute-windows.exe ./apps/site/public/downloads/cli/v${{ steps.version.outputs.version }}/
+
+      - name: Commit and push updated binaries
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add ./apps/site/public/downloads/
+          git commit -m "Update CLI binaries v${{ steps.version.outputs.version }}" || exit 0
+          git push

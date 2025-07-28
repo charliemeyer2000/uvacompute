@@ -1,15 +1,17 @@
 {
   "name": "cli",
+  "version": "0.0.1",
   "module": "index.ts",
   "type": "module",
   "scripts": {
     "build": "bun build index.ts --outdir ./dist",
     "build-binary": "bun build --compile ./index.ts --outfile ./dist/uvacompute",
-    "dev": "bun --watch index.ts",
+    "dev": "NODE_ENV=development bun --watch index.ts",
     "test": "bun test"
   },
   "devDependencies": {
-    "@types/bun": "latest"
+    "@types/bun": "latest",
+    "@types/commander": "^2.12.5"
   },
   "peerDependencies": {
     "typescript": "^5"
@@ -17,6 +19,7 @@
   "dependencies": {
     "boxen": "^8.0.1",
     "chalk": "^5.4.1",
-    "commander": "^14.0.0"
+    "commander": "^14.0.0",
+    "ora": "^8.2.0"
   }
 }
