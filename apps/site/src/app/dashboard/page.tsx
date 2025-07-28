@@ -2,10 +2,12 @@
 
 import { authClient } from "@/lib/auth";
 import { redirect } from "next/navigation";
+import { useRouter } from "next/navigation";
 import Image from "next/image";
 
 export default function Page() {
   const { data: session, isPending } = authClient.useSession();
+  const router = useRouter();
 
   if (isPending) {
     return (
@@ -37,7 +39,21 @@ export default function Page() {
         <div className="text-xl font-semibold">{user?.name || "No Name"}</div>
         <div className="text-gray-500 text-sm">ID: {user?.id || "N/A"}</div>
         <button
-          onClick={async () => await authClient.signOut()}
+          onClick={async () => {
+            try {
+              await authClient.signOut({
+                fetchOptions: {
+                  onSuccess: () => {
+                    router.push("/login");
+                  },
+                },
+              });
+            } catch (error) {
+              console.error("Sign out error:", error);
+              // Fallback: redirect anyway
+              router.push("/login");
+            }
+          }}
           className="mt-4 px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition"
         >
           Sign out
