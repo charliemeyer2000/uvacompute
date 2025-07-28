@@ -7,6 +7,8 @@
     "build": "turbo build",
     "lint": "turbo lint",
     "dev": "turbo dev",
+    "dev:cli": "turbo dev --filter=cli",
+    "dev:site": "turbo dev --filter=site",
     "check-types": "turbo check-types",
     "prepare": "husky"
   },
