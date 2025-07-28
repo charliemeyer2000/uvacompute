@@ -4,7 +4,7 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "env": ["BETTER_AUTH_SECRET", "BETTER_AUTH_URL"],
+      "env": ["BETTER_AUTH_SECRET", "BETTER_AUTH_URL", "DATABASE_URL"],
       "inputs": [".env"]
     },
     "check-types": {
