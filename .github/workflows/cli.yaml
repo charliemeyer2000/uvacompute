@@ -72,6 +72,41 @@ jobs:
         with:
           path: ./dist
 
+      - name: Debug - List downloaded files
+        run: |
+          echo "Contents of ./dist:"
+          find ./dist -type f -ls || echo "No files found"
+
+      - name: Upload to website
+        run: |
+          mkdir -p ./apps/site/public/downloads/cli/latest
+          mkdir -p ./apps/site/public/downloads/cli/v${{ steps.version.outputs.version }}
+
+          # Copy files if they exist
+          if [ -f "./dist/uvacompute-linux/uvacompute-linux" ]; then
+            cp ./dist/uvacompute-linux/uvacompute-linux ./apps/site/public/downloads/cli/latest/
+            cp ./dist/uvacompute-linux/uvacompute-linux ./apps/site/public/downloads/cli/v${{ steps.version.outputs.version }}/
+            echo "✓ Linux binary copied"
+          else
+            echo "⚠️ Linux binary not found"
+          fi
+
+          if [ -f "./dist/uvacompute-macos/uvacompute-macos" ]; then
+            cp ./dist/uvacompute-macos/uvacompute-macos ./apps/site/public/downloads/cli/latest/
+            cp ./dist/uvacompute-macos/uvacompute-macos ./apps/site/public/downloads/cli/v${{ steps.version.outputs.version }}/
+            echo "✓ macOS binary copied"
+          else
+            echo "⚠️ macOS binary not found"
+          fi
+
+          if [ -f "./dist/uvacompute-windows.exe/uvacompute-windows.exe" ]; then
+            cp ./dist/uvacompute-windows.exe/uvacompute-windows.exe ./apps/site/public/downloads/cli/latest/
+            cp ./dist/uvacompute-windows.exe/uvacompute-windows.exe ./apps/site/public/downloads/cli/v${{ steps.version.outputs.version }}/
+            echo "✓ Windows binary copied"
+          else
+            echo "⚠️ Windows binary not found"
+          fi
+
       - name: Create Release (for private tracking)
         uses: softprops/action-gh-release@v2
         with:
@@ -80,20 +115,8 @@ jobs:
           files: |
             ./dist/uvacompute-linux/uvacompute-linux
             ./dist/uvacompute-macos/uvacompute-macos
-            ./dist/uvacompute-windows/uvacompute-windows.exe
+            ./dist/uvacompute-windows.exe/uvacompute-windows.exe
           generate_release_notes: true
-
-      - name: Upload to website
-        run: |
-          mkdir -p ./apps/site/public/downloads/cli/latest
-          cp ./dist/uvacompute-linux/uvacompute-linux ./apps/site/public/downloads/cli/latest/
-          cp ./dist/uvacompute-macos/uvacompute-macos ./apps/site/public/downloads/cli/latest/
-          cp ./dist/uvacompute-windows/uvacompute-windows.exe ./apps/site/public/downloads/cli/latest/
-
-          mkdir -p ./apps/site/public/downloads/cli/v${{ steps.version.outputs.version }}
-          cp ./dist/uvacompute-linux/uvacompute-linux ./apps/site/public/downloads/cli/v${{ steps.version.outputs.version }}/
-          cp ./dist/uvacompute-macos/uvacompute-macos ./apps/site/public/downloads/cli/v${{ steps.version.outputs.version }}/
-          cp ./dist/uvacompute-windows/uvacompute-windows.exe ./apps/site/public/downloads/cli/v${{ steps.version.outputs.version }}/
 
       - name: Commit and push updated binaries
         run: |
