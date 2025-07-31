@@ -12,7 +12,8 @@ function main() {
   registerLoginCommand(program);
 
   // ONLY add interactive functionality in development
-  if (process.env.NODE_ENV === "development") {
+  const isDevelopment = process.env.NODE_ENV === "development";
+  if (isDevelopment) {
     program.option("-i, --interactive", "run in interactive mode");
 
     const hasInteractiveFlag =
