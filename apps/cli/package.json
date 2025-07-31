@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "build": "bun build index.ts --outdir ./dist",
-    "build-binary": "NODE_ENV=production bun build --compile ./index.ts --outfile ./dist/uvacompute",
-    "dev": "NODE_ENV=development bun --watch index.ts",
+    "build-binary": "bun build --compile ./index.ts --outfile ./dist/uvacompute",
+    "dev": "bun --watch index.ts",
     "test": "bun test"
   },
   "devDependencies": {
