@@ -11,7 +11,6 @@ function main() {
     .description("uvacompute cli");
   registerLoginCommand(program);
 
-  // ONLY add interactive functionality in development
   const isDevelopment = process.env.NODE_ENV === "development";
   if (isDevelopment) {
     program.option("-i, --interactive", "run in interactive mode");
