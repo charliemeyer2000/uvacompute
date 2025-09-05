@@ -20,12 +20,12 @@ export default function DashboardPage() {
   }
 
   if (!session) {
-    redirect("../login");
+    redirect("/login");
   }
 
   const handleSignOut = async () => {
     await authClient.signOut();
-    router.push("../login");
+    router.push("/login");
   };
 
   return (
