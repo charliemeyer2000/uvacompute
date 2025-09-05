@@ -22,7 +22,7 @@ export default async function Page({
       </p>
       {live ? (
         <Link
-          href="./(protected)/login"
+          href="/login"
           className="mt-8 px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition"
         >
           Log in
