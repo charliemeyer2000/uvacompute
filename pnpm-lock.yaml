@@ -47,6 +47,9 @@ importers:
 
   apps/site:
     dependencies:
+      "@convex-dev/better-auth":
+        specifier: ^0.7.17
+        version: 0.7.17(better-auth@1.3.7(react-dom@19.1.0(react@19.1.0))(react@19.1.0)(zod@4.0.10))(convex@1.26.2(react@19.1.0))(react-dom@19.1.0(react@19.1.0))(react@19.1.0)(typescript@5.8.3)
       "@neondatabase/serverless":
         specifier: ^1.0.1
         version: 1.0.1
@@ -54,8 +57,8 @@ importers:
         specifier: ^1.15.0
         version: 1.15.0(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
       better-auth:
-        specifier: ^1.3.3
-        version: 1.3.3(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
+        specifier: ^1.3.7
+        version: 1.3.7(react-dom@19.1.0(react@19.1.0))(react@19.1.0)(zod@4.0.10)
       bufferutil:
         specifier: ^4.0.9
         version: 4.0.9
@@ -67,7 +70,7 @@ importers:
         version: 17.2.1
       drizzle-orm:
         specifier: ^0.44.3
-        version: 0.44.3(@neondatabase/serverless@1.0.1)(@types/pg@8.15.4)(bun-types@1.2.21(@types/react@19.1.8))(kysely@0.28.3)
+        version: 0.44.3(@neondatabase/serverless@1.0.1)(@types/pg@8.15.4)(bun-types@1.2.21(@types/react@19.1.8))(kysely@0.28.5)
       next:
         specifier: 15.4.4
         version: 15.4.4(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
@@ -130,10 +133,10 @@ packages:
       }
     engines: { node: ">=6.0.0" }
 
-  "@better-auth/utils@0.2.5":
+  "@better-auth/utils@0.2.6":
     resolution:
       {
-        integrity: sha512-uI2+/8h/zVsH8RrYdG8eUErbuGBk16rZKQfz8CjxQOyCE6v7BqFYEbFwvOkvl1KbUdxhqOnXp78+uE5h8qVEgQ==,
+        integrity: sha512-3y/vaL5Ox33dBwgJ6ub3OPkVqr6B5xL2kgxNHG8eHZuryLyG/4JSPGqjbdRSgjuy9kALUZYDFl+ORIAxlWMSuA==,
       }
 
   "@better-fetch/fetch@1.1.18":
@@ -141,6 +144,17 @@ packages:
       {
         integrity: sha512-rEFOE1MYIsBmoMJtQbl32PGHHXuG2hDxvEd7rUHE0vCBoFQVSDqaVs9hkZEtHCxRoY+CljXKFCOuJ8uxqw1LcA==,
       }
+
+  "@convex-dev/better-auth@0.7.17":
+    resolution:
+      {
+        integrity: sha512-ozV4SgXqsg3lsDjDIbmedjqWxl02YPbSO1+2+0nRcHVdV0eAZ7fAtSWdCc8QrCQlBqynTacgYF02uL5dGvnthA==,
+      }
+    peerDependencies:
+      better-auth: 1.3.7
+      convex: ">=1.25.0 <1.35.0"
+      react: ^18.3.1 || ^19.0.0
+      react-dom: ^18.3.1 || ^19.0.0
 
   "@drizzle-team/brocli@0.10.2":
     resolution:
@@ -1465,24 +1479,25 @@ packages:
       }
     engines: { node: ">=12.0.0" }
 
-  better-auth@1.3.3:
+  better-auth@1.3.7:
     resolution:
       {
-        integrity: sha512-q1aD2nNpGfEI2ckYu+pBjN+23CIRctOpmREkWyJDJdoYW1q9EPs1Xdb+KhFztg2rMmsoUN8I9Xm5mUWMxiWuLw==,
+        integrity: sha512-/1fEyx2SGgJQM5ujozDCh9eJksnVkNU/J7Fk/tG5Y390l8nKbrPvqiFlCjlMM+scR+UABJbQzA6An7HT50LHyQ==,
       }
     peerDependencies:
       react: ^18.0.0 || ^19.0.0
       react-dom: ^18.0.0 || ^19.0.0
+      zod: ^3.25.0 || ^4.0.0
     peerDependenciesMeta:
       react:
         optional: true
       react-dom:
         optional: true
 
-  better-call@1.0.12:
+  better-call@1.0.16:
     resolution:
       {
-        integrity: sha512-ssq5OfB9Ungv2M1WVrRnMBomB0qz1VKuhkY2WxjHaLtlsHoSe9EPolj1xf7xf8LY9o3vfk3Rx6rCWI4oVHeBRg==,
+        integrity: sha512-42dgJ1rOtc0anOoxjXPOWuel/Z/4aeO7EJ2SiXNwvlkySSgjXhNjAjTMWa8DL1nt6EXS3jl3VKC3mPsU/lUgVA==,
       }
 
   boxen@8.0.1:
@@ -1619,6 +1634,38 @@ packages:
         integrity: sha512-2uM9rYjPvyq39NwLRqaiLtWHyDC1FvryJDa2ATTVims5YAS4PupsEQsDvP14FqhFr0P49CYDugi59xaxJlTXRA==,
       }
     engines: { node: ">=20" }
+
+  common-tags@1.8.2:
+    resolution:
+      {
+        integrity: sha512-gk/Z852D2Wtb//0I+kRFNKKE9dIIVirjoqPoA1wJU+XePVXZfGeBpk45+A1rKO4Q43prqWBNY/MiIeRLbPWUaA==,
+      }
+    engines: { node: ">=4.0.0" }
+
+  convex-helpers@0.1.104:
+    resolution:
+      {
+        integrity: sha512-7CYvx7T3K6n+McDTK4ZQaQNNGBzq5aWezpjzsKbOxPXx7oNcTP9wrpef3JxeXWFzkByJv5hRCjseh9B7eNJ7Ig==,
+      }
+    hasBin: true
+    peerDependencies:
+      "@standard-schema/spec": ^1.0.0
+      convex: ^1.24.0
+      hono: ^4.0.5
+      react: ^17.0.2 || ^18.0.0 || ^19.0.0
+      typescript: ^5.5
+      zod: ^3.22.4 || ^4.0.15
+    peerDependenciesMeta:
+      "@standard-schema/spec":
+        optional: true
+      hono:
+        optional: true
+      react:
+        optional: true
+      typescript:
+        optional: true
+      zod:
+        optional: true
 
   convex@1.26.2:
     resolution:
@@ -1923,6 +1970,13 @@ packages:
       }
     engines: { node: ">=12" }
 
+  is-network-error@1.1.0:
+    resolution:
+      {
+        integrity: sha512-tUdRRAnhT+OtCZR/LxZelH/C7QtjtFrTu5tXCA8pl55eTUElUHT+GPYV8MBMBvea/j+NxQqVt3LbWMRir7Gx9g==,
+      }
+    engines: { node: ">=16" }
+
   is-number@7.0.0:
     resolution:
       {
@@ -1964,10 +2018,10 @@ packages:
       }
     engines: { node: ">=18" }
 
-  kysely@0.28.3:
+  kysely@0.28.5:
     resolution:
       {
-        integrity: sha512-svKnkSH72APRdjfVCCOknxaC9Eb3nA2StHG9d5/sKOqRvHRp2Dtf1XwDvc92b4B5v6LV+EAGWXQbZ5jMOvHaDw==,
+        integrity: sha512-rlB0I/c6FBDWPcQoDtkxi9zIvpmnV5xoIalfCMSMCa7nuA6VGA3F54TW9mEgX4DVf10sXAWCF5fDbamI/5ZpKA==,
       }
     engines: { node: ">=20.0.0" }
 
@@ -2682,6 +2736,12 @@ packages:
     engines: { node: ">= 14.6" }
     hasBin: true
 
+  zod@3.25.76:
+    resolution:
+      {
+        integrity: sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ==,
+      }
+
   zod@4.0.10:
     resolution:
       {
@@ -2696,12 +2756,27 @@ snapshots:
       "@jridgewell/gen-mapping": 0.3.12
       "@jridgewell/trace-mapping": 0.3.29
 
-  "@better-auth/utils@0.2.5":
+  "@better-auth/utils@0.2.6":
     dependencies:
-      typescript: 5.8.3
       uncrypto: 0.1.3
 
   "@better-fetch/fetch@1.1.18": {}
+
+  "@convex-dev/better-auth@0.7.17(better-auth@1.3.7(react-dom@19.1.0(react@19.1.0))(react@19.1.0)(zod@4.0.10))(convex@1.26.2(react@19.1.0))(react-dom@19.1.0(react@19.1.0))(react@19.1.0)(typescript@5.8.3)":
+    dependencies:
+      better-auth: 1.3.7(react-dom@19.1.0(react@19.1.0))(react@19.1.0)(zod@4.0.10)
+      common-tags: 1.8.2
+      convex: 1.26.2(react@19.1.0)
+      convex-helpers: 0.1.104(convex@1.26.2(react@19.1.0))(react@19.1.0)(typescript@5.8.3)(zod@3.25.76)
+      is-network-error: 1.1.0
+      react: 19.1.0
+      react-dom: 19.1.0(react@19.1.0)
+      type-fest: 4.41.0
+      zod: 3.25.76
+    transitivePeerDependencies:
+      - "@standard-schema/spec"
+      - hono
+      - typescript
 
   "@drizzle-team/brocli@0.10.2": {}
 
@@ -3282,25 +3357,25 @@ snapshots:
       pvutils: 1.1.3
       tslib: 2.8.1
 
-  better-auth@1.3.3(react-dom@19.1.0(react@19.1.0))(react@19.1.0):
+  better-auth@1.3.7(react-dom@19.1.0(react@19.1.0))(react@19.1.0)(zod@4.0.10):
     dependencies:
-      "@better-auth/utils": 0.2.5
+      "@better-auth/utils": 0.2.6
       "@better-fetch/fetch": 1.1.18
       "@noble/ciphers": 0.6.0
       "@noble/hashes": 1.8.0
       "@simplewebauthn/browser": 13.1.2
       "@simplewebauthn/server": 13.1.2
-      better-call: 1.0.12
+      better-call: 1.0.16
       defu: 6.1.4
       jose: 5.10.0
-      kysely: 0.28.3
+      kysely: 0.28.5
       nanostores: 0.11.4
       zod: 4.0.10
     optionalDependencies:
       react: 19.1.0
       react-dom: 19.1.0(react@19.1.0)
 
-  better-call@1.0.12:
+  better-call@1.0.16:
     dependencies:
       "@better-fetch/fetch": 1.1.18
       rou3: 0.5.1
@@ -3380,6 +3455,16 @@ snapshots:
 
   commander@14.0.0: {}
 
+  common-tags@1.8.2: {}
+
+  convex-helpers@0.1.104(convex@1.26.2(react@19.1.0))(react@19.1.0)(typescript@5.8.3)(zod@3.25.76):
+    dependencies:
+      convex: 1.26.2(react@19.1.0)
+    optionalDependencies:
+      react: 19.1.0
+      typescript: 5.8.3
+      zod: 3.25.76
+
   convex@1.26.2(react@19.1.0):
     dependencies:
       esbuild: 0.25.4
@@ -3413,12 +3498,12 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  drizzle-orm@0.44.3(@neondatabase/serverless@1.0.1)(@types/pg@8.15.4)(bun-types@1.2.21(@types/react@19.1.8))(kysely@0.28.3):
+  drizzle-orm@0.44.3(@neondatabase/serverless@1.0.1)(@types/pg@8.15.4)(bun-types@1.2.21(@types/react@19.1.8))(kysely@0.28.5):
     optionalDependencies:
       "@neondatabase/serverless": 1.0.1
       "@types/pg": 8.15.4
       bun-types: 1.2.21(@types/react@19.1.8)
-      kysely: 0.28.3
+      kysely: 0.28.5
 
   emoji-regex@10.4.0: {}
 
@@ -3549,6 +3634,8 @@ snapshots:
 
   is-interactive@2.0.0: {}
 
+  is-network-error@1.1.0: {}
+
   is-number@7.0.0: {}
 
   is-unicode-supported@1.3.0: {}
@@ -3561,7 +3648,7 @@ snapshots:
 
   jwt-decode@4.0.0: {}
 
-  kysely@0.28.3: {}
+  kysely@0.28.5: {}
 
   lightningcss-darwin-arm64@1.30.1:
     optional: true
@@ -3957,5 +4044,7 @@ snapshots:
   yallist@5.0.0: {}
 
   yaml@2.8.0: {}
+
+  zod@3.25.76: {}
 
   zod@4.0.10: {}
