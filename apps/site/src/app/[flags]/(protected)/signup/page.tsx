@@ -23,7 +23,7 @@ export default function SignUpPage() {
   }
 
   if (session) {
-    redirect("./dashboard");
+    redirect("/dashboard");
   }
 
   const handleEmailSignUp = async (e: React.FormEvent) => {
@@ -38,7 +38,7 @@ export default function SignUpPage() {
         onRequest: () => setLoading(true),
         onSuccess: () => {
           setLoading(false);
-          router.push("./dashboard");
+          router.push("/dashboard");
         },
         onError: (ctx) => {
           setLoading(false);
@@ -52,7 +52,7 @@ export default function SignUpPage() {
     await authClient.signIn.social(
       {
         provider,
-        callbackURL: "./dashboard",
+        callbackURL: "/dashboard",
       },
       {
         onRequest: () => setLoading(true),

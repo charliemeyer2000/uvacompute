@@ -22,7 +22,7 @@ export default function LoginPage() {
   }
 
   if (session) {
-    redirect("./dashboard");
+    redirect("/dashboard");
   }
 
   const handleEmailSignIn = async (e: React.FormEvent) => {
@@ -36,7 +36,7 @@ export default function LoginPage() {
         onRequest: () => setLoading(true),
         onSuccess: () => {
           setLoading(false);
-          router.push("./dashboard");
+          router.push("/dashboard");
         },
         onError: (ctx) => {
           setLoading(false);
@@ -50,7 +50,7 @@ export default function LoginPage() {
     await authClient.signIn.social(
       {
         provider,
-        callbackURL: "./dashboard",
+        callbackURL: "/dashboard",
       },
       {
         onRequest: () => setLoading(true),
