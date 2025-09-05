@@ -1,6 +1,7 @@
 import { convexAdapter } from "@convex-dev/better-auth";
 import { convex } from "@convex-dev/better-auth/plugins";
 import { betterAuth, BetterAuthOptions } from "better-auth";
+import { deviceAuthorization } from "better-auth/plugins";
 import { betterAuthComponent } from "../../convex/auth";
 import { requireEnv } from "@convex-dev/better-auth/utils";
 import { GenericCtx } from "../../convex/_generated/server";
@@ -44,7 +45,15 @@ const createOptions = (ctx: GenericCtx) =>
         enabled: true,
       },
     },
-    plugins: [],
+    plugins: [
+      deviceAuthorization({
+        expiresIn: "30m",
+        interval: "5s",
+        validateClient: async (clientId: string) => {
+          return clientId === "uvacompute-cli";
+        },
+      }),
+    ],
     trustedOrigins: [process.env.SITE_URL as string],
     basePath: "/api/auth",
   }) satisfies BetterAuthOptions;
