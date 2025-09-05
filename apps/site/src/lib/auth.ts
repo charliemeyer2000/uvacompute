@@ -1,45 +1,67 @@
-import { betterAuth as ba } from "better-auth";
-import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import { bearer } from "better-auth/plugins";
-import { db } from "@/lib/db";
-import { createAuthClient } from "better-auth/react";
+import { convexAdapter } from "@convex-dev/better-auth";
+import { convex } from "@convex-dev/better-auth/plugins";
+import { betterAuth, BetterAuthOptions } from "better-auth";
+import { betterAuthComponent } from "../../convex/auth";
+import { requireEnv } from "@convex-dev/better-auth/utils";
+import { GenericCtx } from "../../convex/_generated/server";
 
-export const betterAuth = ba({
-  database: drizzleAdapter(db, {
-    provider: "pg",
-  }),
-  plugins: [bearer()],
-  secret: process.env.BETTER_AUTH_SECRET!,
-  baseURL: process.env.BETTER_AUTH_URL!,
-  emailAndPassword: {
-    enabled: true,
-  },
-  socialProviders: {
-    github: {
-      clientId: process.env.GITHUB_CLIENT_ID!,
-      clientSecret: process.env.GITHUB_CLIENT_SECRET!,
-    },
-    google: {
-      prompt: "select_account+consent",
-      accessType: "offline",
-      clientId: process.env.GOOGLE_CLIENT_ID!,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-    },
-  },
-  trustedOrigins: [
-    "uvacompute.com",
-    "www.uvacompute.com",
-    "preview.uvacompute.com",
-    "www.preview.uvacompute.com",
-    "https://uvacompute.com",
-    "https://www.uvacompute.com",
-    "https://preview.uvacompute.com",
-    "https://www.preview.uvacompute.com",
-    "https://www.preview.uvacompute.com",
-    "http://localhost:3000",
-  ],
-});
+const siteUrl = requireEnv("SITE_URL");
 
-export const authClient = createAuthClient({
-  baseURL: process.env.BETTER_AUTH_URL!,
-});
+const createOptions = (ctx: GenericCtx) =>
+  ({
+    baseURL: siteUrl,
+    database: convexAdapter(ctx, betterAuthComponent),
+    account: {
+      accountLinking: {
+        enabled: true,
+        allowDifferentEmails: true,
+      },
+    },
+    emailAndPassword: {
+      enabled: true,
+      requireEmailVerification: false,
+    },
+    socialProviders: {
+      github: {
+        clientId: process.env.GITHUB_CLIENT_ID as string,
+        clientSecret: process.env.GITHUB_CLIENT_SECRET as string,
+      },
+      google: {
+        clientId: process.env.GOOGLE_CLIENT_ID as string,
+        clientSecret: process.env.GOOGLE_CLIENT_SECRET as string,
+        accessType: "offline",
+        prompt: "select_account consent",
+      },
+    },
+    user: {
+      additionalFields: {
+        foo: {
+          type: "string",
+          required: false,
+        },
+      },
+      deleteUser: {
+        enabled: true,
+      },
+    },
+    plugins: [],
+    trustedOrigins: [process.env.SITE_URL as string],
+    basePath: "/api/auth",
+  }) satisfies BetterAuthOptions;
+
+export const createAuth = (ctx: GenericCtx) => {
+  const options = createOptions(ctx);
+  return betterAuth({
+    ...options,
+    plugins: [
+      ...options.plugins,
+      // Pass in options so plugin schema inference flows through. Only required
+      // for plugins that customize the user or session schema.
+      // See "Some caveats":
+      // https://www.better-auth.com/docs/concepts/session-management#customizing-session-response
+      convex({ options }),
+    ],
+  });
+};
+
+export const authWithoutCtx = createAuth({} as any);
