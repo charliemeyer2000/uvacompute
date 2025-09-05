@@ -175,7 +175,7 @@ export default function LoginPage() {
             <span className="text-sm text-gray-600">
               Don't have an account?{" "}
               <Link
-                href="./signup"
+                href="/signup"
                 className="font-medium text-blue-600 hover:text-blue-500"
               >
                 Sign up
