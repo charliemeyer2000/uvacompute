@@ -3,7 +3,7 @@
 import { useQuery } from "convex/react";
 import { useRouter } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
-import { api } from "../../../convex/_generated/api";
+import { api } from "../../../../../convex/_generated/api";
 import { redirect } from "next/navigation";
 
 export default function DashboardPage() {
@@ -20,12 +20,12 @@ export default function DashboardPage() {
   }
 
   if (!session) {
-    redirect("/login");
+    redirect("../login");
   }
 
   const handleSignOut = async () => {
     await authClient.signOut();
-    router.push("/login");
+    router.push("../login");
   };
 
   return (
@@ -100,7 +100,6 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            {/* Debug info */}
             <div className="mt-8">
               <details className="bg-gray-50 p-4 rounded-lg">
                 <summary className="text-sm font-medium text-gray-700 cursor-pointer">

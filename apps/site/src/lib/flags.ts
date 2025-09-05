@@ -1,8 +1,10 @@
 import { flag } from "flags/next";
 
-export const shouldHideWebsite = flag({
-  key: "shouldHideWebsite",
+export const areWeLive = flag({
+  key: "areWeLive",
   decide() {
-    return true;
+    return false;
   },
 });
+
+export const rootFlags = [areWeLive] as const;
