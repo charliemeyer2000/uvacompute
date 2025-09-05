@@ -1,6 +1,6 @@
 import { Metadata } from "next";
 import "./globals.css";
-import { ConvexClientProvider } from "./providers/convexClientProvider";
+import { ConvexClientProvider } from "../providers/convexClientProvider";
 import { Analytics } from "@vercel/analytics/next";
 import { VercelToolbar } from "@vercel/toolbar/next";
 
