@@ -38,7 +38,7 @@ export default function LoginPage() {
           setLoading(false);
           router.push("/dashboard");
         },
-        onError: (ctx) => {
+        onError: (ctx: { error: Error }) => {
           setLoading(false);
           alert(ctx.error.message);
         },
@@ -55,7 +55,7 @@ export default function LoginPage() {
       {
         onRequest: () => setLoading(true),
         onResponse: () => setLoading(false),
-        onError: (ctx) => {
+        onError: (ctx: { error: Error }) => {
           setLoading(false);
           alert(ctx.error.message);
         },
