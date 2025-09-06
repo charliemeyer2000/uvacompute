@@ -309,22 +309,6 @@ export declare const components: {
                   lastRequest?: null | number;
                 };
                 model: "rateLimit";
-              }
-            | {
-                data: {
-                  clientId?: null | string;
-                  createdAt?: null | number;
-                  deviceCode: string;
-                  expiresAt: number;
-                  lastPolledAt?: null | number;
-                  pollingInterval?: null | number;
-                  scope?: null | string;
-                  status: string;
-                  updatedAt?: null | number;
-                  userCode: string;
-                  userId?: null | string;
-                };
-                model: "deviceCode";
               };
         },
         any
@@ -1445,57 +1429,6 @@ export declare const components: {
                     | Array<number>
                     | null;
                 }>;
-              }
-            | {
-                limit?: number;
-                model: "deviceCode";
-                offset?: number;
-                paginationOpts: {
-                  cursor: string | null;
-                  endCursor?: string | null;
-                  id?: number;
-                  maximumBytesRead?: number;
-                  maximumRowsRead?: number;
-                  numItems: number;
-                };
-                select?: Array<string>;
-                sortBy?: { direction: "asc" | "desc"; field: string };
-                unique?: boolean;
-                update: {
-                  clientId?: null | string;
-                  createdAt?: null | number;
-                  deviceCode?: string;
-                  expiresAt?: number;
-                  lastPolledAt?: null | number;
-                  pollingInterval?: null | number;
-                  scope?: null | string;
-                  status?: string;
-                  updatedAt?: null | number;
-                  userCode?: string;
-                  userId?: null | string;
-                };
-                where?: Array<{
-                  connector?: "AND" | "OR";
-                  field: string;
-                  operator?:
-                    | "lt"
-                    | "lte"
-                    | "gt"
-                    | "gte"
-                    | "eq"
-                    | "in"
-                    | "ne"
-                    | "contains"
-                    | "starts_with"
-                    | "ends_with";
-                  value:
-                    | string
-                    | number
-                    | boolean
-                    | Array<string>
-                    | Array<number>
-                    | null;
-                }>;
               };
         },
         any
@@ -2176,44 +2109,6 @@ export declare const components: {
                   count?: null | number;
                   key?: null | string;
                   lastRequest?: null | number;
-                };
-                where?: Array<{
-                  connector?: "AND" | "OR";
-                  field: string;
-                  operator?:
-                    | "lt"
-                    | "lte"
-                    | "gt"
-                    | "gte"
-                    | "eq"
-                    | "in"
-                    | "ne"
-                    | "contains"
-                    | "starts_with"
-                    | "ends_with";
-                  value:
-                    | string
-                    | number
-                    | boolean
-                    | Array<string>
-                    | Array<number>
-                    | null;
-                }>;
-              }
-            | {
-                model: "deviceCode";
-                update: {
-                  clientId?: null | string;
-                  createdAt?: null | number;
-                  deviceCode?: string;
-                  expiresAt?: number;
-                  lastPolledAt?: null | number;
-                  pollingInterval?: null | number;
-                  scope?: null | string;
-                  status?: string;
-                  updatedAt?: null | number;
-                  userCode?: string;
-                  userId?: null | string;
                 };
                 where?: Array<{
                   connector?: "AND" | "OR";
