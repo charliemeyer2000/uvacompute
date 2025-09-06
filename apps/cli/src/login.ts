@@ -3,70 +3,28 @@ import ora from "ora";
 import boxen from "boxen";
 import chalk from "chalk";
 import open from "open";
-import { writeFileSync, readFileSync, existsSync, mkdirSync } from "fs";
-import { join } from "path";
-import { homedir } from "os";
-
-function getBaseUrl(): string {
-  if (process.env.SITE_URL) {
-    return process.env.SITE_URL;
-  }
-
-  if (process.env.NODE_ENV === "production") {
-    return "https://uvacompute.com";
-  }
-
-  return "http://localhost:3000";
-}
+import { getBaseUrl, saveToken, loadToken } from "./lib/utils";
+import {
+  type DeviceCodeResponse,
+  type TokenResponse,
+  type TokenSuccessResponse,
+} from "./lib/types";
+import {
+  CLIENT_ID,
+  DEFAULT_DEVICE_EXPIRES_SECONDS,
+  DEFAULT_DEVICE_POLL_INTERVAL_SECONDS,
+} from "./lib/constants";
+import { DeviceCodeResponseSchema, TokenResponseSchema } from "./lib/schemas";
 
 const BASE_URL = getBaseUrl();
-const CLIENT_ID = "uvacompute-cli";
 
-const CONFIG_DIR = join(homedir(), ".uvacompute");
-const CONFIG_FILE = join(CONFIG_DIR, "config");
-
-function saveToken(accessToken: string) {
-  try {
-    if (!existsSync(CONFIG_DIR)) {
-      mkdirSync(CONFIG_DIR, { recursive: true });
-    }
-
-    const config = {
-      auth_token: accessToken,
-    };
-
-    writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2));
-    console.log(chalk.gray(`💾 Token saved to ${CONFIG_FILE}`));
-  } catch (error) {
-    console.warn(chalk.yellow("⚠️ Could not save token to disk"));
-  }
-}
-
-function loadToken(): string | null {
-  try {
-    if (!existsSync(CONFIG_FILE)) {
-      return null;
-    }
-
-    const data = JSON.parse(readFileSync(CONFIG_FILE, "utf8"));
-    return data.auth_token || null;
-  } catch (error) {
-    return null;
-  }
-}
-
-export function getStoredToken(): string | null {
-  return loadToken();
-}
-
-async function deviceAuthorization() {
+async function deviceAuthorization(): Promise<TokenSuccessResponse> {
   console.log(chalk.blue("🔐 Starting device authorization flow..."));
   console.log(chalk.gray(`🌐 Connecting to: ${BASE_URL}\n`));
 
   let spinner = ora("Requesting device authorization...").start();
 
   try {
-    // Request device code
     const deviceResponse = await fetch(`${BASE_URL}/api/auth/device/code`, {
       method: "POST",
       headers: {
@@ -84,13 +42,14 @@ async function deviceAuthorization() {
       );
     }
 
-    const deviceData = await deviceResponse.json();
+    const rawDeviceData = await deviceResponse.json();
+    const deviceData = DeviceCodeResponseSchema.parse(rawDeviceData);
     const {
       device_code,
       user_code,
       verification_uri,
       verification_uri_complete,
-      interval = 5,
+      interval = DEFAULT_DEVICE_POLL_INTERVAL_SECONDS,
     } = deviceData;
 
     spinner.succeed("Device authorization requested");
@@ -134,7 +93,7 @@ async function deviceAuthorization() {
     }
 
     spinner = ora(
-      `Waiting for authorization (expires in ${Math.floor((deviceData.expires_in || 1800) / 60)} minutes)...`,
+      `Waiting for authorization (expires in ${Math.floor((deviceData.expires_in || DEFAULT_DEVICE_EXPIRES_SECONDS) / 60)} minutes)...`,
     ).start();
 
     return await pollForToken(device_code, interval, spinner);
@@ -148,7 +107,7 @@ async function pollForToken(
   deviceCode: string,
   interval: number,
   spinner: any,
-): Promise<any> {
+): Promise<TokenSuccessResponse> {
   let pollingInterval = interval;
 
   return new Promise((resolve, reject) => {
@@ -166,12 +125,13 @@ async function pollForToken(
           }),
         });
 
-        const tokenData = await tokenResponse.json();
+        const rawToken = await tokenResponse.json();
+        const tokenData = TokenResponseSchema.parse(rawToken);
 
-        if (tokenResponse.ok && (tokenData as any).access_token) {
+        if (tokenResponse.ok && "access_token" in tokenData) {
           spinner.succeed("✅ Authorization successful!");
 
-          const accessToken = (tokenData as any).access_token;
+          const accessToken = tokenData.access_token;
 
           try {
             const userResponse = await fetch(`${BASE_URL}/api/auth/session`, {
@@ -197,7 +157,7 @@ async function pollForToken(
 
           resolve(tokenData);
           return;
-        } else if (tokenData.error) {
+        } else if ("error" in tokenData) {
           switch (tokenData.error) {
             case "authorization_pending":
               // Continue polling silently
