@@ -20,11 +20,13 @@
 - `--gpus` (number): number of gpus (currently {0, 1})
 - `--gpu-type` (string): gpu type (currently only 5090)
 
-`uva job run [image url]`:
+`uva job run [image url]`: run my docker image.
 
 - `--gpus` (number): number of gpus (currently {0, 1})
 - `--gpu-type` (string): gpu type (currently only 5090)
 - `--env` (key-value pairs): environment variables
+- `--env-file` (string): path to `.env` file (parsing)
+- `--command` (string): run command (aruments passed into entrypoint
 
 ### List
 
@@ -62,6 +64,14 @@
 - `--gpus` (number): number of gpus (currently {0, 1})
 - `--gpu-type` (string): gpu type (currently only 5090)
 - `--max-seconds` (number): for a `job` only, calculate price for max seconds since its charged per second.
+
+### Auth
+
+`uva login`: logs in to uvacompute
+
+- `--force`: if already logged in, forcefully re-logs in.
+
+`uva logout`: logs out
 
 ## Development
 
