@@ -16,6 +16,7 @@ async function incrementCounter(): Promise<void> {
       const body = await response.text();
       throw new Error(`HTTP ${response.status}: ${body}`);
     }
+    console.log(await response.json());
     console.log("✅ Counter incremented.");
   } catch (err: any) {
     console.error("❌ Failed to increment counter:", err?.message || err);

@@ -28,6 +28,8 @@ export const {
     // We'll use onUpdateUser to keep it synced.
     const userId = await ctx.db.insert("users", {
       email: user.email,
+      name: user.name,
+      count: 0,
     });
 
     // This function must return the user id.
