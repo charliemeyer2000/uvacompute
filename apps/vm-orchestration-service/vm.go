@@ -15,13 +15,20 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "Hello, World!")
 }
 
+// should always return a VMCreationResponse
 func createVMHandler(w http.ResponseWriter, r *http.Request) {
 	var req VMCreationRequest
 
 	// Ensure the request body is valid
 	jsonDecoder := json.NewDecoder(r.Body).Decode(&req)
 	if jsonDecoder != nil {
-		http.Error(w, jsonDecoder.Error(), http.StatusBadRequest)
+		resp := VMCreationResponse{
+			Status: VM_CREATION_FAILED_VALIDATION,
+			Msg:    jsonDecoder.Error(),
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(resp)
 		return
 	}
 
@@ -29,12 +36,25 @@ func createVMHandler(w http.ResponseWriter, r *http.Request) {
 	validate := validator.New()
 	validationErr := validate.Struct(&req)
 	if validationErr != nil {
-		http.Error(w, validationErr.Error(), http.StatusBadRequest)
+		resp := VMCreationResponse{
+			Status: VM_CREATION_FAILED_VALIDATION,
+			Msg:    validationErr.Error(),
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(resp)
 		return
 	}
 
 	// Create the VM (right now just mock successful request)
-	w.Write([]byte("VM created successfully"))
+	resp := VMCreationResponse{
+		Status: VM_CREATION_SUCCESS,
+		VMId:   "vm-12345",
+		Msg:    "VM created successfully",
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(resp)
 
 }
 
