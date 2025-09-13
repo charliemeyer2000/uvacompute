@@ -1,4 +1,4 @@
-package main
+package structs
 
 type VMCreationStatus string
 
