@@ -1,41 +1,22 @@
 package main
 
-import (
-	"encoding/json"
-)
-
-type VMCreationStatus int
+type VMCreationStatus string
 
 const (
-	VM_CREATION_SUCCESS VMCreationStatus = iota
-	VM_CREATION_FAILED_VALIDATION
-	VM_CREATION_FAILED_INTERNAL
-	VM_CREATION_FAILED_RESOURCES_UNAVAILABLE
+	VM_CREATION_SUCCESS                      VMCreationStatus = "success"
+	VM_CREATION_FAILED_VALIDATION            VMCreationStatus = "validation_failed"
+	VM_CREATION_FAILED_INTERNAL              VMCreationStatus = "internal_error"
+	VM_CREATION_FAILED_RESOURCES_UNAVAILABLE VMCreationStatus = "resources_unavailable"
 )
 
-var vmCreationStatuses = map[VMCreationStatus]string{
-	VM_CREATION_SUCCESS:                      "VM creation successful",
-	VM_CREATION_FAILED_VALIDATION:            "VM creation failed validation, invalid request body",
-	VM_CREATION_FAILED_INTERNAL:              "VM creation failed internally",
-	VM_CREATION_FAILED_RESOURCES_UNAVAILABLE: "VM creation failed, requested resources are unavailable",
-}
-
-func (s VMCreationStatus) MarshalJSON() ([]byte, error) {
-	return json.Marshal(vmCreationStatuses[s])
-}
-
-func (s VMCreationStatus) String() string {
-	return vmCreationStatuses[s]
-}
-
 type VMCreationRequest struct {
-	Hours   int    `json:"hours" validate:"required,min=1"`
-	Gpus    int    `json:"gpus" validate:"required,min=0,max=1"`
-	GpuType string `json:"gpu-type" validate:"omitempty,oneof=5090"`
-	Cpus    int    `json:"cpus" validate:"omitempty,min=1,max=16"`
-	Ram     int    `json:"ram" validate:"omitempty,min=1,max=64"`
-	Disk    int    `json:"disk" validate:"omitempty,min=64,max=1000"`
-	UserId  string `json:"userId" validate:"required"`
+	Hours   int     `json:"hours" validate:"required,min=1"`
+	Gpus    int     `json:"gpus" validate:"required,min=0,max=1"`
+	GpuType GPUType `json:"gpu-type" validate:"omitempty,oneof='5090'"`
+	Cpus    int     `json:"cpus" validate:"omitempty,min=1,max=16"`
+	Ram     int     `json:"ram" validate:"omitempty,min=1,max=64"`
+	Disk    int     `json:"disk" validate:"omitempty,min=64,max=1000"`
+	UserId  string  `json:"userId" validate:"required"`
 }
 
 type VMCreationResponse struct {
@@ -43,3 +24,9 @@ type VMCreationResponse struct {
 	VMId   string           `json:"vmId,omitempty"`
 	Msg    string           `json:"msg"`
 }
+
+type GPUType string
+
+const (
+	GPU_5090 GPUType = "5090"
+)
