@@ -15,34 +15,47 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "Hello, World!")
 }
 
-// should always return a VMCreationResponse
+func validatePowerOfTwo(w http.ResponseWriter, value int, fieldName string) bool {
+	if value > 0 && (value&(value-1)) != 0 {
+		resp := VMCreationResponse{
+			Status: VM_CREATION_FAILED_VALIDATION,
+			Msg:    fmt.Sprintf("%s must be a power of 2", fieldName),
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(resp)
+		return false
+	}
+	return true
+}
+
+func sendValidationError(w http.ResponseWriter, message string) {
+	resp := VMCreationResponse{
+		Status: VM_CREATION_FAILED_VALIDATION,
+		Msg:    message,
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusBadRequest)
+	json.NewEncoder(w).Encode(resp)
+}
+
 func createVMHandler(w http.ResponseWriter, r *http.Request) {
 	var req VMCreationRequest
 
-	// Ensure the request body is valid
-	jsonDecoder := json.NewDecoder(r.Body).Decode(&req)
-	if jsonDecoder != nil {
-		resp := VMCreationResponse{
-			Status: VM_CREATION_FAILED_VALIDATION,
-			Msg:    jsonDecoder.Error(),
-		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(resp)
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		sendValidationError(w, err.Error())
 		return
 	}
 
-	// Validate the request body against schema
 	validate := validator.New()
-	validationErr := validate.Struct(&req)
-	if validationErr != nil {
-		resp := VMCreationResponse{
-			Status: VM_CREATION_FAILED_VALIDATION,
-			Msg:    validationErr.Error(),
-		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(resp)
+	if err := validate.Struct(&req); err != nil {
+		sendValidationError(w, err.Error())
+		return
+	}
+
+	if !validatePowerOfTwo(w, req.Cpus, "CPUs") ||
+		!validatePowerOfTwo(w, req.Ram, "RAM") ||
+		!validatePowerOfTwo(w, req.Disk, "Disk") {
 		return
 	}
 
