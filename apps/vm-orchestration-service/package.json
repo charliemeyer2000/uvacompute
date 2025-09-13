@@ -1,9 +1,0 @@
-{
-  "name": "vm-orchestration-service",
-  "version": "0.0.1",
-  "scripts": {
-    "run:go": "go run vm.go",
-    "build": "go build -o dist/vm vm.go",
-    "format": "go fmt ./..."
-  }
-}
