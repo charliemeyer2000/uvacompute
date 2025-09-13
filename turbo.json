@@ -69,7 +69,13 @@
       ],
       "inputs": [".env"]
     },
-    "run:go": {
+    "go:run": {
+      "cache": false
+    },
+    "go:build": {
+      "cache": false
+    },
+    "go:fmt": {
       "cache": false
     },
     "test:watch": {
