@@ -1,5 +1,33 @@
 package main
 
+import (
+	"encoding/json"
+)
+
+type VMCreationStatus int
+
+const (
+	VM_CREATION_SUCCESS VMCreationStatus = iota
+	VM_CREATION_FAILED_VALIDATION
+	VM_CREATION_FAILED_INTERNAL
+	VM_CREATION_FAILED_RESOURCES_UNAVAILABLE
+)
+
+var vmCreationStatuses = map[VMCreationStatus]string{
+	VM_CREATION_SUCCESS:                      "VM creation successful",
+	VM_CREATION_FAILED_VALIDATION:            "VM creation failed validation, invalid request body",
+	VM_CREATION_FAILED_INTERNAL:              "VM creation failed internally",
+	VM_CREATION_FAILED_RESOURCES_UNAVAILABLE: "VM creation failed, requested resources are unavailable",
+}
+
+func (s VMCreationStatus) MarshalJSON() ([]byte, error) {
+	return json.Marshal(vmCreationStatuses[s])
+}
+
+func (s VMCreationStatus) String() string {
+	return vmCreationStatuses[s]
+}
+
 type VMCreationRequest struct {
 	Hours   int    `json:"hours" validate:"required,min=1"`
 	Gpus    int    `json:"gpus" validate:"required,min=0,max=1"`
@@ -11,7 +39,7 @@ type VMCreationRequest struct {
 }
 
 type VMCreationResponse struct {
-	Status int    `json:"status"`
-	VMId   string `json:"vmId"`
-	Msg    string `json:"msg"`
+	Status VMCreationStatus `json:"status"`
+	VMId   string           `json:"vmId,omitempty"`
+	Msg    string           `json:"msg"`
 }
