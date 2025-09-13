@@ -1,7 +1,10 @@
-.PHONY: run build fmt clean test
+.PHONY: run dev build fmt clean test
 
 run:
 	go run .
+
+dev:
+	air
 
 build:
 	mkdir -p dist
