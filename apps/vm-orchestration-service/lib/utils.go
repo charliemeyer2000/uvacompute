@@ -8,7 +8,8 @@ import (
 	"vm-orchestration-service/structs"
 )
 
-func ValidatePowerOfTwo(w http.ResponseWriter, value int, fieldName string) bool {
+// Ensures that some value is a power of 2. If not, it responds with a 400 error.
+func ValidatePowerOfTwoOrError(w http.ResponseWriter, value int, fieldName string) bool {
 	if value > 0 && (value&(value-1)) != 0 {
 		resp := structs.VMCreationResponse{
 			Status: structs.VM_CREATION_FAILED_VALIDATION,
