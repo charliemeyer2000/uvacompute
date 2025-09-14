@@ -15,7 +15,7 @@ import (
 func NewApp() *structs.App {
 	app := &structs.App{
 		VMManager: *structs.NewVMManager(),
-		Router: chi.NewRouter(),
+		Router:    chi.NewRouter(),
 	}
 	return app
 }
