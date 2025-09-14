@@ -8,22 +8,13 @@ import (
 	"vm-orchestration-service/handlers"
 	"vm-orchestration-service/structs"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 )
-
-func NewApp() *structs.App {
-	app := &structs.App{
-		VMManager: *structs.NewVMManager(),
-		Router:    chi.NewRouter(),
-	}
-	return app
-}
 
 func main() {
 	fmt.Println("Starting server...")
 
-	app := NewApp()
+	app := structs.NewApp()
 
 	app.Router.Use(middleware.Logger)
 	app.Router.Use(middleware.RequestID)

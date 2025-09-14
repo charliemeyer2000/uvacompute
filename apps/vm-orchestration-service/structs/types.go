@@ -1,13 +1,10 @@
 package structs
 
 import (
-	"net/http"
-	"sync"
 	"time"
-
-	"github.com/go-chi/chi/v5"
 )
 
+// VM Creation Status
 type VMCreationStatus string
 
 const (
@@ -17,6 +14,7 @@ const (
 	VM_CREATION_FAILED_RESOURCES_UNAVAILABLE VMCreationStatus = "resources_unavailable"
 )
 
+// VM Runtime Status
 type VMStatus string
 
 const (
@@ -28,6 +26,14 @@ const (
 	VM_STATUS_UPDATING VMStatus = "updating" // vm is being updated (extended, update config)
 )
 
+// GPU Types
+type GPUType string
+
+const (
+	GPU_5090 GPUType = "5090"
+)
+
+// Request/Response Types
 type VMCreationRequest struct {
 	Hours   int      `json:"hours" validate:"required,min=1"`
 	Gpus    int      `json:"gpus" validate:"required,min=0,max=1"`
@@ -44,12 +50,7 @@ type VMCreationResponse struct {
 	Msg    string           `json:"msg"`
 }
 
-type GPUType string
-
-const (
-	GPU_5090 GPUType = "5090"
-)
-
+// VM State
 type VMState struct {
 	Id     string `json:"id"`
 	UserId string `json:"userId"`
@@ -63,33 +64,4 @@ type VMState struct {
 	GPUType GPUType `json:"gpu-type"`
 
 	Status VMStatus `json:"status"`
-}
-
-type VMManager struct {
-	mu    sync.Mutex
-	vmMap map[string]VMState
-}
-
-func NewVMManager() *VMManager {
-	return &VMManager{
-		mu:    sync.Mutex{},
-		vmMap: make(map[string]VMState),
-	}
-}
-
-type App struct {
-	VMManager VMManager
-	Router    *chi.Mux
-}
-
-func NewApp() *App {
-	return &App{
-		VMManager: *NewVMManager(),
-		Router:    chi.NewRouter(),
-	}
-}
-
-func (app *App) SetupRoutes(rootHandler, createVMHandler http.HandlerFunc) {
-	app.Router.Get("/", rootHandler)
-	app.Router.Post("/vms", createVMHandler)
 }
