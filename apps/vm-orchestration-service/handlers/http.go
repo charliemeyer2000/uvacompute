@@ -20,7 +20,8 @@ func RootHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "Hello, World!!!!")
 }
 
-func CreateVMHandler(w http.ResponseWriter, r *http.Request) {
+// CreateVMHandler now takes the App instance to access VMManager
+func CreateVMHandler(app *structs.App, w http.ResponseWriter, r *http.Request) {
 	var req structs.VMCreationRequest
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -40,7 +41,7 @@ func CreateVMHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// For optional fields, set defaults if not provided.
+	// Set defaults for optional fields
 	if req.Cpus == nil {
 		req.Cpus = &defaultCpus
 	}
@@ -54,10 +55,38 @@ func CreateVMHandler(w http.ResponseWriter, r *http.Request) {
 		req.GpuType = &defaultGpuType
 	}
 
-	// Create the VM (right now just mock successful request)
+	// Create VM in VMManager first
+	vmId, err := app.VMManager.CreateVM(req)
+	if err != nil {
+		resp := structs.VMCreationResponse{
+			Status: structs.VM_CREATION_FAILED_INTERNAL,
+			Msg:    err.Error(),
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(resp)
+		return
+	}
+
+	// Now call Incus to actually create the VM
+	_, incusErr := lib.CreateIncusVM(req)
+	if incusErr != nil {
+		// Remove from VMManager if Incus fails
+		app.VMManager.DeleteVM(vmId)
+		resp := structs.VMCreationResponse{
+			Status: structs.VM_CREATION_FAILED_INTERNAL,
+			Msg:    incusErr.Error(),
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(resp)
+		return
+	}
+
+	// Success response
 	resp := structs.VMCreationResponse{
 		Status: structs.VM_CREATION_SUCCESS,
-		VMId:   "vm-12345",
+		VMId:   vmId,
 		Msg:    "VM created successfully",
 	}
 	w.Header().Set("Content-Type", "application/json")
