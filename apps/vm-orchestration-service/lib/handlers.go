@@ -10,7 +10,6 @@ import (
 	"github.com/go-playground/validator/v10"
 )
 
-
 var defaultCpus = 1                   // 1vCPU
 var defaultRam = 1                    // 1GB ram
 var defaultDisk = 64                  // 64GB disk
