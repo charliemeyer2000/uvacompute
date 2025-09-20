@@ -1,69 +1,61 @@
-import {
-  AuthFunctions,
-  BetterAuth,
-  PublicAuthFunctions,
-} from "@convex-dev/better-auth";
-import { api, components, internal } from "./_generated/api";
-import { query } from "./_generated/server";
-import { DataModel, Id } from "./_generated/dataModel";
+import { components } from "./_generated/api";
+import { query, QueryCtx } from "./_generated/server";
+import authSchema from "./betterAuth/schema.js";
+import { createClient, GenericCtx } from "@convex-dev/better-auth";
+import { convex } from "@convex-dev/better-auth/plugins";
+import { betterAuth, BetterAuthOptions } from "better-auth";
+import { deviceAuthorization } from "better-auth/plugins";
+import { DataModel } from "./_generated/dataModel";
 
-const authFunctions: AuthFunctions = internal.auth;
-const publicAuthFunctions: PublicAuthFunctions = api.auth;
+const siteUrl = process.env.SITE_URL || "http://localhost:3000";
 
-export const betterAuthComponent = new BetterAuth(components.betterAuth, {
-  authFunctions,
-  publicAuthFunctions,
-  verbose: false,
-});
-
-export const {
-  createUser,
-  deleteUser,
-  updateUser,
-  createSession,
-  isAuthenticated,
-} = betterAuthComponent.createAuthFunctions<DataModel>({
-  onCreateUser: async (ctx, user) => {
-    // Example: copy the user's email to the application users table.
-    // We'll use onUpdateUser to keep it synced.
-    const userId = await ctx.db.insert("users", {
-      email: user.email,
-      name: user.name,
-      count: 0,
-    });
-
-    // This function must return the user id.
-    return userId;
+export const betterAuthComponent = createClient<DataModel, typeof authSchema>(
+  components.betterAuth,
+  {
+    local: {
+      schema: authSchema,
+    },
+    verbose: false,
   },
-  onDeleteUser: async (ctx, userId) => {
-    // Delete the user's data if the user is being deleted
-    await ctx.db.delete(userId as Id<"users">);
-  },
-  onUpdateUser: async (ctx, user) => {
-    // Keep the user's email synced
-    const userId = user.userId as Id<"users">;
-    await ctx.db.patch(userId, {
-      email: user.email,
-    });
-  },
-});
+);
 
-// Example function for getting the current user
-// Feel free to edit, omit, etc.
+export const createAuth = (
+  ctx: GenericCtx<DataModel>,
+  { optionsOnly } = { optionsOnly: false },
+) =>
+  betterAuth({
+    baseURL: siteUrl,
+    logger: {
+      disabled: optionsOnly,
+    },
+    database: betterAuthComponent.adapter(ctx),
+    emailAndPassword: {
+      enabled: true,
+      requireEmailVerification: false, // Simplified for now
+    },
+    plugins: [
+      deviceAuthorization({
+        expiresIn: "30m",
+        interval: "5s",
+        validateClient: async (clientId: string) => {
+          return clientId === "uvacompute-cli";
+        },
+      }),
+      convex(),
+    ],
+  } satisfies BetterAuthOptions);
+
+export const safeGetUser = async (ctx: QueryCtx) => {
+  return betterAuthComponent.safeGetAuthUser(ctx);
+};
+
+export const getUser = async (ctx: QueryCtx) => {
+  return betterAuthComponent.getAuthUser(ctx);
+};
+
 export const getCurrentUser = query({
   args: {},
   handler: async (ctx) => {
-    // Get user data from Better Auth - email, name, image, etc.
-    const userMetadata = await betterAuthComponent.getAuthUser(ctx);
-    if (!userMetadata) {
-      return null;
-    }
-    // Get user data from your application's database (skip this if you have no
-    // fields in your users table schema)
-    const user = await ctx.db.get(userMetadata.userId as Id<"users">);
-    return {
-      ...user,
-      ...userMetadata,
-    };
+    return safeGetUser(ctx);
   },
 });
