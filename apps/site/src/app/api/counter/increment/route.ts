@@ -9,7 +9,10 @@ export async function POST(request: NextRequest) {
   });
 
   if (error || !session) {
-    return NextResponse.json({ error: error.message }, { status: 401 });
+    return NextResponse.json(
+      { error: error?.message || "Unauthorized" },
+      { status: 401 },
+    );
   }
 
   return NextResponse.json({
