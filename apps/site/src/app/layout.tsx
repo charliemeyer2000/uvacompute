@@ -2,6 +2,7 @@ import { Metadata } from "next";
 import "./globals.css";
 import { ConvexClientProvider } from "../providers/convexClientProvider";
 import { Analytics } from "@vercel/analytics/next";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import { VercelToolbar } from "@vercel/toolbar/next";
 
 export const metadata: Metadata = {
@@ -20,6 +21,7 @@ export default function RootLayout({
       <body>
         <ConvexClientProvider>{children}</ConvexClientProvider>
         <Analytics />
+        <SpeedInsights />
         {shouldInjectToolbar && <VercelToolbar />}
       </body>
     </html>
