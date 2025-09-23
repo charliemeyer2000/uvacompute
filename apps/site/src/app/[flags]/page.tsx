@@ -39,18 +39,16 @@ export default async function Page({
         </p>
 
         <h2 className="text-xl font-semibold mt-8 mb-4 text-black">access</h2>
-        {live && (
-          <div className="mt-8">
-            uvacompute is currently in closed beta. email{" "}
-            <Link
-              href="mailto:charlie@charliemeyer.xyz"
-              className="text-orange-accent no-underline hover:underline"
-            >
-              charlie@charliemeyer.xyz
-            </Link>{" "}
-            if you want to be an early adopter.
-          </div>
-        )}
+        <div className="mt-8">
+          uvacompute is currently in closed beta. email{" "}
+          <Link
+            href="mailto:charlie@charliemeyer.xyz"
+            className="text-orange-accent no-underline hover:underline"
+          >
+            charlie@charliemeyer.xyz
+          </Link>{" "}
+          if you want to be an early adopter.
+        </div>
 
         <footer className="mt-16 pt-4 border-t border-gray-200">
           <h3 className="text-base font-normal text-footer-grey italic">
