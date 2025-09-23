@@ -4,10 +4,18 @@ import { ConvexClientProvider } from "../providers/convexClientProvider";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { VercelToolbar } from "@vercel/toolbar/next";
+import { IBM_Plex_Mono } from "next/font/google";
+
+const ibmPlexMono = IBM_Plex_Mono({
+  subsets: ["latin"],
+  weight: ["100", "200", "300", "400", "500", "600", "700"],
+  variable: "--font-ibm-plex-mono",
+});
 
 export const metadata: Metadata = {
   title: "uvacompute",
-  description: "your friendly local compute cluster",
+  description:
+    "High-performance cloud compute with NVIDIA RTX 5090 GPUs, flexible VMs, and serverless containers",
 };
 
 export default function RootLayout({
@@ -18,7 +26,7 @@ export default function RootLayout({
   const shouldInjectToolbar = !process.env.VERCEL;
   return (
     <html lang="en">
-      <body>
+      <body className={`${ibmPlexMono.variable} font-mono`}>
         <ConvexClientProvider>{children}</ConvexClientProvider>
         <Analytics />
         <SpeedInsights />
