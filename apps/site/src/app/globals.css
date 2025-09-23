@@ -1,1 +1,6 @@
 @import "tailwindcss";
+
+:root {
+  --orange-accent: 255 119 0;
+  --footer-grey: 118 118 118;
+}
