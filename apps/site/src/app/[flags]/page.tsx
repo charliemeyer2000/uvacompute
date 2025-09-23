@@ -43,7 +43,7 @@ export default async function Page({
           uvacompute is currently in closed beta. email{" "}
           <Link
             href="mailto:charlie@charliemeyer.xyz"
-            className="text-orange-accent no-underline hover:underline"
+            className="text-orange-accent underline"
           >
             charlie@charliemeyer.xyz
           </Link>{" "}
@@ -56,7 +56,12 @@ export default async function Page({
           </h3>
           <ul className="list-none mb-2 space-y-1 italic">
             <li>
-              <a href="mailto:charlie@charliemeyer.xyz">Contact us</a>
+              <a
+                href="mailto:charlie@charliemeyer.xyz"
+                className="text-orange-accent underline"
+              >
+                Contact us
+              </a>
             </li>
           </ul>
         </footer>
