@@ -1,6 +1,12 @@
 @import "tailwindcss";
 
 :root {
-  --orange-accent: 255 119 0;
-  --footer-grey: 118 118 118;
+  --orange-accent: #ff7700;
+  --footer-grey: #767676;
+}
+
+@theme inline {
+  --color-orange-accent: var(--orange-accent);
+  --color-footer-grey: var(--footer-grey);
+  --font-mono: var(--font-ibm-plex-mono);
 }
