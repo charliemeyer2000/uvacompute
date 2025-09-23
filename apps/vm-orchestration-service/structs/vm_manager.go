@@ -2,7 +2,7 @@ package structs
 
 import (
 	"errors"
-	"fmt"
+	"github.com/google/uuid"
 	"sync"
 	"time"
 )
@@ -30,7 +30,7 @@ func (vm *VMManager) CreateVM(req VMCreationRequest) (string, error) {
 	}
 
 	// 2. Generate VM ID (Incus integration will be called from handler)
-	vmId := fmt.Sprintf("vm-%s-%d", req.UserId[:8], req.Hours)
+	vmId := uuid.New().String()
 
 	// 3. Update internal state
 	vm.vmMap[vmId] = VMState{

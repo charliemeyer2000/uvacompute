@@ -1,9 +1,8 @@
 package structs
 
 import (
-	"net/http"
-
 	"github.com/go-chi/chi/v5"
+	"net/http"
 )
 
 type App struct {

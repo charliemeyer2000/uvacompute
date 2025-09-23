@@ -2,8 +2,11 @@ package lib
 
 import (
 	"errors"
-	"fmt"
+	"os/exec"
+	"strconv"
 	"vm-orchestration-service/structs"
+
+	"github.com/google/uuid"
 )
 
 // CreateIncusVM handles low-level Incus VM creation
@@ -17,8 +20,46 @@ func CreateIncusVM(req structs.VMCreationRequest) (string, error) {
 	// 4. Configure Tailscale funnel for port forwarding
 	// 5. Return the VM ID from Incus
 
-	// For now, return a mock VM ID
-	vmId := fmt.Sprintf("vm-%s-%d", req.UserId[:8], req.Hours)
+	// create incus vm
+	vmId := uuid.New().String()
+
+	_, err := exec.Command("incus", "launch", "images:ubuntu/24.04", vmId, "--vm", "-c", "limits.cpu="+strconv.Itoa(*req.Cpus), "-c", "limits.memory="+strconv.Itoa(*req.Ram)+"GiB", "-c", "-d", "root,size="+strconv.Itoa(*req.Disk)+"GiB", "-d", "root,io.bus=nvme", "-d", "gpu0,gpu,gputype=physical").Output()
+	if err != nil {
+		switch e := err.(type) {
+		case *exec.Error:
+			return "", errors.New(e.Error())
+		case *exec.ExitError:
+			return "", errors.New(string(e.Stderr))
+		default:
+			return "", errors.New(e.Error())
+
+		}
+	}
+
+	if req.Gpus > 0 {
+		_, err = exec.Command("incus", "config", "set", vmId, "nvidia.runtime=true", "nvidia.driver.capabilities=all").Output()
+		if err != nil {
+			switch e := err.(type) {
+			case *exec.Error:
+				return "", errors.New(e.Error())
+			case *exec.ExitError:
+				return "", errors.New(string(e.Stderr))
+			default:
+				return "", errors.New(e.Error())
+			}
+		}
+		_, err = exec.Command("incus", "config", "device", "add", vmId, "gpu0", "gpu", "gputype=physical").Output()
+		if err != nil {
+			switch e := err.(type) {
+			case *exec.Error:
+				return "", errors.New(e.Error())
+			case *exec.ExitError:
+				return "", errors.New(string(e.Stderr))
+			default:
+				return "", errors.New(e.Error())
+			}
+		}
+	}
 
 	// Simulate the "not implemented" error for now
 	return vmId, errors.New("Incus integration not implemented yet")
