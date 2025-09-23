@@ -52,7 +52,7 @@ export default async function Page({
 
         <footer className="mt-16 pt-4 border-t border-gray-200">
           <h3 className="text-base font-normal text-footer-grey italic">
-            All content © 2025 UVA Compute LLC
+            all content © 2025 the university of virginia compute company
           </h3>
           <ul className="list-none mb-2 space-y-1 italic">
             <li>
@@ -60,7 +60,7 @@ export default async function Page({
                 href="mailto:charlie@charliemeyer.xyz"
                 className="text-orange-accent underline"
               >
-                Contact us
+                contact us
               </a>
             </li>
           </ul>
