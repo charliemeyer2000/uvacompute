@@ -2,6 +2,8 @@ name: Build and Deploy CLI
 on:
   push:
     branches: [main]
+    paths:
+      - "apps/cli/**"
 
 permissions:
   contents: write
