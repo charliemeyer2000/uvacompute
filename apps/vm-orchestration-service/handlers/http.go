@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"vm-orchestration-service/lib"
 	"vm-orchestration-service/structs"
@@ -38,18 +39,26 @@ func CreateVMHandler(app *structs.App, w http.ResponseWriter, r *http.Request) {
 	// add vm to manager
 	vmId, err := app.VMManager.CreateVM(req)
 	if err != nil {
+		status := structs.VM_CREATION_FAILED_INTERNAL
+		statusCode := http.StatusInternalServerError
+
+		if strings.Contains(err.Error(), "insufficient") {
+			status = structs.VM_CREATION_FAILED_RESOURCES_UNAVAILABLE
+			statusCode = http.StatusConflict
+		}
+
 		resp := structs.VMCreationResponse{
-			Status: structs.VM_CREATION_FAILED_INTERNAL,
+			Status: status,
 			Msg:    err.Error(),
 		}
 		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusInternalServerError)
+		w.WriteHeader(statusCode)
 		json.NewEncoder(w).Encode(resp)
 		return
 	}
 
 	// actually create vm in incus
-	_, incusErr := lib.CreateIncusVM(req)
+	_, incusErr := lib.CreateIncusVM(vmId, req)
 	if incusErr != nil {
 
 		// remove vm from manager

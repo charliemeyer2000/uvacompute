@@ -1,8 +1,9 @@
 package structs
 
 import (
-	"github.com/go-chi/chi/v5"
 	"net/http"
+
+	"github.com/go-chi/chi/v5"
 )
 
 type App struct {
@@ -11,8 +12,16 @@ type App struct {
 }
 
 func NewApp() *App {
+	// TODO: test, what's the max we can allow others to use while we can still use
+	// the workstation?
+	limits := VMResourceLimits{
+		MaxCpus: 16, // in vCPUs
+		MaxRam:  64, // in GiB
+		MaxGpus: 1,  // in GPUs
+	}
+
 	return &App{
-		VMManager: NewVMManager(),
+		VMManager: NewVMManager(limits),
 		Router:    chi.NewRouter(),
 	}
 }
