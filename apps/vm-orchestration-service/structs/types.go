@@ -4,7 +4,6 @@ import (
 	"time"
 )
 
-// VM Creation Status
 type VMCreationStatus string
 
 const (
@@ -14,7 +13,6 @@ const (
 	VM_CREATION_FAILED_RESOURCES_UNAVAILABLE VMCreationStatus = "resources_unavailable"
 )
 
-// VM Runtime Status
 type VMStatus string
 
 const (
@@ -26,22 +24,42 @@ const (
 	VM_STATUS_UPDATING VMStatus = "updating" // vm is being updated (extended, update config)
 )
 
-// GPU Types
 type GPUType string
 
 const (
 	GPU_5090 GPUType = "5090"
 )
 
-// Request/Response Types
 type VMCreationRequest struct {
 	Hours   int      `json:"hours" validate:"required,min=1"`
-	Gpus    int      `json:"gpus" validate:"required,min=0,max=1"`
-	GpuType *GPUType `json:"gpu-type" validate:"omitempty,oneof='5090'"`
-	Cpus    *int     `json:"cpus" validate:"omitempty,min=1,max=16"`    // in vCPUs
-	Ram     *int     `json:"ram" validate:"omitempty,min=1,max=64"`     // in GB
-	Disk    *int     `json:"disk" validate:"omitempty,min=64,max=1000"` // in GB
 	UserId  string   `json:"userId" validate:"required"`
+	Cpus    *int     `json:"cpus,omitempty" validate:"omitempty,min=1,max=16"`
+	Ram     *int     `json:"ram,omitempty" validate:"omitempty,min=1,max=64"`
+	Disk    *int     `json:"disk,omitempty" validate:"omitempty,min=64,max=1000"`
+	Gpus    *int     `json:"gpus,omitempty" validate:"omitempty,min=0,max=1"`
+	GpuType *GPUType `json:"gpu-type,omitempty" validate:"omitempty,oneof='5090'"`
+}
+
+const (
+	DefaultCpus    = 1
+	DefaultRam     = 8
+	DefaultDisk    = 64
+	DefaultGpus    = 0
+	DefaultGpuType = GPU_5090
+)
+
+func IntOrDefault(ptr *int, defaultVal int) int {
+	if ptr == nil {
+		return defaultVal
+	}
+	return *ptr
+}
+
+func GpuTypeOrDefault(ptr *GPUType, defaultVal GPUType) GPUType {
+	if ptr == nil {
+		return defaultVal
+	}
+	return *ptr
 }
 
 type VMCreationResponse struct {
@@ -50,7 +68,6 @@ type VMCreationResponse struct {
 	Msg    string           `json:"msg"`
 }
 
-// VM State
 type VMState struct {
 	Id     string `json:"id"`
 	UserId string `json:"userId"`
