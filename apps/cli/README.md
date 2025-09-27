@@ -6,6 +6,8 @@
 
 `uva vm create`: create vm
 
+`uva vm create -h 1 --gpus 1 my-vm`
+
 - `--hours / -h` (number): hours to buy for
 - `--days / -d` (number): days to buy for
 - `--name / n` (string): name of your vm
