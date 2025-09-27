@@ -1,11 +1,13 @@
 package structs
 
 import (
+	"strings"
 	"testing"
 )
 
 func TestCreateVM(t *testing.T) {
-	vm := NewVMManager()
+	limits := VMResourceLimits{MaxCpus: 16, MaxRam: 64, MaxGpus: 1}
+	vm := NewVMManager(limits)
 
 	req := VMCreationRequest{
 		Hours:  24,
@@ -36,7 +38,8 @@ func TestCreateVM(t *testing.T) {
 }
 
 func TestCreateVMWithCustomValues(t *testing.T) {
-	vm := NewVMManager()
+	limits := VMResourceLimits{MaxCpus: 16, MaxRam: 64, MaxGpus: 1}
+	vm := NewVMManager(limits)
 
 	cpus := 4
 	ram := 16
@@ -67,7 +70,8 @@ func TestCreateVMWithCustomValues(t *testing.T) {
 }
 
 func TestDeleteVM(t *testing.T) {
-	vm := NewVMManager()
+	limits := VMResourceLimits{MaxCpus: 16, MaxRam: 64, MaxGpus: 1}
+	vm := NewVMManager(limits)
 
 	req := VMCreationRequest{
 		Hours:  24,
@@ -84,5 +88,31 @@ func TestDeleteVM(t *testing.T) {
 
 	if len(vm.vmMap) != 0 {
 		t.Fatal("VM should be deleted")
+	}
+}
+
+func TestResourceLimits(t *testing.T) {
+	limits := VMResourceLimits{MaxCpus: 4, MaxRam: 8, MaxGpus: 1}
+	vm := NewVMManager(limits)
+
+	cpus := 4
+	req := VMCreationRequest{
+		Hours:  24,
+		UserId: "test-user",
+		Cpus:   &cpus,
+	}
+
+	_, err := vm.CreateVM(req)
+	if err != nil {
+		t.Fatalf("First VM should succeed: %v", err)
+	}
+
+	_, err = vm.CreateVM(req)
+	if err == nil {
+		t.Fatal("Second VM should fail due to resource limits")
+	}
+
+	if !strings.Contains(err.Error(), "insufficient CPU resources") {
+		t.Fatalf("Expected CPU resource limit error, got: %v", err)
 	}
 }
