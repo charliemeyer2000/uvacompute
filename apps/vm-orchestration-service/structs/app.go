@@ -11,7 +11,7 @@ type App struct {
 	Router    *chi.Mux
 }
 
-func NewApp() *App {
+func NewApp(incusProvider IncusProvider) *App {
 	// TODO: test, what's the max we can allow others to use while we can still use
 	// the workstation?
 	limits := VMResourceLimits{
@@ -21,7 +21,7 @@ func NewApp() *App {
 	}
 
 	return &App{
-		VMManager: NewVMManager(limits),
+		VMManager: NewVMManager(limits, incusProvider),
 		Router:    chi.NewRouter(),
 	}
 }

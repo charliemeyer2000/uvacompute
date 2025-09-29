@@ -30,13 +30,16 @@ func CreateVMHandler(app *structs.App, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !lib.ValidatePowerOfTwoOrError(w, structs.IntOrDefault(req.Cpus, structs.DefaultCpus), "CPUs") ||
-		!lib.ValidatePowerOfTwoOrError(w, structs.IntOrDefault(req.Ram, structs.DefaultRam), "RAM") ||
-		!lib.ValidatePowerOfTwoOrError(w, structs.IntOrDefault(req.Disk, structs.DefaultDisk), "Disk") {
+	cpus := structs.IntOrDefault(req.Cpus, structs.DefaultCpus)
+	ram := structs.IntOrDefault(req.Ram, structs.DefaultRam)
+	disk := structs.IntOrDefault(req.Disk, structs.DefaultDisk)
+
+	if !lib.ValidatePowerOfTwoOrError(w, cpus, "CPUs") ||
+		!lib.ValidatePowerOfTwoOrError(w, ram, "RAM") ||
+		!lib.ValidatePowerOfTwoOrError(w, disk, "Disk") {
 		return
 	}
 
-	// add vm to manager
 	vmId, err := app.VMManager.CreateVM(req)
 	if err != nil {
 		status := structs.VM_CREATION_FAILED_INTERNAL
@@ -57,27 +60,39 @@ func CreateVMHandler(app *structs.App, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// actually create vm in incus
-	_, incusErr := lib.CreateIncusVM(vmId, req)
-	if incusErr != nil {
+	resp := structs.VMCreationResponse{
+		Status: structs.VM_CREATION_SUCCESS,
+		VMId:   vmId,
+		Msg:    "VM created successfully",
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(resp)
+}
 
-		// remove vm from manager
-		app.VMManager.DeleteVM(vmId)
+func DeleteVMHandler(app *structs.App, w http.ResponseWriter, r *http.Request, vmId string) {
+	err := app.VMManager.DeleteVM(vmId)
+	if err != nil {
+		status := structs.VM_CREATION_FAILED_INTERNAL
+		statusCode := http.StatusInternalServerError
+
+		if strings.Contains(err.Error(), "not found") {
+			statusCode = http.StatusNotFound
+		}
+
 		resp := structs.VMCreationResponse{
-			Status: structs.VM_CREATION_FAILED_INTERNAL,
-			Msg:    incusErr.Error(),
+			Status: status,
+			Msg:    err.Error(),
 		}
 		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusInternalServerError)
+		w.WriteHeader(statusCode)
 		json.NewEncoder(w).Encode(resp)
-
 		return
 	}
 
 	resp := structs.VMCreationResponse{
 		Status: structs.VM_CREATION_SUCCESS,
-		VMId:   vmId,
-		Msg:    "VM created successfully",
+		Msg:    "VM deleted successfully",
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
