@@ -5,9 +5,20 @@ import (
 	"testing"
 )
 
+type MockIncusProvider struct{}
+
+func (m *MockIncusProvider) CreateVM(vmId string, cpus, ram, disk, gpus int) error {
+	return nil
+}
+
+func (m *MockIncusProvider) DestroyVM(vmId string) error {
+	return nil
+}
+
 func TestCreateVM(t *testing.T) {
 	limits := VMResourceLimits{MaxCpus: 16, MaxRam: 64, MaxGpus: 1}
-	vm := NewVMManager(limits)
+	mockIncus := &MockIncusProvider{}
+	vm := NewVMManager(limits, mockIncus)
 
 	req := VMCreationRequest{
 		Hours:  24,
@@ -39,7 +50,8 @@ func TestCreateVM(t *testing.T) {
 
 func TestCreateVMWithCustomValues(t *testing.T) {
 	limits := VMResourceLimits{MaxCpus: 16, MaxRam: 64, MaxGpus: 1}
-	vm := NewVMManager(limits)
+	mockIncus := &MockIncusProvider{}
+	vm := NewVMManager(limits, mockIncus)
 
 	cpus := 4
 	ram := 16
@@ -71,7 +83,8 @@ func TestCreateVMWithCustomValues(t *testing.T) {
 
 func TestDeleteVM(t *testing.T) {
 	limits := VMResourceLimits{MaxCpus: 16, MaxRam: 64, MaxGpus: 1}
-	vm := NewVMManager(limits)
+	mockIncus := &MockIncusProvider{}
+	vm := NewVMManager(limits, mockIncus)
 
 	req := VMCreationRequest{
 		Hours:  24,
@@ -84,7 +97,10 @@ func TestDeleteVM(t *testing.T) {
 		t.Fatal("VM should exist before delete")
 	}
 
-	vm.DeleteVM(vmId)
+	err := vm.DeleteVM(vmId)
+	if err != nil {
+		t.Fatalf("DeleteVM failed: %v", err)
+	}
 
 	if len(vm.vmMap) != 0 {
 		t.Fatal("VM should be deleted")
@@ -93,7 +109,8 @@ func TestDeleteVM(t *testing.T) {
 
 func TestResourceLimits(t *testing.T) {
 	limits := VMResourceLimits{MaxCpus: 4, MaxRam: 8, MaxGpus: 1}
-	vm := NewVMManager(limits)
+	mockIncus := &MockIncusProvider{}
+	vm := NewVMManager(limits, mockIncus)
 
 	cpus := 4
 	req := VMCreationRequest{
