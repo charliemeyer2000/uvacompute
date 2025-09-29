@@ -14,17 +14,25 @@ type VMResourceLimits struct {
 	MaxGpus int
 }
 
-type VMManager struct {
-	mu     sync.Mutex
-	vmMap  map[string]VMState
-	limits VMResourceLimits
+type IncusProvider interface {
+	CreateVM(vmId string, cpus, ram, disk, gpus int) error
+	DestroyVM(vmId string) error
+	GetVMStatus(vmId string) (string, error)
 }
 
-func NewVMManager(limits VMResourceLimits) *VMManager {
+type VMManager struct {
+	mu            sync.Mutex
+	vmMap         map[string]VMState
+	limits        VMResourceLimits
+	incusProvider IncusProvider
+}
+
+func NewVMManager(limits VMResourceLimits, incusProvider IncusProvider) *VMManager {
 	return &VMManager{
-		mu:     sync.Mutex{},
-		vmMap:  make(map[string]VMState),
-		limits: limits,
+		mu:            sync.Mutex{},
+		vmMap:         make(map[string]VMState),
+		limits:        limits,
+		incusProvider: incusProvider,
 	}
 }
 
@@ -37,26 +45,71 @@ func (vm *VMManager) CreateVM(req VMCreationRequest) (string, error) {
 	}
 
 	vmId := uuid.New().String()
+
+	cpus := IntOrDefault(req.Cpus, DefaultCpus)
+	ram := IntOrDefault(req.Ram, DefaultRam)
+	disk := IntOrDefault(req.Disk, DefaultDisk)
+	gpus := IntOrDefault(req.Gpus, DefaultGpus)
+	gpuType := GpuTypeOrDefault(req.GpuType, DefaultGpuType)
+
 	vm.vmMap[vmId] = VMState{
 		Id:           vmId,
 		UserId:       req.UserId,
 		CreationTime: time.Now(),
-		Cpus:         IntOrDefault(req.Cpus, DefaultCpus),
-		Ram:          IntOrDefault(req.Ram, DefaultRam),
-		Disk:         IntOrDefault(req.Disk, DefaultDisk),
-		Gpus:         IntOrDefault(req.Gpus, DefaultGpus),
-		GPUType:      GpuTypeOrDefault(req.GpuType, DefaultGpuType),
+		Cpus:         cpus,
+		Ram:          ram,
+		Disk:         disk,
+		Gpus:         gpus,
+		GPUType:      gpuType,
 		Status:       VM_STATUS_CREATING,
 	}
+
+	incusErr := vm.incusProvider.CreateVM(vmId, cpus, ram, disk, gpus)
+
+	if incusErr != nil {
+		delete(vm.vmMap, vmId)
+		return "", fmt.Errorf("failed to create VM in Incus: %w", incusErr)
+	}
+
+	vmState := vm.vmMap[vmId]
+	vmState.Status = VM_STATUS_RUNNING
+	vm.vmMap[vmId] = vmState
 
 	return vmId, nil
 }
 
-func (vm *VMManager) DeleteVM(vmId string) {
+func (vm *VMManager) GetVM(vmId string) (VMState, bool) {
 	vm.mu.Lock()
 	defer vm.mu.Unlock()
 
+	vmState, exists := vm.vmMap[vmId]
+	return vmState, exists
+}
+
+func (vm *VMManager) DeleteVM(vmId string) error {
+	vm.mu.Lock()
+	defer vm.mu.Unlock()
+
+	_, exists := vm.vmMap[vmId]
+	if !exists {
+		return fmt.Errorf("VM %s not found", vmId)
+	}
+
+	vmState := vm.vmMap[vmId]
+	vmState.Status = VM_STATUS_DELETING
+	vm.vmMap[vmId] = vmState
+
+	incusErr := vm.incusProvider.DestroyVM(vmId)
+	if incusErr != nil {
+		return fmt.Errorf("failed to destroy VM in Incus: %w", incusErr)
+	}
+
+	vmState = vm.vmMap[vmId]
+	vmState.Status = VM_STATUS_DELETED
+	vm.vmMap[vmId] = vmState
+
 	delete(vm.vmMap, vmId)
+	return nil
 }
 
 func (vm *VMManager) checkResourceAvailability(req VMCreationRequest) error {

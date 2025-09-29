@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"vm-orchestration-service/handlers"
+	"vm-orchestration-service/lib"
 	"vm-orchestration-service/structs"
 
 	"github.com/go-chi/chi/v5/middleware"
@@ -14,7 +15,8 @@ import (
 func main() {
 	fmt.Println("Starting server...")
 
-	app := structs.NewApp()
+	incusAdapter := lib.NewIncusAdapter()
+	app := structs.NewApp(incusAdapter)
 
 	app.Router.Use(middleware.Logger)
 	app.Router.Use(middleware.RequestID)
