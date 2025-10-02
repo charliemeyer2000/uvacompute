@@ -26,9 +26,13 @@ func NewApp(incusProvider IncusProvider) *App {
 	}
 }
 
-func (app *App) SetupRoutes(rootHandler http.HandlerFunc, createVMHandler func(*App, http.ResponseWriter, *http.Request)) {
+func (app *App) SetupRoutes(rootHandler http.HandlerFunc, createVMHandler func(*App, http.ResponseWriter, *http.Request), deleteVMHandler func(*App, http.ResponseWriter, *http.Request, string)) {
 	app.Router.Get("/", rootHandler)
 	app.Router.Post("/vms", func(w http.ResponseWriter, r *http.Request) {
 		createVMHandler(app, w, r)
+	})
+	app.Router.Delete("/vms/{vmId}", func(w http.ResponseWriter, r *http.Request) {
+		vmId := chi.URLParam(r, "vmId")
+		deleteVMHandler(app, w, r, vmId)
 	})
 }

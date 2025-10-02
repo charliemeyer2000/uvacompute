@@ -24,11 +24,12 @@ func main() {
 	app.Router.Use(middleware.Recoverer)
 	app.Router.Use(middleware.Timeout(60 * time.Second))
 
-	app.SetupRoutes(handlers.RootHandler, handlers.CreateVMHandler)
+	app.SetupRoutes(handlers.RootHandler, handlers.CreateVMHandler, handlers.DeleteVMHandler)
 
 	fmt.Println("Routes configured, starting server on :8080")
 	err := http.ListenAndServe(":8080", app.Router)
 	if err != nil {
 		fmt.Printf("Server failed to start: %v\n", err)
+		panic(err)
 	}
 }
