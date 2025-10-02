@@ -45,7 +45,14 @@ func createIncusVM(vmId string, cpus int, ram int, disk int, gpus int) error {
 		_, err = exec.Command(cmd[0], cmd[1:]...).Output()
 		if err != nil {
 			_ = destroyIncusVM(vmId)
-			return err
+			switch e := err.(type) {
+			case *exec.Error:
+				return errors.New(e.Error())
+			case *exec.ExitError:
+				return errors.New(string(e.Stderr))
+			default:
+				return errors.New(e.Error())
+			}
 		}
 	}
 
@@ -53,7 +60,14 @@ func createIncusVM(vmId string, cpus int, ram int, disk int, gpus int) error {
 	_, err = exec.Command(cmd[0], cmd[1:]...).Output()
 	if err != nil {
 		_ = destroyIncusVM(vmId)
-		return err
+		switch e := err.(type) {
+		case *exec.Error:
+			return errors.New(e.Error())
+		case *exec.ExitError:
+			return errors.New(string(e.Stderr))
+		default:
+			return errors.New(e.Error())
+		}
 	}
 
 	return nil
