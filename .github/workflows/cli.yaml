@@ -47,7 +47,7 @@ jobs:
         shell: bash
 
       - name: Build binary
-        run: NODE_ENV=production bun build --compile ./index.ts --outfile ./dist/${{ matrix.artifact }}
+        run: bun build --compile --define process.env.NODE_ENV='"production"' ./index.ts --outfile ./dist/${{ matrix.artifact }}
         working-directory: ./apps/cli
 
       - name: Upload artifact
