@@ -1,0 +1,57 @@
+name: Build and Test Go Service
+
+env:
+  GO_VERSION: 1.24.6
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/vm-orchestration-service/**"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: $GO_VERSION
+
+      - name: Install dependencies
+        run: make deps
+        working-directory: ./apps/vm-orchestration-service
+
+      - name: Build
+        run: make build
+        working-directory: ./apps/vm-orchestration-service
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: vm-orchestration-service
+          path: ./apps/vm-orchestration-service/dist/vm
+
+  test:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: $GO_VERSION
+
+      - name: Install dependencies
+        run: make deps
+        working-directory: ./apps/vm-orchestration-service
+
+      - name: Test
+        run: make test
+        working-directory: ./apps/vm-orchestration-service
