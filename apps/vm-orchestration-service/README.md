@@ -2,6 +2,17 @@
 
 This is the Go service that we use to actually orchestrate provisioning VMs using Incus.
 
+## Todo
+
+- no vm state persistence (e.g. if service dies, need to recover vms? or should it just die?)
+- vm lifecycle:
+  - need to track expiration
+  - support extension
+- support all apis
+- incus vm creation non-atomic operations
+- ssh connection
+- mutex for creation rather than for all operations
+
 ## API Structure
 
 The API we are supporting right now is just for VM management (k8s, docker images coming later).
