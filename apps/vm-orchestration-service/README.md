@@ -11,6 +11,7 @@ This is the Go service that we use to actually orchestrate provisioning VMs usin
 - support all apis
 - incus vm creation non-atomic operations
 - ssh connection
+- mutex for creation rather than for all operations
 
 ## API Structure
 
