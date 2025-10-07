@@ -19,6 +19,10 @@ func (m *MockIncusProvider) GetVMStatus(vmId string) (string, error) {
 	return "", nil
 }
 
+func (m *MockIncusProvider) GetVMInfo(vmId string) (*IncusVMInfo, error) {
+	return &IncusVMInfo{}, nil
+}
+
 func TestCreateVM(t *testing.T) {
 	limits := VMResourceLimits{MaxCpus: 16, MaxRam: 64, MaxGpus: 1}
 	mockIncus := &MockIncusProvider{}

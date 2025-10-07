@@ -1,4 +1,4 @@
-.PHONY: run dev build fmt clean test
+.PHONY: run dev build fmt fmty clean test deps
 
 run:
 	go run .
@@ -12,6 +12,9 @@ build:
 
 fmt:
 	go fmt ./...
+
+fmty:
+	gofmt -w .
 
 clean:
 	rm -rf dist/
