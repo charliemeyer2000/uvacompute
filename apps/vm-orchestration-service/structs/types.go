@@ -4,6 +4,12 @@ import (
 	"time"
 )
 
+type VMStatusResponse struct {
+	Status VMStatus     `json:"status"`
+	Msg    string       `json:"msg"`
+	Info   *IncusVMInfo `json:"info,omitempty"`
+}
+
 type VMCreationStatus string
 
 const (
@@ -16,12 +22,13 @@ const (
 type VMStatus string
 
 const (
-	VM_STATUS_CREATING VMStatus = "creating" // creating vm
-	VM_STATUS_FAILED   VMStatus = "failed"   // vm failed to create
-	VM_STATUS_RUNNING  VMStatus = "running"  // vm is running
-	VM_STATUS_DELETING VMStatus = "deleting" // vm is being deleted
-	VM_STATUS_DELETED  VMStatus = "deleted"  // vm is deleted (likely will never be used)
-	VM_STATUS_UPDATING VMStatus = "updating" // vm is being updated (extended, update config)
+	VM_STATUS_NOT_FOUND VMStatus = "not_found" // vm not found
+	VM_STATUS_CREATING  VMStatus = "creating"  // creating vm
+	VM_STATUS_FAILED    VMStatus = "failed"    // vm failed to create
+	VM_STATUS_RUNNING   VMStatus = "running"   // vm is running
+	VM_STATUS_DELETING  VMStatus = "deleting"  // vm is being deleted
+	VM_STATUS_DELETED   VMStatus = "deleted"   // vm is deleted (likely will never be used)
+	VM_STATUS_UPDATING  VMStatus = "updating"  // vm is being updated (extended, update config)
 )
 
 type GPUType string
