@@ -18,6 +18,7 @@ type IncusProvider interface {
 	CreateVM(vmId string, cpus, ram, disk, gpus int) error
 	DestroyVM(vmId string) error
 	GetVMStatus(vmId string) (string, error)
+	GetVMInfo(vmId string) (*IncusVMInfo, error)
 }
 
 type VMManager struct {

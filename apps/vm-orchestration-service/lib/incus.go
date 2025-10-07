@@ -4,6 +4,8 @@ import (
 	"errors"
 	"os/exec"
 	"strconv"
+
+	"vm-orchestration-service/structs"
 )
 
 type IncusAdapter struct{}
@@ -22,6 +24,10 @@ func (i *IncusAdapter) DestroyVM(vmId string) error {
 
 func (i *IncusAdapter) GetVMStatus(vmId string) (string, error) {
 	return getIncusVMStatus(vmId)
+}
+
+func (i *IncusAdapter) GetVMInfo(vmId string) (*structs.IncusVMInfo, error) {
+	return getIncusVMInfo(vmId)
 }
 
 func createIncusVM(vmId string, cpus int, ram int, disk int, gpus int) error {
@@ -106,4 +112,26 @@ func getIncusVMStatus(vmId string) (string, error) {
 	}
 
 	return string(out), nil
+}
+
+func getIncusVMInfo(vmId string) (*structs.IncusVMInfo, error) {
+	cmd := []string{"incus", "info", vmId, "--resources"}
+	out, err := exec.Command(cmd[0], cmd[1:]...).Output()
+	if err != nil {
+		switch e := err.(type) {
+		case *exec.Error:
+			return nil, errors.New(e.Error())
+		case *exec.ExitError:
+			return nil, errors.New(string(e.Stderr))
+		default:
+			return nil, errors.New(e.Error())
+		}
+	}
+
+	info, parseErr := structs.ParseIncusInfo(out)
+	if parseErr != nil {
+		return nil, parseErr
+	}
+
+	return info, nil
 }

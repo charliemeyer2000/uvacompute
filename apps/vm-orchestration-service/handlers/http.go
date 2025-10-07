@@ -16,6 +16,22 @@ func RootHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "Hello, World!!!!")
 }
 
+func GetVMStatusHandler(app *structs.App, w http.ResponseWriter, r *http.Request, vmId string) {
+	_, exists := app.VMManager.GetVM(vmId)
+	if !exists {
+		resp := structs.VMStatusResponse{
+			Status: structs.VM_STATUS_NOT_FOUND,
+			Msg:    "VM not found",
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(resp)
+		return
+	}
+
+	// TODO: finish implementing this
+}
+
 func CreateVMHandler(app *structs.App, w http.ResponseWriter, r *http.Request) {
 	var req structs.VMCreationRequest
 
