@@ -40,6 +40,7 @@ const (
 type VMCreationRequest struct {
 	Hours   int      `json:"hours" validate:"required,min=1"`
 	UserId  string   `json:"userId" validate:"required"`
+	Name    *string  `json:"name,omitempty" validate:"omitempty,max=255"`
 	Cpus    *int     `json:"cpus,omitempty" validate:"omitempty,min=1,max=16"`
 	Ram     *int     `json:"ram,omitempty" validate:"omitempty,min=1,max=64"`
 	Disk    *int     `json:"disk,omitempty" validate:"omitempty,min=64,max=1000"`
@@ -69,6 +70,13 @@ func GpuTypeOrDefault(ptr *GPUType, defaultVal GPUType) GPUType {
 	return *ptr
 }
 
+func StringOrDefault(ptr *string, defaultVal string) string {
+	if ptr == nil {
+		return defaultVal
+	}
+	return *ptr
+}
+
 type VMCreationResponse struct {
 	Status VMCreationStatus `json:"status"`
 	VMId   string           `json:"vmId,omitempty"`
@@ -77,6 +85,7 @@ type VMCreationResponse struct {
 
 type VMState struct {
 	Id     string `json:"id"`
+	Name   string `json:"name,omitempty"`
 	UserId string `json:"userId"`
 
 	CreationTime time.Time `json:"creationTime"`
