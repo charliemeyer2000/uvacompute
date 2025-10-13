@@ -63,8 +63,10 @@ func TestCreateVMWithCustomValues(t *testing.T) {
 
 	cpus := 4
 	ram := 16
+	name := "test-vm-2"
 	req := VMCreationRequest{
 		Hours:  12,
+		Name:   &name,
 		UserId: "test-user-2",
 		Cpus:   &cpus,
 		Ram:    &ram,
@@ -86,6 +88,10 @@ func TestCreateVMWithCustomValues(t *testing.T) {
 
 	if vmState.Disk != DefaultDisk {
 		t.Fatalf("expected default disk %d, got %d", DefaultDisk, vmState.Disk)
+	}
+
+	if vmState.Name != "test-vm-2" {
+		t.Fatalf("expected name 'test-vm-2', got %s", vmState.Name)
 	}
 }
 
