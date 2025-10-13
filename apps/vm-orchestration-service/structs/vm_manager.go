@@ -52,9 +52,11 @@ func (vm *VMManager) CreateVM(req VMCreationRequest) (string, error) {
 	disk := IntOrDefault(req.Disk, DefaultDisk)
 	gpus := IntOrDefault(req.Gpus, DefaultGpus)
 	gpuType := GpuTypeOrDefault(req.GpuType, DefaultGpuType)
+	name := StringOrDefault(req.Name, "")
 
 	vm.vmMap[vmId] = VMState{
 		Id:           vmId,
+		Name:         name,
 		UserId:       req.UserId,
 		CreationTime: time.Now(),
 		Cpus:         cpus,
