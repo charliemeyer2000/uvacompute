@@ -2,6 +2,28 @@
 
 This is the Go service that we use to actually orchestrate provisioning VMs using Incus.
 
+## Quick Start
+
+```bash
+# Development, with hot reload
+make dev
+
+# Production
+sudo make install
+sudo make uninstall
+```
+
+## Commands
+
+```bash
+# logs
+journalctl -u vm-orchestration -f
+systemctl status vm-orchestration
+systemctl restart vm-orchestration
+# check funnell status
+tailscale funnel status
+```
+
 ## Todo
 
 - no vm state persistence (e.g. if service dies, need to recover vms? or should it just die?)
