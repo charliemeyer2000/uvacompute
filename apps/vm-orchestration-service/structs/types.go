@@ -17,6 +17,9 @@ const (
 	VM_CREATION_FAILED_VALIDATION            VMCreationStatus = "validation_failed"
 	VM_CREATION_FAILED_INTERNAL              VMCreationStatus = "internal_error"
 	VM_CREATION_FAILED_RESOURCES_UNAVAILABLE VMCreationStatus = "resources_unavailable"
+	VM_DELETION_SUCCESS                      VMCreationStatus = "deletion_success"
+	VM_DELETION_FAILED_INTERNAL              VMCreationStatus = "deletion_failed_internal"
+	VM_DELETION_FAILED_NOT_FOUND             VMCreationStatus = "deletion_failed_not_found"
 )
 
 type VMStatus string
@@ -78,6 +81,12 @@ func StringOrDefault(ptr *string, defaultVal string) string {
 }
 
 type VMCreationResponse struct {
+	Status VMCreationStatus `json:"status"`
+	VMId   string           `json:"vmId,omitempty"`
+	Msg    string           `json:"msg"`
+}
+
+type VMDeletionResponse struct {
 	Status VMCreationStatus `json:"status"`
 	VMId   string           `json:"vmId,omitempty"`
 	Msg    string           `json:"msg"`
