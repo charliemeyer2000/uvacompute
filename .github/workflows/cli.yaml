@@ -1,7 +1,6 @@
 name: Build and Deploy CLI
 on:
   push:
-    branches: [main]
     paths:
       - "apps/cli/**"
 
@@ -51,6 +50,8 @@ jobs:
         working-directory: ./apps/cli
 
       - name: Upload artifact
+        if: github.ref == 'refs/heads/main'
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact }}
