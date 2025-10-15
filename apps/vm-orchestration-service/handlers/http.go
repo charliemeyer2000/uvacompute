@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"strings"
 
@@ -13,7 +12,8 @@ import (
 )
 
 func RootHandler(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintf(w, "Hello, World!!!!")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{"status": "alive"})
 }
 
 func GetVMStatusHandler(app *structs.App, w http.ResponseWriter, r *http.Request, vmId string) {

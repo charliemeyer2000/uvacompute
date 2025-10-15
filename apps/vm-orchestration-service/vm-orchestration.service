@@ -1,0 +1,18 @@
+[Unit]
+Description=VM Orchestration Service
+After=network-online.target tailscaled.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/vm-orchestration
+ExecStartPost=-/usr/bin/tailscale funnel --bg --https=443 8080
+ExecStopPost=-/usr/bin/tailscale funnel --https=443 off
+Restart=always
+RestartSec=10s
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
+
