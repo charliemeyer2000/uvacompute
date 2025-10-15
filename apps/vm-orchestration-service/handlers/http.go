@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"strings"
 
@@ -13,7 +12,9 @@ import (
 )
 
 func RootHandler(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintf(w, "Hello, World!!!!")
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{"status": "alive"})
 }
 
 func GetVMStatusHandler(app *structs.App, w http.ResponseWriter, r *http.Request, vmId string) {
@@ -89,16 +90,17 @@ func CreateVMHandler(app *structs.App, w http.ResponseWriter, r *http.Request) {
 func DeleteVMHandler(app *structs.App, w http.ResponseWriter, r *http.Request, vmId string) {
 	err := app.VMManager.DeleteVM(vmId)
 	if err != nil {
-		status := structs.VM_CREATION_FAILED_INTERNAL
+		status := structs.VM_DELETION_FAILED_INTERNAL
 		statusCode := http.StatusInternalServerError
 
 		if strings.Contains(err.Error(), "not found") {
 			statusCode = http.StatusNotFound
 		}
 
-		resp := structs.VMCreationResponse{
+		resp := structs.VMDeletionResponse{
 			Status: status,
-			Msg:    err.Error(),
+			VMId:   vmId,
+			Msg:    "VM deletion failed",
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(statusCode)
@@ -106,9 +108,10 @@ func DeleteVMHandler(app *structs.App, w http.ResponseWriter, r *http.Request, v
 		return
 	}
 
-	resp := structs.VMCreationResponse{
-		Status: structs.VM_CREATION_SUCCESS,
-		Msg:    "VM deleted successfully",
+	resp := structs.VMDeletionResponse{
+		Status: structs.VM_DELETION_SUCCESS,
+		VMId:   vmId,
+		Msg:    "VM deletion successful",
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
