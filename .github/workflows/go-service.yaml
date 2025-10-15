@@ -5,7 +5,6 @@ env:
 
 on:
   push:
-    branches: [main]
     paths:
       - "apps/vm-orchestration-service/**"
 
@@ -32,6 +31,8 @@ jobs:
         working-directory: ./apps/vm-orchestration-service
 
       - name: Upload artifact
+        if: github.ref == 'refs/heads/main'
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: vm-orchestration-service
