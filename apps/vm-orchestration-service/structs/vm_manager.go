@@ -78,6 +78,14 @@ func (vm *VMManager) CreateVM(req VMCreationRequest) (string, error) {
 	vmState.Status = VM_STATUS_RUNNING
 	vm.vmMap[vmId] = vmState
 
+	time.AfterFunc(time.Duration(req.Hours*3600*int(time.Second)), func() {
+		vm.incusProvider.DestroyVM(vmId)
+		vmState := vm.vmMap[vmId]
+		vmState.Status = VM_STATUS_DELETED
+		vm.vmMap[vmId] = vmState
+		delete(vm.vmMap, vmId)
+	})
+
 	return vmId, nil
 }
 
