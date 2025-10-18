@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
 import { api } from "../../../../../convex/_generated/api";
 import { redirect } from "next/navigation";
+import VMList from "@/components/VMList";
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -126,6 +127,11 @@ export default function DashboardPage() {
               </details>
             </div>
           </div>
+        </div>
+
+        {/* VM List Section */}
+        <div className="mt-8">
+          <VMList />
         </div>
       </div>
     </div>
