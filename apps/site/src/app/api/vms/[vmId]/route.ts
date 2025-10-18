@@ -8,7 +8,7 @@ const VM_ORCHESTRATION_SERVICE_URL =
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { vmId: string } },
+  { params }: { params: Promise<{ vmId: string }> },
 ) {
   const { data: session, error } = await authClient.getSession({
     fetchOptions: {
@@ -24,7 +24,7 @@ export async function DELETE(
   }
 
   try {
-    const { vmId } = params;
+    const { vmId } = await params;
 
     const vm = await fetchQuery(api.vms.getByVmId, { vmId });
     if (!vm) {
@@ -91,7 +91,7 @@ export async function DELETE(
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { vmId: string } },
+  { params }: { params: Promise<{ vmId: string }> },
 ) {
   const { data: session, error } = await authClient.getSession({
     fetchOptions: {
@@ -107,7 +107,7 @@ export async function GET(
   }
 
   try {
-    const { vmId } = params;
+    const { vmId } = await params;
 
     const vm = await fetchQuery(api.vms.getByVmId, { vmId });
     if (!vm) {
