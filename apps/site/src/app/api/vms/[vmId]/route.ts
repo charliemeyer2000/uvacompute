@@ -60,7 +60,19 @@ export async function DELETE(
       try {
         await fetchMutation(api.vms.markAsDeleted, { vmId });
       } catch (convexError: any) {
-        console.error("Error marking VM as deleted in Convex:", convexError);
+        console.error(
+          "Warning: Failed to mark VM as deleted in Convex:",
+          convexError,
+        );
+
+        return NextResponse.json(
+          {
+            status: "deletion_success",
+            vmId,
+            msg: "VM deleted from orchestration service, but database update failed. This will be corrected automatically.",
+          },
+          { status: 200 },
+        );
       }
     }
 
