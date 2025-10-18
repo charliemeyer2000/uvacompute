@@ -47,10 +47,43 @@ async function createVM(options: {
     };
 
     if (options.name) requestBody.name = options.name;
-    if (options.cpus) requestBody.cpus = parseInt(options.cpus, 10);
-    if (options.ram) requestBody.ram = parseInt(options.ram, 10);
-    if (options.disk) requestBody.disk = parseInt(options.disk, 10);
-    if (options.gpus) requestBody.gpus = parseInt(options.gpus, 10);
+
+    if (options.cpus) {
+      const cpus = parseInt(options.cpus, 10);
+      if (isNaN(cpus)) {
+        spinner.fail("Invalid CPUs value. Must be a number.");
+        process.exit(1);
+      }
+      requestBody.cpus = cpus;
+    }
+
+    if (options.ram) {
+      const ram = parseInt(options.ram, 10);
+      if (isNaN(ram)) {
+        spinner.fail("Invalid RAM value. Must be a number.");
+        process.exit(1);
+      }
+      requestBody.ram = ram;
+    }
+
+    if (options.disk) {
+      const disk = parseInt(options.disk, 10);
+      if (isNaN(disk)) {
+        spinner.fail("Invalid disk value. Must be a number.");
+        process.exit(1);
+      }
+      requestBody.disk = disk;
+    }
+
+    if (options.gpus) {
+      const gpus = parseInt(options.gpus, 10);
+      if (isNaN(gpus)) {
+        spinner.fail("Invalid GPUs value. Must be a number.");
+        process.exit(1);
+      }
+      requestBody.gpus = gpus;
+    }
+
     if (options.gpuType) requestBody["gpu-type"] = options.gpuType as "5090";
 
     // Make API request to Next.js backend

@@ -97,6 +97,27 @@ export async function GET(
   try {
     const { vmId } = params;
 
+    const vm = await fetchQuery(api.vms.getByVmId, { vmId });
+    if (!vm) {
+      return NextResponse.json(
+        {
+          status: "not_found",
+          msg: "VM not found",
+        },
+        { status: 404 },
+      );
+    }
+
+    if (vm.userId !== session.user.id) {
+      return NextResponse.json(
+        {
+          status: "not_found",
+          msg: "VM not found",
+        },
+        { status: 404 },
+      );
+    }
+
     const response = await fetch(
       `${VM_ORCHESTRATION_SERVICE_URL}/vms/${vmId}`,
       {
