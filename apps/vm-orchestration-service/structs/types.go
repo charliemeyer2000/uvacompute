@@ -1,6 +1,8 @@
 package structs
 
 import (
+	"os"
+	"strings"
 	"time"
 )
 
@@ -78,6 +80,11 @@ func StringOrDefault(ptr *string, defaultVal string) string {
 		return defaultVal
 	}
 	return *ptr
+}
+
+func IsDevelopment() bool {
+	env := strings.ToLower(strings.TrimSpace(os.Getenv("ENV")))
+	return env == "development" || env == "dev"
 }
 
 type VMCreationResponse struct {
