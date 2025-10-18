@@ -2,6 +2,7 @@ package structs
 
 import (
 	"fmt"
+	"log"
 	"sync"
 	"time"
 
@@ -67,11 +68,14 @@ func (vm *VMManager) CreateVM(req VMCreationRequest) (string, error) {
 		Status:       VM_STATUS_CREATING,
 	}
 
-	incusErr := vm.incusProvider.CreateVM(vmId, cpus, ram, disk, gpus)
-
-	if incusErr != nil {
-		delete(vm.vmMap, vmId)
-		return "", fmt.Errorf("failed to create VM in Incus: %w", incusErr)
+	if !IsDevelopment() {
+		incusErr := vm.incusProvider.CreateVM(vmId, cpus, ram, disk, gpus)
+		if incusErr != nil {
+			delete(vm.vmMap, vmId)
+			return "", fmt.Errorf("failed to create VM in Incus: %w", incusErr)
+		}
+	} else {
+		log.Printf("[DEV MODE] Skipping Incus VM creation for VM %s", vmId)
 	}
 
 	vmState := vm.vmMap[vmId]
@@ -79,7 +83,11 @@ func (vm *VMManager) CreateVM(req VMCreationRequest) (string, error) {
 	vm.vmMap[vmId] = vmState
 
 	time.AfterFunc(time.Duration(req.Hours*3600*int(time.Second)), func() {
-		vm.incusProvider.DestroyVM(vmId)
+		if !IsDevelopment() {
+			vm.incusProvider.DestroyVM(vmId)
+		} else {
+			log.Printf("[DEV MODE] Skipping Incus VM deletion for VM %s", vmId)
+		}
 		vmState := vm.vmMap[vmId]
 		vmState.Status = VM_STATUS_DELETED
 		vm.vmMap[vmId] = vmState
@@ -110,9 +118,14 @@ func (vm *VMManager) DeleteVM(vmId string) error {
 	vmState.Status = VM_STATUS_DELETING
 	vm.vmMap[vmId] = vmState
 
-	incusErr := vm.incusProvider.DestroyVM(vmId)
-	if incusErr != nil {
-		return fmt.Errorf("failed to destroy VM in Incus: %w", incusErr)
+	// Only destroy actual Incus VM in production
+	if !IsDevelopment() {
+		incusErr := vm.incusProvider.DestroyVM(vmId)
+		if incusErr != nil {
+			return fmt.Errorf("failed to destroy VM in Incus: %w", incusErr)
+		}
+	} else {
+		log.Printf("[DEV MODE] Skipping Incus VM deletion for VM %s", vmId)
 	}
 
 	vmState = vm.vmMap[vmId]

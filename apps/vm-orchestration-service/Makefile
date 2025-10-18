@@ -4,7 +4,7 @@ run:
 	go run .
 
 dev:
-	air
+	ENV=development air && tailscale funnel --bg --https=443 8080
 
 build:
 	mkdir -p dist

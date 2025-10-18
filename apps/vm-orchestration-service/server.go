@@ -15,6 +15,12 @@ import (
 func main() {
 	fmt.Println("Starting server...")
 
+	if structs.IsDevelopment() {
+		fmt.Println("Running in development (no incus calls)")
+	} else {
+		fmt.Println("Running in production.")
+	}
+
 	incusAdapter := lib.NewIncusAdapter()
 	app := structs.NewApp(incusAdapter)
 
