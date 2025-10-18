@@ -1,6 +1,6 @@
 import { Command } from "commander";
 import { registerLoginCommand } from "./src/login";
-import { registerIncrementCommand } from "./src/increment";
+import { registerVMCommands } from "./src/vm";
 
 function main() {
   const program = new Command();
@@ -10,7 +10,7 @@ function main() {
     .name("uva")
     .description("uvacompute cli");
   registerLoginCommand(program);
-  registerIncrementCommand(program);
+  registerVMCommands(program);
   program.parse(process.argv);
 }
 

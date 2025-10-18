@@ -1,8 +1,19 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## UVA Compute Site
+
+This Next.js application serves as the web frontend and API gateway for UVA Compute, handling authentication and proxying requests to the VM orchestration service.
+
 ## Getting Started
 
-First, run the development server:
+First, set up your environment variables. Create a `.env.local` file:
+
+```bash
+# VM Orchestration Service URL
+VM_ORCHESTRATION_SERVICE_URL=http://localhost:8080
+```
+
+Then, run the development server:
 
 ```bash
 npm run dev
@@ -16,7 +27,32 @@ bun dev
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## API Routes
+
+### VM Management
+
+- `POST /api/vms` - Create a new VM
+  - Requires authentication
+  - Automatically adds userId from session
+  - Proxies to VM orchestration service
+
+- `DELETE /api/vms/[vmId]` - Delete a VM
+  - Requires authentication
+  - Proxies to VM orchestration service
+
+- `GET /api/vms/[vmId]` - Get VM status
+  - Requires authentication
+  - Proxies to VM orchestration service
+
+### Authentication
+
+- `POST /api/auth/device/code` - Start device authorization flow
+- `POST /api/auth/device/token` - Poll for device token
+- `GET /api/auth/session` - Get current session
+
+## Environment Variables
+
+- `VM_ORCHESTRATION_SERVICE_URL` - URL of the VM orchestration service (default: http://localhost:8080)
 
 ## Learn More
 
