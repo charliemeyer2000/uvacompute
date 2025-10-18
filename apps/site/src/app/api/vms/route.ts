@@ -58,7 +58,30 @@ export async function POST(request: NextRequest) {
           vmId: data.vmId,
         });
       } catch (convexError: any) {
-        console.error("Error saving VM to Convex:", convexError);
+        console.error(
+          "Critical error: Failed to save VM to Convex:",
+          convexError,
+        );
+
+        try {
+          await fetch(`${VM_ORCHESTRATION_SERVICE_URL}/vms/${data.vmId}`, {
+            method: "DELETE",
+          });
+          console.log(`Rolled back VM ${data.vmId} from orchestration service`);
+        } catch (rollbackError: any) {
+          console.error(
+            `Failed to rollback VM ${data.vmId} from orchestration service:`,
+            rollbackError,
+          );
+        }
+
+        return NextResponse.json(
+          {
+            status: "internal_error",
+            msg: "Failed to save VM to database. VM creation has been rolled back.",
+          },
+          { status: 500 },
+        );
       }
     }
 
