@@ -28,9 +28,33 @@ export const TokenResponseSchema = z.union([
 export const VMCreationRequestSchema = z.object({
   hours: z.number().int().min(1),
   name: z.string().max(255).optional(),
-  cpus: z.number().int().min(1).max(16).optional(),
-  ram: z.number().int().min(1).max(64).optional(),
-  disk: z.number().int().min(64).max(1000).optional(),
+  cpus: z
+    .number()
+    .int()
+    .min(1)
+    .max(16)
+    .refine((n) => n > 0 && (n & (n - 1)) === 0, {
+      message: "CPUs must be a power of 2 (1, 2, 4, 8, 16)",
+    })
+    .optional(),
+  ram: z
+    .number()
+    .int()
+    .min(1)
+    .max(64)
+    .refine((n) => n > 0 && (n & (n - 1)) === 0, {
+      message: "RAM must be a power of 2 (1, 2, 4, 8, 16, 32, 64)",
+    })
+    .optional(),
+  disk: z
+    .number()
+    .int()
+    .min(64)
+    .max(1000)
+    .refine((n) => n > 0 && (n & (n - 1)) === 0, {
+      message: "Disk must be a power of 2 (64, 128, 256, 512)",
+    })
+    .optional(),
   gpus: z.number().int().min(0).max(1).optional(),
   "gpu-type": z.enum(["5090"]).optional(),
 });
