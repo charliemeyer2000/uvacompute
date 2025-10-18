@@ -4,8 +4,8 @@
   "module": "index.ts",
   "type": "module",
   "scripts": {
-    "build": "bun build index.ts --outdir ./dist",
-    "build:prod": "bun build --define process.env.NODE_ENV='\"production\"' index.ts --outdir ./dist",
+    "build": "bun build index.ts --target=node --outdir ./dist",
+    "build:prod": "bun build --target=node --define process.env.NODE_ENV='\"production\"' index.ts --outdir ./dist",
     "build-binary": "bun build --compile ./index.ts --outfile ./dist/uvacompute",
     "build-binary:prod": "bun build --compile --define process.env.NODE_ENV='\"production\"' ./index.ts --outfile ./dist/uvacompute",
     "dev": "bun --watch index.ts",

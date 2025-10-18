@@ -2,78 +2,82 @@
 
 ## API
 
-### Buy/Create
-
-`uva vm create`: create vm
-
-`uva vm create -h 1 --gpus 1 my-vm`
-
-- `--hours / -h` (number): hours to buy for
-- `--days / -d` (number): days to buy for
-- `--name / n` (string): name of your vm
-- `--gpus` (number): number of gpus (currently {0, 1})
-- `--gpu-type` (string): gpu type (currently only 5090)
-
-`uva k8s create`: create vcluster
-
-- `--hours / -h` (number): hours to buy for
-- `--days / -d` (number): days to buy for
-- `--name / n` (string): name of your vm
-- `--gpus` (number): number of gpus (currently {0, 1})
-- `--gpu-type` (string): gpu type (currently only 5090)
-
-`uva job run [image url]`: run my docker image.
-
-- `--gpus` (number): number of gpus (currently {0, 1})
-- `--gpu-type` (string): gpu type (currently only 5090)
-- `--env` (key-value pairs): environment variables
-- `--env-file` (string): path to `.env` file (parsing)
-- `--command` (string): run command (aruments passed into entrypoint
-
-### List
-
-`uva [vm|k8s] list`:
-
-- `--json`: json output
-
-`uva job list`:
-
-- `--[all|completed|active]`: flag for filtering
-- `--json`: json output
-
-### Lifecycle
-
-`uva [vm|k8s|job] stop [id]`: stop early
-
-`uva [vm|k8s] extend [id]`: extend vm/cluster
-
-- `--hours / -h` (number): hours to buy for
-- `--days / -d` (number): days to buy for
-
-### Access Helpers
-
-`uva vm ssh [id]`: prints ssh command/opens session
-
-`uva cluster kubeconfig [id]`: write kubeconfig to file and echoes path
-
-### Price Quotes
-
-`uva price quote [job|vm|k8s]`:
-
-- `--hours / -h` (number): hours to buy for
-- `--days / -d` (number): days to buy for
-- `--name / n` (string): name of your vm
-- `--gpus` (number): number of gpus (currently {0, 1})
-- `--gpu-type` (string): gpu type (currently only 5090)
-- `--max-seconds` (number): for a `job` only, calculate price for max seconds since its charged per second.
-
 ### Auth
 
 `uva login`: logs in to uvacompute
 
 - `--force`: if already logged in, forcefully re-logs in.
 
-`uva logout`: logs out
+`uva logout`: logs out (not yet implemented)
+
+### Virtual Machines
+
+#### Create VM
+
+`uva vm create`: create a new virtual machine
+
+**Required:**
+
+- `-h, --hours <hours>`: Number of hours to run the VM
+
+**Optional:**
+
+- `-c, --cpus <cpus>`: Number of CPUs (default: 1, must be power of 2, max: 16)
+- `-r, --ram <ram>`: RAM in GB (default: 8, must be power of 2, max: 64)
+- `-d, --disk <disk>`: Disk size in GB (default: 64, must be power of 2, max: 1000)
+- `-g, --gpus <gpus>`: Number of GPUs (default: 0, max: 1)
+- `-t, --gpu-type <type>`: GPU type (default: 5090, currently only supports 5090)
+- `-n, --name <name>`: VM name (optional)
+
+**Examples:**
+
+```bash
+# Create a basic VM for 1 hour
+uva vm create -h 1
+
+# Create a VM with GPU for 24 hours
+uva vm create -h 24 -g 1 -t 5090
+
+# Create a custom VM with specific resources
+uva vm create -h 2 -c 4 -r 16 -d 128 -n my-training-vm
+```
+
+#### Delete VM
+
+`uva vm delete <vmId>`: delete a virtual machine
+
+`uva vm rm <vmId>`: alias for delete
+
+**Example:**
+
+```bash
+uva vm delete abc-123-def
+uva vm rm abc-123-def
+```
+
+#### Check VM Status
+
+`uva vm status <vmId>`: get the status of a virtual machine
+
+**Example:**
+
+```bash
+uva vm status abc-123-def
+```
+
+### Planned Features (Not Yet Implemented)
+
+`uva vm list`: list all VMs
+
+`uva vm extend [id]`: extend vm lifetime
+
+- `--hours / -h` (number): hours to extend for
+
+`uva vm ssh [id]`: prints ssh command/opens session
+
+`uva k8s create`: create vcluster
+
+`uva job run [image url]`: run docker image
 
 ## Development
 
