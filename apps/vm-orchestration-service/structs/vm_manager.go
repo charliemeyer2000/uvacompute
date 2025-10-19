@@ -16,7 +16,7 @@ type VMResourceLimits struct {
 }
 
 type IncusProvider interface {
-	CreateVM(vmId string, cpus, ram, disk, gpus int) error
+	CreateVM(vmId string, cpus, ram, disk, gpus int, sshPublicKeys []string) error
 	DestroyVM(vmId string) error
 	GetVMStatus(vmId string) (string, error)
 	GetVMInfo(vmId string) (*IncusVMInfo, error)
@@ -69,7 +69,7 @@ func (vm *VMManager) CreateVM(req VMCreationRequest) (string, error) {
 	}
 
 	if !IsDevelopment() {
-		incusErr := vm.incusProvider.CreateVM(vmId, cpus, ram, disk, gpus)
+		incusErr := vm.incusProvider.CreateVM(vmId, cpus, ram, disk, gpus, req.SSHPublicKeys)
 		if incusErr != nil {
 			delete(vm.vmMap, vmId)
 			return "", fmt.Errorf("failed to create VM in Incus: %w", incusErr)

@@ -1,10 +1,40 @@
 import { NextRequest, NextResponse } from "next/server";
 import { authClient } from "@/lib/auth-client";
-import { fetchMutation } from "convex/nextjs";
+import { fetchMutation, fetchQuery } from "convex/nextjs";
 import { api } from "../../../../convex/_generated/api";
+import { createAuthHeaders } from "@/lib/orchestration-auth";
 
 const VM_ORCHESTRATION_SERVICE_URL =
   process.env.VM_ORCHESTRATION_SERVICE_URL || "http://localhost:8080";
+
+export async function GET(request: NextRequest) {
+  const { data: session, error } = await authClient.getSession({
+    fetchOptions: {
+      headers: request.headers,
+    },
+  });
+
+  if (error || !session) {
+    return NextResponse.json(
+      { error: error?.message || "Unauthorized" },
+      { status: 401 },
+    );
+  }
+
+  try {
+    const vms = await fetchQuery(api.vms.listByUser, {
+      userId: session.user.id,
+    });
+
+    return NextResponse.json({ vms }, { status: 200 });
+  } catch (error: any) {
+    console.error("Error fetching VMs:", error);
+    return NextResponse.json(
+      { error: error.message || "Failed to fetch VMs" },
+      { status: 500 },
+    );
+  }
+}
 
 export async function POST(request: NextRequest) {
   // Authenticate user
@@ -24,17 +54,30 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
 
+    const sshPublicKeys = await fetchQuery(api.sshKeys.getAllPublicKeys, {
+      userId: session.user.id,
+    });
+
+    if (sshPublicKeys.length === 0) {
+      console.warn(`User ${session.user.id} has no SSH keys configured`);
+    }
+
     const vmCreationRequest = {
       ...body,
       userId: session.user.id,
+      sshPublicKeys,
     };
+
+    const requestBody = JSON.stringify(vmCreationRequest);
+    const authHeaders = createAuthHeaders("POST", "/vms", requestBody);
 
     const response = await fetch(`${VM_ORCHESTRATION_SERVICE_URL}/vms`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        ...authHeaders,
       },
-      body: JSON.stringify(vmCreationRequest),
+      body: requestBody,
     });
 
     const data = await response.json();
@@ -64,8 +107,14 @@ export async function POST(request: NextRequest) {
         );
 
         try {
+          const deleteAuthHeaders = createAuthHeaders(
+            "DELETE",
+            `/vms/${data.vmId}`,
+            "",
+          );
           await fetch(`${VM_ORCHESTRATION_SERVICE_URL}/vms/${data.vmId}`, {
             method: "DELETE",
+            headers: deleteAuthHeaders,
           });
           console.log(`Rolled back VM ${data.vmId} from orchestration service`);
         } catch (rollbackError: any) {
