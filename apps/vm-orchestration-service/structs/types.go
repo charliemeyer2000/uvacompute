@@ -43,14 +43,15 @@ const (
 )
 
 type VMCreationRequest struct {
-	Hours   int      `json:"hours" validate:"required,min=1"`
-	UserId  string   `json:"userId" validate:"required"`
-	Name    *string  `json:"name,omitempty" validate:"omitempty,max=255"`
-	Cpus    *int     `json:"cpus,omitempty" validate:"omitempty,min=1,max=16"`
-	Ram     *int     `json:"ram,omitempty" validate:"omitempty,min=1,max=64"`
-	Disk    *int     `json:"disk,omitempty" validate:"omitempty,min=64,max=1000"`
-	Gpus    *int     `json:"gpus,omitempty" validate:"omitempty,min=0,max=1"`
-	GpuType *GPUType `json:"gpu-type,omitempty" validate:"omitempty,oneof='5090'"`
+	Hours         int      `json:"hours" validate:"required,min=1"`
+	UserId        string   `json:"userId" validate:"required"`
+	Name          *string  `json:"name,omitempty" validate:"omitempty,max=255"`
+	Cpus          *int     `json:"cpus,omitempty" validate:"omitempty,min=1,max=16"`
+	Ram           *int     `json:"ram,omitempty" validate:"omitempty,min=1,max=64"`
+	Disk          *int     `json:"disk,omitempty" validate:"omitempty,min=64,max=1000"`
+	Gpus          *int     `json:"gpus,omitempty" validate:"omitempty,min=0,max=1"`
+	GpuType       *GPUType `json:"gpu-type,omitempty" validate:"omitempty,oneof='5090'"`
+	SSHPublicKeys []string `json:"sshPublicKeys,omitempty"`
 }
 
 const (

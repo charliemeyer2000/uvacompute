@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { authClient } from "@/lib/auth-client";
 import { fetchMutation, fetchQuery } from "convex/nextjs";
 import { api } from "../../../../../convex/_generated/api";
+import { createAuthHeaders } from "@/lib/orchestration-auth";
 
 const VM_ORCHESTRATION_SERVICE_URL =
   process.env.VM_ORCHESTRATION_SERVICE_URL || "http://localhost:8080";
@@ -47,10 +48,12 @@ export async function DELETE(
       );
     }
 
+    const authHeaders = createAuthHeaders("DELETE", `/vms/${vmId}`, "");
     const response = await fetch(
       `${VM_ORCHESTRATION_SERVICE_URL}/vms/${vmId}`,
       {
         method: "DELETE",
+        headers: authHeaders,
       },
     );
 

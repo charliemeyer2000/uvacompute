@@ -93,3 +93,65 @@ export const VMStatusResponseSchema = z.object({
   msg: z.string(),
   info: z.any().optional(),
 });
+
+export const SSHKeySchema = z.object({
+  _id: z.string(),
+  _creationTime: z.number(),
+  userId: z.string(),
+  name: z.string(),
+  publicKey: z.string(),
+  fingerprint: z.string(),
+  isPrimary: z.boolean(),
+  createdAt: z.number(),
+});
+
+export const SSHKeyListResponseSchema = z.object({
+  keys: z.array(SSHKeySchema),
+});
+
+export const SSHKeyAddResponseSchema = z.object({
+  success: z.boolean(),
+  keyId: z.string(),
+  fingerprint: z.string(),
+  keyType: z.string(),
+  name: z.string(),
+});
+
+export const VMInfoSchema = z.object({
+  _id: z.string(),
+  _creationTime: z.number(),
+  userId: z.string(),
+  vmId: z.string(),
+  name: z.string().optional(),
+  cpus: z.number(),
+  ram: z.number(),
+  disk: z.number(),
+  gpus: z.number(),
+  gpuType: z.string(),
+  status: z.enum([
+    "creating",
+    "running",
+    "failed",
+    "deleting",
+    "deleted",
+    "expired",
+  ]),
+  hours: z.number(),
+  createdAt: z.number(),
+  expiresAt: z.number(),
+  deletedAt: z.number().optional(),
+  orchestrationResponse: z.any().optional(),
+});
+
+export const VMListResponseSchema = z.object({
+  vms: z.array(VMInfoSchema),
+});
+
+export const VMConnectionInfoSchema = z.object({
+  vmId: z.string(),
+  name: z.string().nullable(),
+  sshHost: z.string(),
+  sshPort: z.number(),
+  user: z.string(),
+  status: z.string(),
+});
