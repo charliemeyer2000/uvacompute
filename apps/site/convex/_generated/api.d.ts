@@ -15,6 +15,7 @@ import type * as betterAuth_adapter from "../betterAuth/adapter.js";
 import type * as betterAuth_auth from "../betterAuth/auth.js";
 import type * as betterAuth_generatedSchema from "../betterAuth/generatedSchema.js";
 import type * as http from "../http.js";
+import type * as sshKeys from "../sshKeys.js";
 import type * as vms from "../vms.js";
 
 import type {
@@ -39,6 +40,7 @@ declare const fullApi: ApiFromModules<{
   "betterAuth/auth": typeof betterAuth_auth;
   "betterAuth/generatedSchema": typeof betterAuth_generatedSchema;
   http: typeof http;
+  sshKeys: typeof sshKeys;
   vms: typeof vms;
 }>;
 declare const fullApiWithMounts: typeof fullApi;

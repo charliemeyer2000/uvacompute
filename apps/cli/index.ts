@@ -1,6 +1,7 @@
 import { Command } from "commander";
 import { registerLoginCommand } from "./src/login";
 import { registerVMCommands } from "./src/vm";
+import { registerSSHKeyCommands } from "./src/ssh-keys";
 
 function main() {
   const program = new Command();
@@ -11,6 +12,7 @@ function main() {
     .description("uvacompute cli");
   registerLoginCommand(program);
   registerVMCommands(program);
+  registerSSHKeyCommands(program);
   program.parse(process.argv);
 }
 
