@@ -3,3 +3,5 @@ alwaysApply: true
 ---
 
 After completing a task, NEVER make a .md file summarizing your work. Give a quick summary of the work you performed in a text response only. 
+
+do not write comments for single lines of code unless a line of code is unclear and needs documenting. 
