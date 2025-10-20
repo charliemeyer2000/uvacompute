@@ -151,7 +151,7 @@ export const listActiveByUser = query({
       .order("desc")
       .collect();
 
-    return vms;
+    return vms.filter((vm) => vm.expiresAt > Date.now());
   },
 });
 

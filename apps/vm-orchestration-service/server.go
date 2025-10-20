@@ -11,9 +11,25 @@ import (
 	"vm-orchestration-service/structs"
 
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/joho/godotenv"
 )
 
+func loadEnvFile() {
+	env := os.Getenv("ENV")
+	if env == "" {
+		env = "development"
+	}
+
+	envFile := fmt.Sprintf(".env.%s", env)
+	if err := godotenv.Load(envFile); err != nil {
+		panic(err)
+	}
+
+	fmt.Printf("Loaded environment from %s\n", envFile)
+}
+
 func main() {
+	loadEnvFile()
 	fmt.Println("Starting server...")
 
 	if structs.IsDevelopment() {
@@ -22,15 +38,25 @@ func main() {
 		fmt.Println("Running in production.")
 	}
 
-	secret := os.Getenv("ORCHESTRATION_SHARED_SECRET")
-	if secret == "" {
-		fmt.Println("WARNING: ORCHESTRATION_SHARED_SECRET not set - running without authentication!")
-	} else {
-		fmt.Println("Authentication enabled (HMAC request signing)")
+	siteBaseUrl := os.Getenv("SITE_BASE_URL")
+	sharedSecret := os.Getenv("ORCHESTRATION_SHARED_SECRET")
+
+	if siteBaseUrl == "" || sharedSecret == "" {
+		fmt.Println("ERROR: Missing required environment variables:")
+		if siteBaseUrl == "" {
+			fmt.Println("  - SITE_BASE_URL is not set")
+		}
+		if sharedSecret == "" {
+			fmt.Println("  - ORCHESTRATION_SHARED_SECRET is not set")
+		}
+		panic("Cannot start without required configuration")
 	}
 
+	fmt.Printf("Callback client configured for: %s\n", siteBaseUrl)
+
+	callbackClient := lib.NewCallbackClient(siteBaseUrl, sharedSecret)
 	incusAdapter := lib.NewIncusAdapter()
-	app := structs.NewApp(incusAdapter)
+	app := structs.NewApp(incusAdapter, callbackClient)
 
 	app.Router.Use(middleware.Logger)
 	app.Router.Use(middleware.RequestID)
