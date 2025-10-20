@@ -23,18 +23,20 @@ type IncusProvider interface {
 }
 
 type VMManager struct {
-	mu            sync.Mutex
-	vmMap         map[string]VMState
-	limits        VMResourceLimits
-	incusProvider IncusProvider
+	mu             sync.Mutex
+	vmMap          map[string]VMState
+	limits         VMResourceLimits
+	incusProvider  IncusProvider
+	callbackClient CallbackClient
 }
 
-func NewVMManager(limits VMResourceLimits, incusProvider IncusProvider) *VMManager {
+func NewVMManager(limits VMResourceLimits, incusProvider IncusProvider, callbackClient CallbackClient) *VMManager {
 	return &VMManager{
-		mu:            sync.Mutex{},
-		vmMap:         make(map[string]VMState),
-		limits:        limits,
-		incusProvider: incusProvider,
+		mu:             sync.Mutex{},
+		vmMap:          make(map[string]VMState),
+		limits:         limits,
+		incusProvider:  incusProvider,
+		callbackClient: callbackClient,
 	}
 }
 
@@ -83,15 +85,29 @@ func (vm *VMManager) CreateVM(req VMCreationRequest) (string, error) {
 	vm.vmMap[vmId] = vmState
 
 	time.AfterFunc(time.Duration(req.Hours*3600*int(time.Second)), func() {
+		log.Printf("VM %s expired, deleting from Incus", vmId)
+
 		if !IsDevelopment() {
 			vm.incusProvider.DestroyVM(vmId)
 		} else {
 			log.Printf("[DEV MODE] Skipping Incus VM deletion for VM %s", vmId)
 		}
+
+		vm.mu.Lock()
 		vmState := vm.vmMap[vmId]
 		vmState.Status = VM_STATUS_DELETED
 		vm.vmMap[vmId] = vmState
 		delete(vm.vmMap, vmId)
+		vm.mu.Unlock()
+
+		// notify in background
+		if vm.callbackClient != nil {
+			go func() {
+				if err := vm.callbackClient.NotifyVMDeleted(vmId); err != nil {
+					log.Printf("ERROR: Failed to notify site about VM %s deletion: %v", vmId, err)
+				}
+			}()
+		}
 	})
 
 	return vmId, nil
