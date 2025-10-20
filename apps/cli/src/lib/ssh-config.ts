@@ -12,7 +12,6 @@ export interface SSHHostConfig {
   hostName: string;
   user: string;
   port: number;
-  proxyCommand: string;
   strictHostKeyChecking?: string;
   userKnownHostsFile?: string;
 }
@@ -69,7 +68,6 @@ function generateHostConfig(
   lines.push(`  HostName ${config.hostName}`);
   lines.push(`  User ${config.user}`);
   lines.push(`  Port ${config.port}`);
-  lines.push(`  ProxyCommand ${config.proxyCommand}`);
 
   if (config.strictHostKeyChecking) {
     lines.push(`  StrictHostKeyChecking ${config.strictHostKeyChecking}`);
