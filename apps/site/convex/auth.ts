@@ -49,6 +49,10 @@ export const createAuth = (
       }),
       convex(),
     ],
+    trustedOrigins: [
+      "https://ai-workstation.tail0eb43d.ts.net/",
+      process.env.BETTER_AUTH_URL!,
+    ],
   } satisfies BetterAuthOptions);
 
 export const safeGetUser = async (ctx: QueryCtx) => {
