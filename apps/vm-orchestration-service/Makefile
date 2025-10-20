@@ -1,4 +1,4 @@
-.PHONY: run dev build fmt fmty clean test deps install uninstall
+.PHONY: run dev build fmt clean test lint check-types deps install uninstall
 
 run:
 	go run .
@@ -13,8 +13,11 @@ build:
 fmt:
 	go fmt ./...
 
-fmty:
-	gofmt -w .
+lint:
+	go fmt ./... && go vet ./...
+
+check-types:
+	go vet ./...
 
 clean:
 	rm -rf dist/

@@ -13,7 +13,7 @@
     "prepare": "husky"
   },
   "lint-staged": {
-    "**/*.go": "gofmt -w",
+    "**/*.go": "go fmt",
     "**/*": "prettier --write --ignore-unknown"
   },
   "packageManager": "pnpm@10.0.0",
