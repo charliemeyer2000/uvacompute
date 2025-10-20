@@ -38,4 +38,15 @@ export default defineSchema({
     .index("by_user", ["userId"])
     .index("by_user_and_status", ["userId", "status"])
     .index("by_vmId", ["vmId"]),
+
+  sshKeys: defineTable({
+    userId: v.string(),
+    name: v.string(),
+    publicKey: v.string(),
+    fingerprint: v.string(),
+    isPrimary: v.boolean(),
+    createdAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_and_primary", ["userId", "isPrimary"]),
 });
