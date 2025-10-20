@@ -423,13 +423,11 @@ async function sshToVM(
     spinner.succeed(chalk.green("VM connection info retrieved!"));
 
     const hostAlias = vm.name || vm.vmId;
-    const proxyCommand = `ssh -p ${connectionInfo.sshPort} ${vm.vmId}@${connectionInfo.sshHost}`;
 
     updateSSHConfig(hostAlias, {
-      hostName: vm.vmId,
-      user: connectionInfo.user,
+      hostName: connectionInfo.sshHost,
+      user: `${connectionInfo.user}@${vm.vmId}`,
       port: connectionInfo.sshPort,
-      proxyCommand,
       strictHostKeyChecking: "no",
       userKnownHostsFile: "/dev/null",
     });
