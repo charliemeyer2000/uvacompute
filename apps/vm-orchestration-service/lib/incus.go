@@ -2,8 +2,10 @@ package lib
 
 import (
 	"errors"
+	"fmt"
 	"os/exec"
 	"strconv"
+	"strings"
 
 	"vm-orchestration-service/structs"
 )
@@ -14,8 +16,8 @@ func NewIncusAdapter() *IncusAdapter {
 	return &IncusAdapter{}
 }
 
-func (i *IncusAdapter) CreateVM(vmId string, cpus, ram, disk, gpus int) error {
-	return createIncusVM(vmId, cpus, ram, disk, gpus)
+func (i *IncusAdapter) CreateVM(vmId string, cpus, ram, disk, gpus int, sshPublicKeys []string) error {
+	return createIncusVM(vmId, cpus, ram, disk, gpus, sshPublicKeys)
 }
 
 func (i *IncusAdapter) DestroyVM(vmId string) error {
@@ -30,8 +32,32 @@ func (i *IncusAdapter) GetVMInfo(vmId string) (*structs.IncusVMInfo, error) {
 	return getIncusVMInfo(vmId)
 }
 
-func createIncusVM(vmId string, cpus int, ram int, disk int, gpus int) error {
-	cmd := []string{"incus", "init", "images:ubuntu/24.04", vmId, "--vm", "-c", "limits.cpu=" + strconv.Itoa(cpus), "-c", "limits.memory=" + strconv.Itoa(ram) + "GiB", "-d", "root,size=" + strconv.Itoa(disk) + "GiB", "-d", "root,io.bus=nvme", "-c", "security.secureboot=false"}
+func generateCloudInitUserData(sshPublicKeys []string) string {
+	var topLevelKeys []string
+	var userLevelKeys []string
+	for _, key := range sshPublicKeys {
+		topLevelKeys = append(topLevelKeys, fmt.Sprintf("  - %s", key))
+		userLevelKeys = append(userLevelKeys, fmt.Sprintf("      - %s", key))
+	}
+
+	cloudInit := fmt.Sprintf(`#cloud-config
+ssh_authorized_keys:
+%s
+users:
+  - name: root
+    ssh_authorized_keys:
+%s`, strings.Join(topLevelKeys, "\n"), strings.Join(userLevelKeys, "\n"))
+
+	return cloudInit
+}
+
+func createIncusVM(vmId string, cpus int, ram int, disk int, gpus int, sshPublicKeys []string) error {
+	cmd := []string{"incus", "init", "images:ubuntu/24.04/cloud", vmId, "--vm", "-c", "limits.cpu=" + strconv.Itoa(cpus), "-c", "limits.memory=" + strconv.Itoa(ram) + "GiB", "-d", "root,size=" + strconv.Itoa(disk) + "GiB", "-d", "root,io.bus=nvme", "-c", "security.secureboot=false"}
+
+	if len(sshPublicKeys) > 0 {
+		cloudInitUserData := generateCloudInitUserData(sshPublicKeys)
+		cmd = append(cmd, "-c", "user.user-data="+cloudInitUserData)
+	}
 
 	_, err := exec.Command(cmd[0], cmd[1:]...).Output()
 	if err != nil {

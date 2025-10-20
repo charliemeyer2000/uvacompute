@@ -19,9 +19,6 @@ import { DeviceCodeResponseSchema, TokenResponseSchema } from "./lib/schemas";
 const BASE_URL = getBaseUrl();
 
 async function deviceAuthorization(): Promise<TokenSuccessResponse> {
-  console.log(chalk.blue("🔐 Starting device authorization flow..."));
-  console.log(chalk.gray(`🌐 Connecting to: ${BASE_URL}\n`));
-
   let spinner = ora("Requesting device authorization...").start();
 
   try {
@@ -53,10 +50,8 @@ async function deviceAuthorization(): Promise<TokenSuccessResponse> {
     } = deviceData;
 
     spinner.succeed("Device authorization requested");
-    spinner = ora("Waiting for authorization...").start();
     spinner.stop();
 
-    // Display the authorization box
     const authBox = boxen(
       chalk.bold("CLI Authentication Required") +
         "\n\n" +
@@ -77,13 +72,12 @@ async function deviceAuthorization(): Promise<TokenSuccessResponse> {
 
     console.log(authBox);
 
-    // Open browser automatically
     const urlToOpen =
       verification_uri_complete || `${verification_uri}?user_code=${user_code}`;
-    console.log(chalk.cyan("🌐 Opened browser automatically\n"));
 
     try {
       await open(urlToOpen);
+      console.log(chalk.gray("Browser opened automatically\n"));
     } catch (error) {
       console.log(
         chalk.yellow(
@@ -98,7 +92,7 @@ async function deviceAuthorization(): Promise<TokenSuccessResponse> {
 
     return await pollForToken(device_code, interval, spinner);
   } catch (error: any) {
-    spinner.fail(`❌ Error: ${error.message}`);
+    spinner.fail(`Error: ${error.message}`);
     throw error;
   }
 }
@@ -129,7 +123,7 @@ async function pollForToken(
         const tokenData = TokenResponseSchema.parse(rawToken);
 
         if (tokenResponse.ok && "access_token" in tokenData) {
-          spinner.succeed("✅ Authorization successful!");
+          spinner.succeed("Authorization successful!");
 
           const accessToken = tokenData.access_token;
 
@@ -149,9 +143,7 @@ async function pollForToken(
                 );
               }
             }
-          } catch (error) {
-            // Continue even if we can't get user info
-          }
+          } catch (error) {}
 
           saveToken(accessToken);
 
@@ -160,23 +152,22 @@ async function pollForToken(
         } else if ("error" in tokenData) {
           switch (tokenData.error) {
             case "authorization_pending":
-              // Continue polling silently
               break;
             case "slow_down":
               pollingInterval += 5;
               spinner.text = `Slowing down polling to ${pollingInterval}s intervals...`;
               break;
             case "access_denied":
-              spinner.fail("❌ Access was denied by the user");
+              spinner.fail("Access was denied by the user");
               reject(new Error("Access denied"));
               return;
             case "expired_token":
-              spinner.fail("❌ The device code has expired. Please try again.");
+              spinner.fail("The device code has expired. Please try again.");
               reject(new Error("Device code expired"));
               return;
             default:
               spinner.fail(
-                `❌ Error: ${tokenData.error_description || tokenData.error}`,
+                `Error: ${tokenData.error_description || tokenData.error}`,
               );
               reject(new Error(tokenData.error_description || tokenData.error));
               return;
@@ -185,14 +176,13 @@ async function pollForToken(
       } catch (error: any) {
         if (error.name === "FetchError" || error.code === "ECONNREFUSED") {
           spinner.fail(
-            "❌ Could not connect to authentication server. Make sure the server is running.",
+            "Could not connect to authentication server. Make sure the server is running.",
           );
           reject(new Error("Connection failed"));
           return;
         }
       }
 
-      // Schedule next poll
       setTimeout(poll, pollingInterval * 1000);
     };
 
@@ -210,7 +200,7 @@ export function registerLoginCommand(program: Command) {
         if (!options.force) {
           const existingToken = loadToken();
           if (existingToken) {
-            console.log(chalk.green("✅ Already logged in!"));
+            console.log(chalk.green("Already logged in!"));
             console.log(
               chalk.gray(`Token: ${existingToken.substring(0, 20)}...`),
             );
@@ -219,27 +209,12 @@ export function registerLoginCommand(program: Command) {
           }
         }
 
-        const tokenData = await deviceAuthorization();
+        await deviceAuthorization();
 
-        console.log(chalk.blue("\n🔍 Token Details:"));
-        console.log(
-          chalk.gray(
-            `- Access Token: ${(tokenData as any).access_token.substring(0, 20)}...`,
-          ),
-        );
-        console.log(
-          chalk.gray(
-            `- Token Type: ${(tokenData as any).token_type || "Bearer"}`,
-          ),
-        );
-        console.log(
-          chalk.gray(`- Scope: ${(tokenData as any).scope || "Unknown"}`),
-        );
-
-        console.log(chalk.green("🎉 Authentication successful!"));
+        console.log(chalk.green("\nAuthentication successful!"));
         console.log(chalk.gray("You are now logged in to uvacompute.\n"));
       } catch (error: any) {
-        console.error(chalk.red("\n❌ Authentication failed."));
+        console.error(chalk.red("\nAuthentication failed."));
         process.exit(1);
       }
     });
