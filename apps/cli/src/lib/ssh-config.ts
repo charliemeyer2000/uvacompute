@@ -1,4 +1,10 @@
-import { readFileSync, writeFileSync, existsSync, copyFileSync } from "fs";
+import {
+  readFileSync,
+  writeFileSync,
+  existsSync,
+  copyFileSync,
+  mkdirSync,
+} from "fs";
 import { homedir } from "os";
 import { join } from "path";
 
@@ -11,8 +17,21 @@ export interface SSHHostConfig {
   userKnownHostsFile?: string;
 }
 
-const SSH_CONFIG_PATH = join(homedir(), ".ssh", "config");
-const SSH_CONFIG_BACKUP_PATH = join(homedir(), ".ssh", "config.backup");
+const SSH_DIR = join(homedir(), ".ssh");
+const SSH_CONFIG_PATH = join(SSH_DIR, "config");
+const SSH_CONFIG_BACKUP_PATH = join(SSH_DIR, "config.backup");
+
+function ensureSSHDirectory(): void {
+  if (!existsSync(SSH_DIR)) {
+    try {
+      mkdirSync(SSH_DIR, { mode: 0o700, recursive: true });
+    } catch (error: any) {
+      throw new Error(
+        `Failed to create SSH directory at ${SSH_DIR}: ${error.message}`,
+      );
+    }
+  }
+}
 
 function parseSSHConfig(content: string): Map<string, string[]> {
   const hosts = new Map<string, string[]>();
@@ -67,46 +86,87 @@ export function updateSSHConfig(
   hostAlias: string,
   config: SSHHostConfig,
 ): void {
-  let existingContent = "";
-  let hosts = new Map<string, string[]>();
+  try {
+    ensureSSHDirectory();
 
-  if (existsSync(SSH_CONFIG_PATH)) {
-    copyFileSync(SSH_CONFIG_PATH, SSH_CONFIG_BACKUP_PATH);
-    existingContent = readFileSync(SSH_CONFIG_PATH, "utf-8");
-    hosts = parseSSHConfig(existingContent);
-  }
+    let existingContent = "";
+    let hosts = new Map<string, string[]>();
 
-  const newHostConfig = generateHostConfig(hostAlias, config);
-  hosts.set(hostAlias, newHostConfig);
+    if (existsSync(SSH_CONFIG_PATH)) {
+      try {
+        copyFileSync(SSH_CONFIG_PATH, SSH_CONFIG_BACKUP_PATH);
+      } catch (error: any) {
+        throw new Error(
+          `Failed to create backup of SSH config: ${error.message}`,
+        );
+      }
 
-  const otherHosts: string[] = [];
-  for (const [host, lines] of hosts.entries()) {
-    if (host !== hostAlias) {
-      otherHosts.push(...lines);
+      try {
+        existingContent = readFileSync(SSH_CONFIG_PATH, "utf-8");
+        hosts = parseSSHConfig(existingContent);
+      } catch (error: any) {
+        throw new Error(`Failed to read SSH config: ${error.message}`);
+      }
     }
+
+    const newHostConfig = generateHostConfig(hostAlias, config);
+    hosts.set(hostAlias, newHostConfig);
+
+    const otherHosts: string[] = [];
+    for (const [host, lines] of hosts.entries()) {
+      if (host !== hostAlias) {
+        otherHosts.push(...lines);
+      }
+    }
+
+    const finalConfig = [...newHostConfig, "", ...otherHosts].join("\n");
+
+    try {
+      writeFileSync(SSH_CONFIG_PATH, finalConfig, "utf-8");
+    } catch (error: any) {
+      throw new Error(`Failed to write SSH config: ${error.message}`);
+    }
+  } catch (error: any) {
+    throw new Error(`Failed to update SSH config: ${error.message}`);
   }
-
-  const finalConfig = [...newHostConfig, "", ...otherHosts].join("\n");
-
-  writeFileSync(SSH_CONFIG_PATH, finalConfig, "utf-8");
 }
 
 export function removeSSHConfig(hostAlias: string): void {
-  if (!existsSync(SSH_CONFIG_PATH)) {
-    return;
+  try {
+    if (!existsSync(SSH_CONFIG_PATH)) {
+      return;
+    }
+
+    try {
+      copyFileSync(SSH_CONFIG_PATH, SSH_CONFIG_BACKUP_PATH);
+    } catch (error: any) {
+      throw new Error(
+        `Failed to create backup of SSH config: ${error.message}`,
+      );
+    }
+
+    let existingContent: string;
+    try {
+      existingContent = readFileSync(SSH_CONFIG_PATH, "utf-8");
+    } catch (error: any) {
+      throw new Error(`Failed to read SSH config: ${error.message}`);
+    }
+
+    const hosts = parseSSHConfig(existingContent);
+    hosts.delete(hostAlias);
+
+    const allLines: string[] = [];
+    for (const lines of hosts.values()) {
+      allLines.push(...lines);
+      allLines.push("");
+    }
+
+    try {
+      writeFileSync(SSH_CONFIG_PATH, allLines.join("\n"), "utf-8");
+    } catch (error: any) {
+      throw new Error(`Failed to write SSH config: ${error.message}`);
+    }
+  } catch (error: any) {
+    throw new Error(`Failed to remove SSH config: ${error.message}`);
   }
-
-  copyFileSync(SSH_CONFIG_PATH, SSH_CONFIG_BACKUP_PATH);
-  const existingContent = readFileSync(SSH_CONFIG_PATH, "utf-8");
-  const hosts = parseSSHConfig(existingContent);
-
-  hosts.delete(hostAlias);
-
-  const allLines: string[] = [];
-  for (const lines of hosts.values()) {
-    allLines.push(...lines);
-    allLines.push("");
-  }
-
-  writeFileSync(SSH_CONFIG_PATH, allLines.join("\n"), "utf-8");
 }
