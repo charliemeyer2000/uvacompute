@@ -16,6 +16,9 @@ export const metadata: Metadata = {
   title: "uvacompute",
   description:
     "High-performance cloud compute with NVIDIA RTX 5090 GPUs, flexible VMs, and serverless containers",
+  icons: {
+    icon: "/favicon.svg",
+  },
 };
 
 export default function RootLayout({
