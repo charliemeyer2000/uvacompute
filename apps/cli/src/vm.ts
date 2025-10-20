@@ -373,7 +373,23 @@ async function sshToVM(
     );
 
     if (!connectionResponse.ok) {
-      spinner.fail("Failed to fetch connection info");
+      const errorData = (await connectionResponse.json()) as {
+        error?: string;
+        message?: string;
+        status?: string;
+      };
+      if (connectionResponse.status === 409 && errorData.status) {
+        spinner.fail(`VM is not running (current status: ${errorData.status})`);
+        if (errorData.message) {
+          console.log(chalk.yellow(errorData.message));
+        }
+      } else {
+        spinner.fail(
+          errorData.error ||
+            errorData.message ||
+            "Failed to fetch connection info",
+        );
+      }
       process.exit(1);
     }
 
