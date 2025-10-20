@@ -29,7 +29,7 @@ func (m *MockIncusProvider) GetVMInfo(vmId string) (*IncusVMInfo, error) {
 func TestCreateVM(t *testing.T) {
 	limits := VMResourceLimits{MaxCpus: 16, MaxRam: 64, MaxGpus: 1}
 	mockIncus := &MockIncusProvider{}
-	vm := NewVMManager(limits, mockIncus)
+	vm := NewVMManager(limits, mockIncus, nil)
 
 	req := VMCreationRequest{
 		Hours:  24,
@@ -62,7 +62,7 @@ func TestCreateVM(t *testing.T) {
 func TestCreateVMWithCustomValues(t *testing.T) {
 	limits := VMResourceLimits{MaxCpus: 16, MaxRam: 64, MaxGpus: 1}
 	mockIncus := &MockIncusProvider{}
-	vm := NewVMManager(limits, mockIncus)
+	vm := NewVMManager(limits, mockIncus, nil)
 
 	cpus := 4
 	ram := 16
@@ -101,7 +101,7 @@ func TestCreateVMWithCustomValues(t *testing.T) {
 func TestDeleteVM(t *testing.T) {
 	limits := VMResourceLimits{MaxCpus: 16, MaxRam: 64, MaxGpus: 1}
 	mockIncus := &MockIncusProvider{}
-	vm := NewVMManager(limits, mockIncus)
+	vm := NewVMManager(limits, mockIncus, nil)
 
 	req := VMCreationRequest{
 		Hours:  24,
@@ -127,7 +127,7 @@ func TestDeleteVM(t *testing.T) {
 func TestResourceLimits(t *testing.T) {
 	limits := VMResourceLimits{MaxCpus: 4, MaxRam: 8, MaxGpus: 1}
 	mockIncus := &MockIncusProvider{}
-	vm := NewVMManager(limits, mockIncus)
+	vm := NewVMManager(limits, mockIncus, nil)
 
 	cpus := 4
 	req := VMCreationRequest{
@@ -154,7 +154,7 @@ func TestResourceLimits(t *testing.T) {
 func TestCreateVMWithSSHKeys(t *testing.T) {
 	limits := VMResourceLimits{MaxCpus: 16, MaxRam: 64, MaxGpus: 1}
 	mockIncus := &MockIncusProvider{}
-	vm := NewVMManager(limits, mockIncus)
+	vm := NewVMManager(limits, mockIncus, nil)
 
 	sshKeys := []string{
 		"ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC... user@example.com",
@@ -192,7 +192,7 @@ func TestCreateVMWithSSHKeys(t *testing.T) {
 func TestCreateVMWithoutSSHKeys(t *testing.T) {
 	limits := VMResourceLimits{MaxCpus: 16, MaxRam: 64, MaxGpus: 1}
 	mockIncus := &MockIncusProvider{}
-	vm := NewVMManager(limits, mockIncus)
+	vm := NewVMManager(limits, mockIncus, nil)
 
 	req := VMCreationRequest{
 		Hours:         24,
@@ -217,7 +217,7 @@ func TestCreateVMWithoutSSHKeys(t *testing.T) {
 func TestCreateVMWithSingleSSHKey(t *testing.T) {
 	limits := VMResourceLimits{MaxCpus: 16, MaxRam: 64, MaxGpus: 1}
 	mockIncus := &MockIncusProvider{}
-	vm := NewVMManager(limits, mockIncus)
+	vm := NewVMManager(limits, mockIncus, nil)
 
 	sshKey := "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC... user@example.com"
 
@@ -248,7 +248,7 @@ func TestCreateVMWithSingleSSHKey(t *testing.T) {
 func TestCreateVMWithSSHKeysAndCustomResources(t *testing.T) {
 	limits := VMResourceLimits{MaxCpus: 16, MaxRam: 64, MaxGpus: 1}
 	mockIncus := &MockIncusProvider{}
-	vm := NewVMManager(limits, mockIncus)
+	vm := NewVMManager(limits, mockIncus, nil)
 
 	cpus := 4
 	ram := 16

@@ -13,7 +13,9 @@
     "prepare": "husky"
   },
   "lint-staged": {
-    "**/*.go": "go fmt",
+    "apps/vm-orchestration-service/**/*.go": [
+      "cd apps/vm-orchestration-service && make fmt"
+    ],
     "**/*": "prettier --write --ignore-unknown"
   },
   "packageManager": "pnpm@10.0.0",
