@@ -1,15 +1,17 @@
-name: Build and Deploy CLI
+name: Build and Test CLI
 on:
   push:
     paths:
       - "apps/cli/**"
+  pull_request:
+    paths:
+      - "apps/cli/**"
 
 permissions:
-  contents: write
-  id-token: write
+  contents: read
 
 jobs:
-  build:
+  build-and-test:
     strategy:
       matrix:
         include:
@@ -33,55 +35,6 @@ jobs:
         run: bun install
         working-directory: ./apps/cli
 
-      - name: Extract version
-        id: version
-        run: |
-          if [[ "${{ runner.os }}" == "Windows" ]]; then
-            VERSION=$(cat ./apps/cli/package.json | jq -r '.version')
-            echo "version=$VERSION" >> $GITHUB_OUTPUT
-          else
-            VERSION=$(cat ./apps/cli/package.json | jq -r '.version')
-            echo "version=$VERSION" >> $GITHUB_OUTPUT
-          fi
-        shell: bash
-
       - name: Build binary
         run: bun build --compile --define process.env.NODE_ENV='"production"' ./index.ts --outfile ./dist/${{ matrix.artifact }}
         working-directory: ./apps/cli
-
-      - name: Upload artifact
-        if: github.ref == 'refs/heads/main'
-        continue-on-error: true
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.artifact }}
-          path: ./apps/cli/dist/${{ matrix.artifact }}
-
-  release:
-    needs: build
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Extract version
-        id: version
-        run: |
-          VERSION=$(cat ./apps/cli/package.json | jq -r '.version')
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: ./dist
-
-      - name: Create Release with binaries
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: cli-v${{ steps.version.outputs.version }}
-          name: CLI v${{ steps.version.outputs.version }}
-          files: |
-            ./dist/uvacompute-linux/uvacompute-linux
-            ./dist/uvacompute-macos/uvacompute-macos
-            ./dist/uvacompute-windows.exe/uvacompute-windows.exe
-          generate_release_notes: true

@@ -7,12 +7,15 @@ on:
   push:
     paths:
       - "apps/vm-orchestration-service/**"
+  pull_request:
+    paths:
+      - "apps/vm-orchestration-service/**"
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  build:
+  build-and-test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -28,29 +31,6 @@ jobs:
 
       - name: Build
         run: make build
-        working-directory: ./apps/vm-orchestration-service
-
-      - name: Upload artifact
-        if: github.ref == 'refs/heads/main'
-        continue-on-error: true
-        uses: actions/upload-artifact@v4
-        with:
-          name: vm-orchestration-service
-          path: ./apps/vm-orchestration-service/dist/vm
-
-  test:
-    needs: build
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Go
-        uses: actions/setup-go@v4
-        with:
-          go-version: ${{ env.GO_VERSION }}
-
-      - name: Install dependencies
-        run: make deps
         working-directory: ./apps/vm-orchestration-service
 
       - name: Test
