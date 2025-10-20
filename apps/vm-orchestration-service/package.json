@@ -1,0 +1,16 @@
+{
+  "name": "vm-orchestration-service",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "make build",
+    "dev": "make run",
+    "start": "make run",
+    "test": "make test",
+    "lint": "make lint",
+    "check-types": "make check-types",
+    "fmt": "make fmt",
+    "clean": "make clean",
+    "deps": "make deps"
+  }
+}
