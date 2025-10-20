@@ -4,7 +4,7 @@ run:
 	go run .
 
 dev:
-	ENV=development air && tailscale funnel --bg --https=443 8080
+	ENV=development $(shell go env GOPATH)/bin/air && tailscale funnel --bg --https=443 8080
 
 build:
 	mkdir -p dist
