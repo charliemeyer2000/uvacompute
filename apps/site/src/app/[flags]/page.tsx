@@ -39,7 +39,7 @@ export default async function Page({
         </p>
 
         <h2 className="text-xl font-semibold mt-8 mb-4 text-black">access</h2>
-        <div className="mt-8">
+        <div>
           uvacompute is currently in closed beta. email{" "}
           <Link
             href="mailto:charlie@charliemeyer.xyz"
