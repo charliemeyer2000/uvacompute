@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -52,13 +53,14 @@ func (c *CallbackClient) NotifyVMDeleted(vmId string) error {
 }
 
 func (c *CallbackClient) makeRequest(method string, url string, body string) error {
-	timestamp := strconv.FormatInt(time.Now().UnixMilli(), 10)
+	timestamp := strconv.FormatInt(time.Now().Unix(), 10)
 
-	req, err := http.NewRequest(method, url, nil)
+	req, err := http.NewRequest(method, url, strings.NewReader(body))
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
 
+	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-Timestamp", timestamp)
 
 	signature := c.signRequest(timestamp, body)
@@ -79,7 +81,7 @@ func (c *CallbackClient) makeRequest(method string, url string, body string) err
 }
 
 func (c *CallbackClient) signRequest(timestamp string, body string) string {
-	payload := fmt.Sprintf("%s.%s", timestamp, body)
+	payload := fmt.Sprintf("%s:%s", timestamp, body)
 	h := hmac.New(sha256.New, []byte(c.sharedSecret))
 	h.Write([]byte(payload))
 	return hex.EncodeToString(h.Sum(nil))

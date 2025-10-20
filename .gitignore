@@ -27,3 +27,6 @@ yarn-error.log*
 
 # reference repositories
 incus/
+
+# env files anywhere
+**/.env*
