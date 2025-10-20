@@ -1,10 +1,13 @@
-.PHONY: run dev build fmt clean test lint check-types deps install uninstall
+.PHONY: run dev prod build fmt clean test lint check-types deps install uninstall
 
 run:
-	go run .
+	ENV=development go run .
 
 dev:
 	ENV=development $(shell go env GOPATH)/bin/air && tailscale funnel --bg --https=443 8080
+
+prod:
+	ENV=production go run .
 
 build:
 	mkdir -p dist
@@ -31,6 +34,8 @@ deps:
 install:
 	@echo "Building and installing vm-orchestration service..."
 	@go build -o /usr/local/bin/vm-orchestration .
+	@mkdir -p /opt/vm-orchestration-service
+	@cp .env.production /opt/vm-orchestration-service/
 	@cp vm-orchestration.service /etc/systemd/system/
 	@systemctl daemon-reload
 	@systemctl enable vm-orchestration
@@ -43,5 +48,6 @@ uninstall:
 	@systemctl disable vm-orchestration || true
 	@rm -f /etc/systemd/system/vm-orchestration.service
 	@rm -f /usr/local/bin/vm-orchestration
+	@rm -rf /opt/vm-orchestration-service
 	@systemctl daemon-reload
 	@echo "✅ Service uninstalled"

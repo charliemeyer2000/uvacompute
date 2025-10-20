@@ -11,9 +11,11 @@ type App struct {
 	Router    *chi.Mux
 }
 
-func NewApp(incusProvider IncusProvider) *App {
-	// TODO: test, what's the max we can allow others to use while we can still use
-	// the workstation?
+type CallbackClient interface {
+	NotifyVMDeleted(vmId string) error
+}
+
+func NewApp(incusProvider IncusProvider, callbackClient CallbackClient) *App {
 	limits := VMResourceLimits{
 		MaxCpus: 16, // in vCPUs
 		MaxRam:  64, // in GiB
@@ -21,7 +23,7 @@ func NewApp(incusProvider IncusProvider) *App {
 	}
 
 	return &App{
-		VMManager: NewVMManager(limits, incusProvider),
+		VMManager: NewVMManager(limits, incusProvider, callbackClient),
 		Router:    chi.NewRouter(),
 	}
 }
