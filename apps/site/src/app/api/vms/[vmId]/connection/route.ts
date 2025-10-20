@@ -37,6 +37,18 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 
+    if (vm.status !== "running") {
+      return NextResponse.json(
+        {
+          error: "VM is not running",
+          vmId: vm.vmId,
+          status: vm.status,
+          message: `Cannot connect to VM in '${vm.status}' state. Please wait for the VM to be running.`,
+        },
+        { status: 409 },
+      );
+    }
+
     return NextResponse.json(
       {
         vmId: vm.vmId,

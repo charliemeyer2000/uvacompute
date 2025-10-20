@@ -80,13 +80,22 @@ func TestGenerateCloudInitUserDataFormat(t *testing.T) {
 		"users:",
 		"  - name: root",
 		"    ssh_authorized_keys:",
-		"  - " + sshKey,
+		"      - " + sshKey,
 	}
 
 	for _, substr := range expectedSubstrings {
 		if !strings.Contains(result, substr) {
 			t.Errorf("Cloud-init data missing expected substring: %s\nGot:\n%s", substr, result)
 		}
+	}
+
+	topLevelKey := "  - " + sshKey
+	userLevelKey := "      - " + sshKey
+	if !strings.Contains(result, topLevelKey) {
+		t.Errorf("Cloud-init data should contain top-level key with 2-space indentation:\n%s", topLevelKey)
+	}
+	if !strings.Contains(result, userLevelKey) {
+		t.Errorf("Cloud-init data should contain user-level key with 6-space indentation:\n%s", userLevelKey)
 	}
 }
 

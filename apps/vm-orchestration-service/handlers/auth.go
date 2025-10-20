@@ -64,12 +64,12 @@ func AuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
+		defer r.Body.Close()
 		body, err := io.ReadAll(r.Body)
 		if err != nil {
 			http.Error(w, "Failed to read request body", http.StatusBadRequest)
 			return
 		}
-		defer r.Body.Close()
 
 		if err := VerifyRequest(r, body); err != nil {
 			http.Error(w, "Unauthorized: "+err.Error(), http.StatusUnauthorized)
