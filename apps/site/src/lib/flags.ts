@@ -7,4 +7,11 @@ export const areWeLive = flag({
   },
 });
 
-export const rootFlags = [areWeLive] as const;
+export const earlyAccessEnabled = flag({
+  key: "earlyAccessEnabled",
+  decide() {
+    return true;
+  },
+});
+
+export const rootFlags = [areWeLive, earlyAccessEnabled] as const;

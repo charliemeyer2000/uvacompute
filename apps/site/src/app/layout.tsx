@@ -5,6 +5,7 @@ import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { VercelToolbar } from "@vercel/toolbar/next";
 import { IBM_Plex_Mono } from "next/font/google";
+import { Toaster } from "@/components/ui/sonner";
 
 const ibmPlexMono = IBM_Plex_Mono({
   subsets: ["latin"],
@@ -28,12 +29,13 @@ export default function RootLayout({
 }>) {
   const shouldInjectToolbar = !process.env.VERCEL;
   return (
-    <html lang="en">
+    <html lang="en" className="overflow-y-scroll">
       <body className={`${ibmPlexMono.variable} font-mono`}>
         <ConvexClientProvider>{children}</ConvexClientProvider>
         <Analytics />
         <SpeedInsights />
         {shouldInjectToolbar && <VercelToolbar />}
+        <Toaster />
       </body>
     </html>
   );
