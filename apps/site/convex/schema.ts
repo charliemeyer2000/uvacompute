@@ -2,12 +2,6 @@ import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 
 export default defineSchema({
-  users: defineTable({
-    email: v.string(),
-    name: v.string(),
-    count: v.number(),
-  }).index("email", ["email"]),
-
   vms: defineTable({
     userId: v.string(),
 
@@ -49,4 +43,19 @@ export default defineSchema({
   })
     .index("by_user", ["userId"])
     .index("by_user_and_primary", ["userId", "isPrimary"]),
+
+  earlyAccessTokens: defineTable({
+    email: v.string(),
+    approveToken: v.string(),
+    denyToken: v.string(),
+    expiresAt: v.number(),
+    used: v.boolean(),
+    approved: v.boolean(),
+    reason: v.string(),
+    createdAt: v.number(),
+  })
+    .index("by_approve_token", ["approveToken"])
+    .index("by_deny_token", ["denyToken"])
+    .index("by_email", ["email"])
+    .index("by_email_and_approved", ["email", "approved"]),
 });
