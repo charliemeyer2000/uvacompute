@@ -1,37 +1,19 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
 import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import { toast } from "sonner";
+import { useState } from "react";
 
 export default function DeviceApprovalPage() {
-  const [user, setUser] = useState<any>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [result, setResult] = useState<{
-    type: "success" | "error";
-    message: string;
-  } | null>(null);
   const router = useRouter();
   const searchParams = useSearchParams();
   const userCode = searchParams.get("user_code");
-
-  useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        const session = await authClient.getSession();
-        if (session.data?.user) {
-          setUser(session.data.user);
-        }
-      } catch (error) {
-        console.error("Failed to get session:", error);
-      }
-      setIsLoading(false);
-    };
-
-    checkAuth();
-  }, []);
+  const { data: session } = authClient.useSession();
+  const [isProcessing, setIsProcessing] = useState(false);
 
   const handleApprove = async () => {
     if (!userCode) return;
@@ -41,16 +23,16 @@ export default function DeviceApprovalPage() {
       await authClient.device.approve({
         userCode: userCode,
       });
-      setResult({ type: "success", message: "Device approved successfully!" });
-      setTimeout(() => router.push("/dashboard"), 2000);
-    } catch (error: any) {
-      setResult({
-        type: "error",
-        message: "Failed to approve device. Please try again.",
+      toast.success("device approved", {
+        description: "device has been authorized to access your account",
       });
-      console.error("Device approval error:", error);
+      setTimeout(() => router.push("/dashboard"), 2000);
+    } catch (error) {
+      toast.error("approval failed", {
+        description: "failed to approve device, please try again",
+      });
+      setIsProcessing(false);
     }
-    setIsProcessing(false);
   };
 
   const handleDeny = async () => {
@@ -61,131 +43,83 @@ export default function DeviceApprovalPage() {
       await authClient.device.deny({
         userCode: userCode,
       });
-      setResult({ type: "success", message: "Device access denied." });
-      setTimeout(() => router.push("/dashboard"), 2000);
-    } catch (error: any) {
-      setResult({
-        type: "error",
-        message: "Failed to deny device. Please try again.",
+      toast.success("device denied", {
+        description: "device access has been denied",
       });
-      console.error("Device denial error:", error);
+      setTimeout(() => router.push("/dashboard"), 2000);
+    } catch (error) {
+      toast.error("denial failed", {
+        description: "failed to deny device, please try again",
+      });
+      setIsProcessing(false);
     }
-    setIsProcessing(false);
   };
-
-  if (isLoading) {
-    return (
-      <main className="flex flex-col items-center justify-center min-h-screen bg-white">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading...</p>
-        </div>
-      </main>
-    );
-  }
-
-  if (!user) {
-    // Redirect to login if not authenticated
-    return (
-      <main className="flex flex-col items-center justify-center min-h-screen bg-white p-8">
-        <div className="text-center max-w-md">
-          <h1 className="text-2xl font-bold mb-4">Authentication Required</h1>
-          <p className="text-gray-600 mb-6">
-            You must be logged in to approve or deny device authorization
-            requests.
-          </p>
-          <Link
-            href={`/login?redirect=/device/approve?user_code=${userCode}`}
-            className="inline-block px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition"
-          >
-            Log In
-          </Link>
-        </div>
-      </main>
-    );
-  }
 
   if (!userCode) {
     return (
-      <main className="flex flex-col items-center justify-center min-h-screen bg-white p-8">
-        <div className="text-center max-w-md">
-          <h1 className="text-2xl font-bold mb-4">Invalid Request</h1>
-          <p className="text-gray-600 mb-6">
-            No device code provided. Please start the authorization process
-            again.
+      <main className="min-h-screen flex items-center justify-center px-8 font-mono">
+        <div className="max-w-md w-full text-center">
+          <h2 className="text-xl font-semibold mb-4 text-black">
+            invalid request
+          </h2>
+          <p className="text-gray-500 mb-8 text-sm">
+            no device code provided. please start the authorization process
+            again
           </p>
-          <Link
-            href="/device"
-            className="inline-block px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition"
-          >
-            Enter Device Code
-          </Link>
-        </div>
-      </main>
-    );
-  }
-
-  if (result) {
-    return (
-      <main className="flex flex-col items-center justify-center min-h-screen bg-white p-8">
-        <div className="text-center max-w-md">
-          <div
-            className={`mb-4 p-4 rounded-lg ${
-              result.type === "success"
-                ? "bg-green-50 text-green-800"
-                : "bg-red-50 text-red-800"
-            }`}
-          >
-            {result.message}
-          </div>
-          {result.type === "success" && (
-            <p className="text-gray-600 text-sm">Redirecting...</p>
-          )}
+          <Button asChild>
+            <Link href="/device">enter device code</Link>
+          </Button>
         </div>
       </main>
     );
   }
 
   return (
-    <main className="flex flex-col items-center justify-center min-h-screen bg-white p-8">
-      <div className="w-full max-w-md text-center">
-        <h1 className="text-3xl font-bold mb-2">
-          Device Authorization Request
-        </h1>
-        <p className="text-gray-600 mb-8">
-          A device is requesting access to your account
+    <main className="min-h-screen flex items-center justify-center px-8 font-mono">
+      <div className="max-w-md w-full">
+        <h2 className="text-xl font-semibold mb-2 text-center text-black">
+          device authorization request
+        </h2>
+        <p className="text-gray-500 text-center mb-8 text-sm">
+          a device is requesting access to your account
         </p>
 
-        <div className="bg-gray-50 p-6 rounded-lg mb-8">
-          <p className="text-sm text-gray-600 mb-2">Device Code:</p>
-          <p className="text-2xl font-mono font-bold text-gray-900">
+        <div className="border border-gray-200 p-6 mb-8">
+          <p className="text-sm text-gray-500 mb-2 text-center">device code:</p>
+          <p className="text-2xl font-mono font-bold text-center text-black mb-4">
             {userCode}
           </p>
-          <p className="text-sm text-gray-600 mt-4">
-            Logged in as <span className="font-medium">{user.email}</span>
-          </p>
+          <div className="text-sm text-gray-500 text-center">
+            logged in as{" "}
+            {session ? (
+              <span className="text-black">{session.user.email}</span>
+            ) : (
+              <Skeleton className="inline-block h-4 w-48 align-middle" />
+            )}
+          </div>
         </div>
 
         <div className="space-y-4">
-          <button
+          <Button
             onClick={handleApprove}
             disabled={isProcessing}
-            className="w-full py-3 px-4 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
+            className="w-full"
           >
-            {isProcessing ? "Processing..." : "✓ Approve"}
-          </button>
+            {isProcessing ? "processing..." : "approve"}
+          </Button>
 
-          <button
+          <Button
             onClick={handleDeny}
             disabled={isProcessing}
-            className="w-full py-3 px-4 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
+            variant="outline"
+            className="w-full"
           >
-            {isProcessing ? "Processing..." : "✗ Deny"}
-          </button>
+            {isProcessing ? "processing..." : "deny"}
+          </Button>
         </div>
 
-        <p className="text-xs text-gray-500 mt-6">
-          Only approve if you recognize this request and trust the device
+        <p className="text-xs text-gray-500 text-center mt-6">
+          only approve if you recognize this request and trust the device
         </p>
       </div>
     </main>
