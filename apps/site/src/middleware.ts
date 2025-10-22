@@ -1,7 +1,6 @@
 import { NextResponse, NextRequest } from "next/server";
 import { precompute } from "flags/next";
 import { rootFlags } from "@/lib/flags";
-import { getSessionCookie } from "better-auth/cookies";
 
 export const config = { matcher: ["/((?!_next|api|\.well-known|.*\\..*).*)"] };
 
@@ -19,17 +18,9 @@ export async function middleware(request: NextRequest) {
     request.url,
   );
 
-  // Handle auth redirect for /device route
-  const sessionCookie = getSessionCookie(request);
-  if (request.nextUrl.pathname === "/device" && !sessionCookie) {
-    const redirectUrl = `/device${request.nextUrl.search}`;
-    const loginUrl = new URL(`/${flags}/login`, request.url);
-    loginUrl.searchParams.set("redirect", redirectUrl);
-    return NextResponse.redirect(loginUrl);
-  }
-
   const response = NextResponse.rewrite(nextUrl, { request });
   response.headers.set("x-invoke-path", request.nextUrl.pathname);
+  response.headers.set("x-invoke-query", request.nextUrl.search);
 
   return response;
 }
