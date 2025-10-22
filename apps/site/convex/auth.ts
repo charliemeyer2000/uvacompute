@@ -1,6 +1,5 @@
 import { components } from "./_generated/api";
 import { query } from "./_generated/server";
-import { v } from "convex/values";
 import { createClient, GenericCtx } from "@convex-dev/better-auth";
 import { convex } from "@convex-dev/better-auth/plugins";
 import { betterAuth, BetterAuthOptions } from "better-auth";
@@ -9,7 +8,6 @@ import { DataModel } from "./_generated/dataModel";
 import authSchema from "./betterAuth/schema";
 
 const siteUrl = process.env.SITE_URL || "http://localhost:3000";
-const isProduction = siteUrl.includes("uvacompute.com");
 
 export const authComponent = createClient<DataModel, typeof authSchema>(
   components.betterAuth,
@@ -26,20 +24,7 @@ export const createAuth = (
 ) =>
   betterAuth({
     baseURL: siteUrl,
-    trustedOrigins: [
-      siteUrl,
-      "https://uvacompute.com",
-      "https://www.uvacompute.com",
-    ],
-    advanced: {
-      cookiePrefix: "better-auth",
-      ...(isProduction && {
-        crossSubDomainCookies: {
-          enabled: true,
-          domain: ".uvacompute.com",
-        },
-      }),
-    },
+    trustedOrigins: [siteUrl],
     logger: {
       disabled: optionsOnly,
     },
