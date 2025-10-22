@@ -125,36 +125,68 @@ export default function VMHistory() {
     session?.user?.id ? { userId: session.user.id } : "skip",
   );
 
-  if (!session?.user?.id) {
-    return null;
-  }
-
-  if (inactiveVMs === undefined) {
-    return null;
-  }
-
   const totalPages = inactiveVMs
     ? Math.ceil(inactiveVMs.length / ITEMS_PER_PAGE)
     : 0;
-  const paginatedInactiveVMs = inactiveVMs?.slice(
-    (currentPage - 1) * ITEMS_PER_PAGE,
-    currentPage * ITEMS_PER_PAGE,
-  );
+  const paginatedInactiveVMs = inactiveVMs
+    ? inactiveVMs.slice(
+        (currentPage - 1) * ITEMS_PER_PAGE,
+        currentPage * ITEMS_PER_PAGE,
+      )
+    : [];
 
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-xl font-semibold text-black">vm history</h2>
-        {inactiveVMs && (
+        {inactiveVMs ? (
           <span className="text-sm text-gray-500">
             {inactiveVMs.length} {inactiveVMs.length === 1 ? "vm" : "vms"}
           </span>
+        ) : (
+          <div className="h-5 w-16 bg-gray-200 animate-pulse" />
         )}
       </div>
 
-      {inactiveVMs && inactiveVMs.length > 0 ? (
+      {!inactiveVMs ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 min-h-[280px]">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="bg-white border border-gray-200 p-6">
+              <div className="flex justify-between items-start mb-4">
+                <div className="flex-1">
+                  <div className="h-6 w-32 bg-gray-200 animate-pulse mb-2" />
+                  <div className="h-4 w-48 bg-gray-200 animate-pulse" />
+                </div>
+                <div className="h-6 w-16 bg-gray-200 animate-pulse" />
+              </div>
+              <div className="grid grid-cols-2 gap-4 mb-4">
+                <div>
+                  <div className="h-3 w-12 bg-gray-200 animate-pulse mb-1" />
+                  <div className="h-4 w-20 bg-gray-200 animate-pulse" />
+                </div>
+                <div>
+                  <div className="h-3 w-12 bg-gray-200 animate-pulse mb-1" />
+                  <div className="h-4 w-16 bg-gray-200 animate-pulse" />
+                </div>
+                <div>
+                  <div className="h-3 w-12 bg-gray-200 animate-pulse mb-1" />
+                  <div className="h-4 w-16 bg-gray-200 animate-pulse" />
+                </div>
+                <div>
+                  <div className="h-3 w-12 bg-gray-200 animate-pulse mb-1" />
+                  <div className="h-4 w-24 bg-gray-200 animate-pulse" />
+                </div>
+              </div>
+              <div className="border-t border-gray-200 pt-4 space-y-2">
+                <div className="h-3 w-full bg-gray-200 animate-pulse" />
+                <div className="h-3 w-full bg-gray-200 animate-pulse" />
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : inactiveVMs.length > 0 ? (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 min-h-[280px]">
             {paginatedInactiveVMs?.map((vm) => (
               <VMCard key={vm._id} vm={vm} />
             ))}
@@ -228,7 +260,7 @@ export default function VMHistory() {
           )}
         </>
       ) : (
-        <div className="border border-gray-200 p-8 text-center">
+        <div className="border border-gray-200 p-8 text-center min-h-[280px] flex flex-col items-center justify-center">
           <p className="text-gray-500 text-sm">no vm history</p>
         </div>
       )}
