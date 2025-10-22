@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { checkVMOrchestrationService } from "@/lib/health-check";
 import { recordStatusCheck } from "@/lib/redis";
 
-export async function POST(request: NextRequest) {
+export async function GET(request: NextRequest) {
   const authHeader = request.headers.get("authorization");
   const cronSecret = process.env.CRON_SECRET;
 
