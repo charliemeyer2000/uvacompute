@@ -10,7 +10,6 @@
 
 import type * as adapter from "../adapter.js";
 import type * as auth from "../auth.js";
-import type * as currentUser from "../currentUser.js";
 import type * as userHelpers from "../userHelpers.js";
 
 import type {
@@ -30,7 +29,6 @@ import type {
 declare const fullApi: ApiFromModules<{
   adapter: typeof adapter;
   auth: typeof auth;
-  currentUser: typeof currentUser;
   userHelpers: typeof userHelpers;
 }>;
 export type Mounts = {
@@ -1152,20 +1150,6 @@ export type Mounts = {
       any
     >;
   };
-  currentUser: {
-    getCurrentUserByToken: FunctionReference<
-      "query",
-      "public",
-      { token: string },
-      any
-    >;
-    getCurrentUserByTokenMutation: FunctionReference<
-      "mutation",
-      "public",
-      { token: string },
-      any
-    >;
-  };
   userHelpers: {
     getAllUsers: FunctionReference<"query", "public", {}, any>;
     getUserByEmail: FunctionReference<
@@ -1174,6 +1158,7 @@ export type Mounts = {
       { email: string },
       any
     >;
+    getUserById: FunctionReference<"query", "public", { userId: string }, any>;
     updateUserEarlyAccess: FunctionReference<
       "mutation",
       "public",

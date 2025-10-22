@@ -793,7 +793,7 @@ GOOGLE_CLIENT_SECRET=
 GITHUB_CLIENT_ID=            # GitHub OAuth
 GITHUB_CLIENT_SECRET=
 RESEND_API_KEY=              # Email service
-DEV_TOOLS_ALLOWED_USERS=     # Comma-separated emails for dev tools access
+ADMIN_USERS=                 # Comma-separated emails for admin access (dev tools + auto-approved early access)
 ```
 
 ### Email Configuration (Resend)

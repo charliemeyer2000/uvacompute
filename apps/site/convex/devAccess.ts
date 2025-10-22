@@ -1,30 +1,24 @@
 import { query } from "./_generated/server";
-import { v } from "convex/values";
-import { components } from "./_generated/api";
+import { authComponent } from "./auth";
 
 export const hasDevAccess = query({
-  args: { token: v.string() },
-  handler: async (ctx, args) => {
+  args: {},
+  handler: async (ctx) => {
     try {
-      const user = await ctx.runQuery(
-        components.betterAuth.currentUser.getCurrentUserByToken,
-        { token: args.token },
-      );
+      const user = await authComponent.getAuthUser(ctx);
 
       if (!user?.email) {
         return false;
       }
 
-      const allowedUsers =
-        process.env.DEV_TOOLS_ALLOWED_USERS?.split(",").map((email) =>
-          email.trim(),
-        ) || [];
+      const adminUsers =
+        process.env.ADMIN_USERS?.split(",").map((email) => email.trim()) || [];
 
-      if (allowedUsers.length === 0) {
+      if (adminUsers.length === 0) {
         return false;
       }
 
-      return allowedUsers.includes(user.email);
+      return adminUsers.includes(user.email);
     } catch (error) {
       return false;
     }
