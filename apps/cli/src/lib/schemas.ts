@@ -162,7 +162,7 @@ export const UserSchema = z.object({
   email: z.string().email(),
   emailVerified: z.boolean(),
   image: z.string().nullable().optional(),
-  createdAt: z.string(),
+  createdAt: z.number(),
 });
 
 export const UserResponseSchema = z.object({

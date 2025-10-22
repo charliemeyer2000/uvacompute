@@ -2,20 +2,20 @@ import { NextRequest, NextResponse } from "next/server";
 import { authClient } from "@/lib/auth-client";
 
 export async function GET(request: NextRequest) {
+  const { data: session, error } = await authClient.getSession({
+    fetchOptions: {
+      headers: request.headers,
+    },
+  });
+
+  if (error || !session) {
+    return NextResponse.json(
+      { error: error?.message || "unauthorized" },
+      { status: 401 },
+    );
+  }
+
   try {
-    const { data: session, error } = await authClient.getSession({
-      fetchOptions: {
-        headers: request.headers,
-      },
-    });
-
-    if (error || !session) {
-      return NextResponse.json(
-        { error: error?.message || "unauthorized" },
-        { status: 401 },
-      );
-    }
-
     const user = session.user;
 
     return NextResponse.json(
