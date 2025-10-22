@@ -3,9 +3,11 @@
 import { useQuery } from "convex/react";
 import { api } from "../../../../../convex/_generated/api";
 import { Skeleton } from "@/components/ui/skeleton";
+import { authClient } from "@/lib/auth-client";
 
 export default function ProfilePage() {
-  const user = useQuery(api.auth.getCurrentUser);
+  const { data: session } = authClient.useSession();
+  const user = useQuery(api.auth.getCurrentUser, session?.user ? {} : "skip");
 
   if (!user) {
     return (
