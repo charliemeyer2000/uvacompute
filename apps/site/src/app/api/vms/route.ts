@@ -23,7 +23,13 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const token = await getToken();
+    // Get token: if CLI request (bearer token), use it directly; otherwise use session cookie
+    const authHeader = request.headers.get("authorization");
+    const bearerToken = authHeader?.startsWith("Bearer ")
+      ? authHeader.substring(7)
+      : null;
+    const token = bearerToken || (await getToken());
+
     const vms = await fetchQuery(api.vms.listByUser, {}, { token });
 
     return NextResponse.json({ vms }, { status: 200 });
@@ -54,7 +60,13 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
 
-    const token = await getToken();
+    // Get token: if CLI request (bearer token), use it directly; otherwise use session cookie
+    const authHeader = request.headers.get("authorization");
+    const bearerToken = authHeader?.startsWith("Bearer ")
+      ? authHeader.substring(7)
+      : null;
+    const token = bearerToken || (await getToken());
+
     const sshPublicKeys = await fetchQuery(
       api.sshKeys.getAllPublicKeys,
       {},
