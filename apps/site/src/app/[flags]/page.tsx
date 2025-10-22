@@ -6,6 +6,7 @@ import LandingHeader from "./_components/landing-header";
 import { authClient } from "@/lib/auth-client";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
+import { FooterStatus } from "@/components/footer-status";
 
 export default function Page() {
   const { data: session, isPending } = authClient.useSession();
@@ -72,6 +73,9 @@ export default function Page() {
               </a>
             </li>
           </ul>
+          <div className="mt-4">
+            <FooterStatus />
+          </div>
         </footer>
       </div>
     </main>
