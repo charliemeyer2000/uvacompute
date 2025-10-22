@@ -15,13 +15,35 @@ import {
 import { toast } from "sonner";
 import { earlyAccessSchema } from "./_schemas/early-access-schema";
 import { submitEarlyAccess } from "./_actions/submit-early-access";
+import { authClient } from "@/lib/auth-client";
+import { useRouter } from "next/navigation";
 
 export default function EarlyAccessPage() {
   const [isSuccess, setIsSuccess] = useState(false);
+  const { data: session, isPending } = authClient.useSession();
+  const router = useRouter();
+  const handleSignOut = () => {
+    authClient
+      .signOut()
+      .then(() => {
+        router.push("/login");
+        toast.success("signed out successfully");
+      })
+      .catch((error) => {
+        toast.error("sign out failed", {
+          description:
+            error instanceof Error ? error.message : "please try again",
+        });
+      });
+  };
+
+  const userEmail =
+    !isPending && session?.user?.email ? session.user.email : "";
+  const isEmailLocked = !!userEmail;
 
   const form = useForm({
     defaultValues: {
-      email: "",
+      email: userEmail,
       reason: "",
     },
     validators: {
@@ -136,6 +158,10 @@ export default function EarlyAccessPage() {
                     aria-invalid={!field.state.meta.isValid}
                     placeholder="your@email.com"
                     autoComplete="email"
+                    readOnly={isEmailLocked}
+                    className={
+                      isEmailLocked ? "bg-gray-50 cursor-not-allowed" : ""
+                    }
                   />
                 </Field>
               )}
@@ -177,10 +203,18 @@ export default function EarlyAccessPage() {
             </Button>
           </div>
 
-          <div className="pt-4 text-sm text-center">
+          <div className="pt-4 text-sm text-center flex flex-row gap-2 justify-center">
             <Link href="/" className="text-orange-accent underline">
               back to home
             </Link>
+            {session?.user && (
+              <p
+                onClick={handleSignOut}
+                className="text-orange-accent underline cursor-pointer"
+              >
+                log out
+              </p>
+            )}
           </div>
         </form>
       </div>
