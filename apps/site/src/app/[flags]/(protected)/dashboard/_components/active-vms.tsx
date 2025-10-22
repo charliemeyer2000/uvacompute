@@ -145,10 +145,7 @@ export default function ActiveVMs() {
   const { data: session } = authClient.useSession();
   const [currentPage, setCurrentPage] = useState(1);
 
-  const activeVMs = useQuery(
-    api.vms.listActiveByUser,
-    session?.user?.id ? { userId: session.user.id } : "skip",
-  );
+  const activeVMs = useQuery(api.vms.listActiveByUser);
 
   const totalPages = activeVMs
     ? Math.ceil(activeVMs.length / ITEMS_PER_PAGE)
