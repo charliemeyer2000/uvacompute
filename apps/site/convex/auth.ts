@@ -9,6 +9,7 @@ import { DataModel } from "./_generated/dataModel";
 import authSchema from "./betterAuth/schema";
 
 const siteUrl = process.env.SITE_URL || "http://localhost:3000";
+const isProduction = siteUrl.includes("uvacompute.com");
 
 export const authComponent = createClient<DataModel, typeof authSchema>(
   components.betterAuth,
@@ -25,7 +26,20 @@ export const createAuth = (
 ) =>
   betterAuth({
     baseURL: siteUrl,
-    trustedOrigins: [siteUrl],
+    trustedOrigins: [
+      siteUrl,
+      "https://uvacompute.com",
+      "https://www.uvacompute.com",
+    ],
+    advanced: {
+      cookiePrefix: "better-auth",
+      ...(isProduction && {
+        crossSubDomainCookies: {
+          enabled: true,
+          domain: ".uvacompute.com",
+        },
+      }),
+    },
     logger: {
       disabled: optionsOnly,
     },
