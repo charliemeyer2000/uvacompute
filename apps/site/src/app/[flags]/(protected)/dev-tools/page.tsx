@@ -10,22 +10,12 @@ import { toast } from "sonner";
 
 export default function DevToolsPage() {
   const { data: session } = authClient.useSession();
-  const sessionToken = session?.session?.token;
-  const hasDevAccess = useQuery(
-    api.devAccess.hasDevAccess,
-    sessionToken ? { token: sessionToken } : "skip",
-  );
+  const hasDevAccess = useQuery(api.devAccess.hasDevAccess);
   const seedVMs = useMutation(api.seed.seedVMs);
   const clearAllVMs = useMutation(api.seed.clearAllVMs);
   const clearInactiveVMs = useMutation(api.seed.clearInactiveVMs);
-  const earlyAccessRequests = useQuery(
-    api.earlyAccess.listEarlyAccessRequests,
-    sessionToken ? { token: sessionToken } : "skip",
-  );
-  const pendingTokens = useQuery(
-    api.earlyAccess.listPendingTokens,
-    sessionToken ? { token: sessionToken } : "skip",
-  );
+  const earlyAccessRequests = useQuery(api.earlyAccess.listEarlyAccessRequests);
+  const pendingTokens = useQuery(api.earlyAccess.listPendingTokens);
   const grantAccess = useMutation(api.earlyAccess.grantAccess);
   const revokeAccess = useMutation(api.earlyAccess.revokeAccess);
   const approveTokenByEmail = useMutation(
@@ -109,9 +99,8 @@ export default function DevToolsPage() {
   };
 
   const handleGrantAccess = async (userId: string, email: string) => {
-    if (!sessionToken) return;
     try {
-      await grantAccess({ userId, token: sessionToken });
+      await grantAccess({ userId });
       toast.success("access granted", {
         description: `${email} now has early access`,
       });
@@ -124,9 +113,8 @@ export default function DevToolsPage() {
   };
 
   const handleRevokeAccess = async (userId: string, email: string) => {
-    if (!sessionToken) return;
     try {
-      await revokeAccess({ userId, token: sessionToken });
+      await revokeAccess({ userId });
       toast.success("access revoked", {
         description: `${email} no longer has early access`,
       });
