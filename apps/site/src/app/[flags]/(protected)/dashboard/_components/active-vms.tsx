@@ -150,36 +150,68 @@ export default function ActiveVMs() {
     session?.user?.id ? { userId: session.user.id } : "skip",
   );
 
-  if (!session?.user?.id) {
-    return null;
-  }
-
-  if (activeVMs === undefined) {
-    return null;
-  }
-
   const totalPages = activeVMs
     ? Math.ceil(activeVMs.length / ITEMS_PER_PAGE)
     : 0;
-  const paginatedActiveVMs = activeVMs?.slice(
-    (currentPage - 1) * ITEMS_PER_PAGE,
-    currentPage * ITEMS_PER_PAGE,
-  );
+  const paginatedActiveVMs = activeVMs
+    ? activeVMs.slice(
+        (currentPage - 1) * ITEMS_PER_PAGE,
+        currentPage * ITEMS_PER_PAGE,
+      )
+    : [];
 
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-xl font-semibold text-black">active vms</h2>
-        {activeVMs && (
+        {activeVMs ? (
           <span className="text-sm text-gray-500">
             {activeVMs.length} {activeVMs.length === 1 ? "vm" : "vms"}
           </span>
+        ) : (
+          <div className="h-5 w-16 bg-gray-200 animate-pulse" />
         )}
       </div>
 
-      {activeVMs && activeVMs.length > 0 ? (
+      {!activeVMs ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 min-h-[280px]">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="bg-white border border-gray-200 p-6">
+              <div className="flex justify-between items-start mb-4">
+                <div className="flex-1">
+                  <div className="h-6 w-32 bg-gray-200 animate-pulse mb-2" />
+                  <div className="h-4 w-48 bg-gray-200 animate-pulse" />
+                </div>
+                <div className="h-6 w-16 bg-gray-200 animate-pulse" />
+              </div>
+              <div className="grid grid-cols-2 gap-4 mb-4">
+                <div>
+                  <div className="h-3 w-12 bg-gray-200 animate-pulse mb-1" />
+                  <div className="h-4 w-20 bg-gray-200 animate-pulse" />
+                </div>
+                <div>
+                  <div className="h-3 w-12 bg-gray-200 animate-pulse mb-1" />
+                  <div className="h-4 w-16 bg-gray-200 animate-pulse" />
+                </div>
+                <div>
+                  <div className="h-3 w-12 bg-gray-200 animate-pulse mb-1" />
+                  <div className="h-4 w-16 bg-gray-200 animate-pulse" />
+                </div>
+                <div>
+                  <div className="h-3 w-12 bg-gray-200 animate-pulse mb-1" />
+                  <div className="h-4 w-24 bg-gray-200 animate-pulse" />
+                </div>
+              </div>
+              <div className="border-t border-gray-200 pt-4 space-y-2">
+                <div className="h-3 w-full bg-gray-200 animate-pulse" />
+                <div className="h-3 w-full bg-gray-200 animate-pulse" />
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : activeVMs.length > 0 ? (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 min-h-[280px]">
             {paginatedActiveVMs?.map((vm) => (
               <VMCard key={vm._id} vm={vm} isActive={true} />
             ))}
@@ -253,7 +285,7 @@ export default function ActiveVMs() {
           )}
         </>
       ) : (
-        <div className="border border-gray-200 p-8 text-center">
+        <div className="border border-gray-200 p-8 text-center min-h-[280px] flex flex-col items-center justify-center">
           <p className="text-gray-500 mb-2 text-sm">no active vms</p>
           <p className="text-xs text-gray-400">
             create a vm using the cli:{" "}
