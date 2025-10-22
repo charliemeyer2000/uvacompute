@@ -14,7 +14,14 @@ export default async function Layout({
   const cookieStore = await cookies();
   const sessionCookie = cookieStore.get("better-auth.session_token");
 
+  console.log("[PROTECTED LAYOUT] Session cookie:", {
+    exists: !!sessionCookie,
+    value: sessionCookie?.value?.substring(0, 10) + "...",
+    allCookies: cookieStore.getAll().map((c) => c.name),
+  });
+
   if (!sessionCookie?.value) {
+    console.log("[PROTECTED LAYOUT] No session cookie, redirecting to /login");
     redirect("/login");
   }
 
