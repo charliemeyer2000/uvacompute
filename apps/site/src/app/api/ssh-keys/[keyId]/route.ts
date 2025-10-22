@@ -3,6 +3,7 @@ import { authClient } from "@/lib/auth-client";
 import { fetchMutation } from "convex/nextjs";
 import { api } from "../../../../../convex/_generated/api";
 import { Id } from "../../../../../convex/_generated/dataModel";
+import { getToken } from "@/lib/auth-server";
 
 export async function DELETE(
   request: NextRequest,
@@ -25,10 +26,8 @@ export async function DELETE(
     const { keyId: keyIdParam } = await params;
     const keyId = keyIdParam as Id<"sshKeys">;
 
-    await fetchMutation(api.sshKeys.remove, {
-      keyId,
-      userId: session.user.id,
-    });
+    const token = await getToken();
+    await fetchMutation(api.sshKeys.remove, { keyId }, { token });
 
     return NextResponse.json({ success: true }, { status: 200 });
   } catch (error: any) {
@@ -65,10 +64,8 @@ export async function PATCH(
       const { keyId: keyIdParam } = await params;
       const keyId = keyIdParam as Id<"sshKeys">;
 
-      await fetchMutation(api.sshKeys.setPrimary, {
-        keyId,
-        userId: session.user.id,
-      });
+      const token = await getToken();
+      await fetchMutation(api.sshKeys.setPrimary, { keyId }, { token });
 
       return NextResponse.json({ success: true }, { status: 200 });
     }

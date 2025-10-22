@@ -1,5 +1,6 @@
 import { mutation } from "./_generated/server";
 import { v } from "convex/values";
+import { authComponent } from "./auth";
 
 const VM_NAMES = [
   "ml-training-gpu",
@@ -40,11 +41,15 @@ function generateVmId(): string {
 
 export const seedVMs = mutation({
   args: {
-    userId: v.string(),
     activeCount: v.optional(v.number()),
     inactiveCount: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    const user = await authComponent.getAuthUser(ctx);
+    if (!user) {
+      throw new Error("Unauthenticated");
+    }
+
     const activeCount = args.activeCount ?? 8;
     const inactiveCount = args.inactiveCount ?? 25;
     const now = Date.now();
@@ -64,7 +69,7 @@ export const seedVMs = mutation({
       const status = Math.random() > 0.15 ? "running" : "creating";
 
       const vmId = await ctx.db.insert("vms", {
-        userId: args.userId,
+        userId: user._id,
         vmId: generateVmId(),
         name: `${randomChoice(VM_NAMES)}-${randomInt(1, 999)}`,
         cpus: randomChoice([2, 4, 8, 16, 32]),
@@ -109,7 +114,7 @@ export const seedVMs = mutation({
             : createdAt + randomInt(60 * 1000, hours * 60 * 60 * 1000);
 
       const vmId = await ctx.db.insert("vms", {
-        userId: args.userId,
+        userId: user._id,
         vmId: generateVmId(),
         name: `${randomChoice(VM_NAMES)}-${randomInt(1, 999)}`,
         cpus: randomChoice([2, 4, 8, 16, 32]),
@@ -137,13 +142,16 @@ export const seedVMs = mutation({
 });
 
 export const clearAllVMs = mutation({
-  args: {
-    userId: v.string(),
-  },
-  handler: async (ctx, args) => {
+  args: {},
+  handler: async (ctx) => {
+    const user = await authComponent.getAuthUser(ctx);
+    if (!user) {
+      throw new Error("Unauthenticated");
+    }
+
     const vms = await ctx.db
       .query("vms")
-      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
       .collect();
 
     for (const vm of vms) {
@@ -158,13 +166,16 @@ export const clearAllVMs = mutation({
 });
 
 export const clearInactiveVMs = mutation({
-  args: {
-    userId: v.string(),
-  },
-  handler: async (ctx, args) => {
+  args: {},
+  handler: async (ctx) => {
+    const user = await authComponent.getAuthUser(ctx);
+    if (!user) {
+      throw new Error("Unauthenticated");
+    }
+
     const vms = await ctx.db
       .query("vms")
-      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
       .collect();
 
     const inactiveVMs = vms.filter(
