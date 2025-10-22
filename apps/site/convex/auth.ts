@@ -25,6 +25,7 @@ export const createAuth = (
 ) =>
   betterAuth({
     baseURL: siteUrl,
+    trustedOrigins: [siteUrl],
     logger: {
       disabled: optionsOnly,
     },
