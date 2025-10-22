@@ -24,6 +24,10 @@ export default async function Layout({
     redirect("/login");
   }
 
+  if (!session.user.emailVerified) {
+    redirect(`/verify-email?email=${encodeURIComponent(session.user.email)}`);
+  }
+
   const earlyAccessIsEnabled = await earlyAccessEnabled(flags, rootFlags);
 
   return (
