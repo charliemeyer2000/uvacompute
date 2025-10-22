@@ -1,6 +1,5 @@
 import type { Command } from "commander";
 import ora from "ora";
-import chalk from "chalk";
 import { loadToken, getBaseUrl } from "./lib/utils";
 import { UserResponseSchema } from "./lib/schemas";
 
@@ -33,23 +32,11 @@ async function whoami(): Promise<void> {
 
     const data = UserResponseSchema.parse(rawData);
 
-    spinner.succeed(chalk.green("User information retrieved!"));
+    spinner.succeed("User information retrieved!");
 
-    console.log(chalk.blue("\nYour Profile:"));
-    console.log(chalk.gray(`- Name: ${data.user.name}`));
-    console.log(chalk.gray(`- Email: ${data.user.email}`));
     console.log(
-      chalk.gray(`- Email Verified: ${data.user.emailVerified ? "Yes" : "No"}`),
+      `You're logged in as \x1b[1m${data.user.name}\x1b[0m with email \x1b[1m${data.user.email}\x1b[0m`,
     );
-    if (data.user.image) {
-      console.log(chalk.gray(`- Profile Image: ${data.user.image}`));
-    }
-    console.log(
-      chalk.gray(
-        `- Member Since: ${new Date(data.user.createdAt).toLocaleDateString()}`,
-      ),
-    );
-    console.log();
   } catch (error: any) {
     spinner.fail(`Error: ${error.message}`);
     process.exit(1);
