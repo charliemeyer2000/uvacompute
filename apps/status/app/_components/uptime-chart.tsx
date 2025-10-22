@@ -20,9 +20,11 @@ export function UptimeChart({ data, days }: UptimeChartProps) {
     return "bg-red-600";
   }
 
+  const daysWithData = data.filter((d) => d.total > 0);
   const overallUptime =
-    data.length > 0
-      ? data.reduce((sum, d) => sum + d.uptimePercentage, 0) / data.length
+    daysWithData.length > 0
+      ? daysWithData.reduce((sum, d) => sum + d.uptimePercentage, 0) /
+        daysWithData.length
       : 0;
 
   return (
