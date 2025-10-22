@@ -28,13 +28,10 @@ export default function DevToolsPage() {
   const [loading, setLoading] = useState(false);
 
   const handleSeed = async () => {
-    if (!session?.user?.id) return;
-
     setLoading(true);
 
     try {
       const result = await seedVMs({
-        userId: session.user.id,
         activeCount,
         inactiveCount,
       });
@@ -53,14 +50,10 @@ export default function DevToolsPage() {
   };
 
   const handleClearAll = async () => {
-    if (!session?.user?.id) return;
-
     setLoading(true);
 
     try {
-      const result = await clearAllVMs({
-        userId: session.user.id,
-      });
+      const result = await clearAllVMs();
 
       toast.success("all vms cleared", {
         description: `deleted ${result.deleted} VMs`,
@@ -76,14 +69,10 @@ export default function DevToolsPage() {
   };
 
   const handleClearInactive = async () => {
-    if (!session?.user?.id) return;
-
     setLoading(true);
 
     try {
-      const result = await clearInactiveVMs({
-        userId: session.user.id,
-      });
+      const result = await clearInactiveVMs();
 
       toast.success("inactive vms cleared", {
         description: `deleted ${result.deleted} inactive VMs`,

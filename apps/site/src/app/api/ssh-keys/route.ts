@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { authClient } from "@/lib/auth-client";
 import { fetchMutation, fetchQuery } from "convex/nextjs";
 import { api } from "../../../../convex/_generated/api";
+import { getToken } from "@/lib/auth-server";
 import crypto from "crypto";
 
 function parseSSHPublicKey(publicKeyContent: string): {
@@ -52,9 +53,8 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const keys = await fetchQuery(api.sshKeys.list, {
-      userId: session.user.id,
-    });
+    const token = await getToken();
+    const keys = await fetchQuery(api.sshKeys.list, {}, { token });
 
     return NextResponse.json({ keys }, { status: 200 });
   } catch (error: any) {
@@ -95,12 +95,16 @@ export async function POST(request: NextRequest) {
 
     const { fingerprint, keyType } = parseSSHPublicKey(publicKey);
 
-    const keyId = await fetchMutation(api.sshKeys.add, {
-      userId: session.user.id,
-      name: keyName,
-      publicKey: publicKey.trim(),
-      fingerprint,
-    });
+    const token = await getToken();
+    const keyId = await fetchMutation(
+      api.sshKeys.add,
+      {
+        name: keyName,
+        publicKey: publicKey.trim(),
+        fingerprint,
+      },
+      { token },
+    );
 
     return NextResponse.json(
       {

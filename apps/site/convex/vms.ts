@@ -1,5 +1,6 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
+import { authComponent } from "./auth";
 
 /**
  * Create a new VM record in the database
@@ -118,16 +119,19 @@ export const markAsFailed = mutation({
 });
 
 /**
- * Get all VMs for a user
+ * Get all VMs for the authenticated user
  */
 export const listByUser = query({
-  args: {
-    userId: v.string(),
-  },
-  handler: async (ctx, args) => {
+  args: {},
+  handler: async (ctx) => {
+    const user = await authComponent.getAuthUser(ctx);
+    if (!user) {
+      throw new Error("Unauthenticated");
+    }
+
     const vms = await ctx.db
       .query("vms")
-      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
       .order("desc")
       .collect();
 
@@ -136,17 +140,20 @@ export const listByUser = query({
 });
 
 /**
- * Get active (running) VMs for a user
+ * Get active (running) VMs for the authenticated user
  */
 export const listActiveByUser = query({
-  args: {
-    userId: v.string(),
-  },
-  handler: async (ctx, args) => {
+  args: {},
+  handler: async (ctx) => {
+    const user = await authComponent.getAuthUser(ctx);
+    if (!user) {
+      throw new Error("Unauthenticated");
+    }
+
     const vms = await ctx.db
       .query("vms")
       .withIndex("by_user_and_status", (q) =>
-        q.eq("userId", args.userId).eq("status", "running"),
+        q.eq("userId", user._id).eq("status", "running"),
       )
       .order("desc")
       .collect();
@@ -156,16 +163,19 @@ export const listActiveByUser = query({
 });
 
 /**
- * Get inactive (deleted, expired, failed) VMs for a user
+ * Get inactive (deleted, expired, failed) VMs for the authenticated user
  */
 export const listInactiveByUser = query({
-  args: {
-    userId: v.string(),
-  },
-  handler: async (ctx, args) => {
+  args: {},
+  handler: async (ctx) => {
+    const user = await authComponent.getAuthUser(ctx);
+    if (!user) {
+      throw new Error("Unauthenticated");
+    }
+
     const allVms = await ctx.db
       .query("vms")
-      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
       .order("desc")
       .collect();
 
