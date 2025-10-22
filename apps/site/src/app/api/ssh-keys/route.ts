@@ -53,7 +53,13 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const token = await getToken();
+    // Get token: if CLI request (bearer token), use it directly; otherwise use session cookie
+    const authHeader = request.headers.get("authorization");
+    const bearerToken = authHeader?.startsWith("Bearer ")
+      ? authHeader.substring(7)
+      : null;
+    const token = bearerToken || (await getToken());
+
     const keys = await fetchQuery(api.sshKeys.list, {}, { token });
 
     return NextResponse.json({ keys }, { status: 200 });
@@ -95,7 +101,13 @@ export async function POST(request: NextRequest) {
 
     const { fingerprint, keyType } = parseSSHPublicKey(publicKey);
 
-    const token = await getToken();
+    // Get token: if CLI request (bearer token), use it directly; otherwise use session cookie
+    const authHeader = request.headers.get("authorization");
+    const bearerToken = authHeader?.startsWith("Bearer ")
+      ? authHeader.substring(7)
+      : null;
+    const token = bearerToken || (await getToken());
+
     const keyId = await fetchMutation(
       api.sshKeys.add,
       {
