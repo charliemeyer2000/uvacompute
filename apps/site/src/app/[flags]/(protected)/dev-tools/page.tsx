@@ -10,12 +10,21 @@ import { toast } from "sonner";
 
 export default function DevToolsPage() {
   const { data: session } = authClient.useSession();
-  const hasDevAccess = useQuery(api.devAccess.hasDevAccess);
+  const hasDevAccess = useQuery(
+    api.devAccess.hasDevAccess,
+    session?.user ? {} : "skip",
+  );
   const seedVMs = useMutation(api.seed.seedVMs);
   const clearAllVMs = useMutation(api.seed.clearAllVMs);
   const clearInactiveVMs = useMutation(api.seed.clearInactiveVMs);
-  const earlyAccessRequests = useQuery(api.earlyAccess.listEarlyAccessRequests);
-  const pendingTokens = useQuery(api.earlyAccess.listPendingTokens);
+  const earlyAccessRequests = useQuery(
+    api.earlyAccess.listEarlyAccessRequests,
+    session?.user ? {} : "skip",
+  );
+  const pendingTokens = useQuery(
+    api.earlyAccess.listPendingTokens,
+    session?.user ? {} : "skip",
+  );
   const grantAccess = useMutation(api.earlyAccess.grantAccess);
   const revokeAccess = useMutation(api.earlyAccess.revokeAccess);
   const approveTokenByEmail = useMutation(
