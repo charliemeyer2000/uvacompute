@@ -26,7 +26,13 @@ export async function DELETE(
     const { keyId: keyIdParam } = await params;
     const keyId = keyIdParam as Id<"sshKeys">;
 
-    const token = await getToken();
+    // Get token: if CLI request (bearer token), use it directly; otherwise use session cookie
+    const authHeader = request.headers.get("authorization");
+    const bearerToken = authHeader?.startsWith("Bearer ")
+      ? authHeader.substring(7)
+      : null;
+    const token = bearerToken || (await getToken());
+
     await fetchMutation(api.sshKeys.remove, { keyId }, { token });
 
     return NextResponse.json({ success: true }, { status: 200 });
@@ -64,7 +70,13 @@ export async function PATCH(
       const { keyId: keyIdParam } = await params;
       const keyId = keyIdParam as Id<"sshKeys">;
 
-      const token = await getToken();
+      // Get token: if CLI request (bearer token), use it directly; otherwise use session cookie
+      const authHeader = request.headers.get("authorization");
+      const bearerToken = authHeader?.startsWith("Bearer ")
+        ? authHeader.substring(7)
+        : null;
+      const token = bearerToken || (await getToken());
+
       await fetchMutation(api.sshKeys.setPrimary, { keyId }, { token });
 
       return NextResponse.json({ success: true }, { status: 200 });
