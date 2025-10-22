@@ -155,3 +155,16 @@ export const VMConnectionInfoSchema = z.object({
   user: z.string(),
   status: z.string(),
 });
+
+export const UserSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  email: z.string().email(),
+  emailVerified: z.boolean(),
+  image: z.string().nullable().optional(),
+  createdAt: z.number(),
+});
+
+export const UserResponseSchema = z.object({
+  user: UserSchema,
+});
