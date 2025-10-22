@@ -1,21 +1,21 @@
 import { components } from "./_generated/api";
-import { query, QueryCtx } from "./_generated/server";
-import authSchema from "./betterAuth/schema.js";
+import { query } from "./_generated/server";
+import { v } from "convex/values";
 import { createClient, GenericCtx } from "@convex-dev/better-auth";
 import { convex } from "@convex-dev/better-auth/plugins";
 import { betterAuth, BetterAuthOptions } from "better-auth";
 import { deviceAuthorization } from "better-auth/plugins";
 import { DataModel } from "./_generated/dataModel";
+import authSchema from "./betterAuth/schema";
 
 const siteUrl = process.env.SITE_URL || "http://localhost:3000";
 
-export const betterAuthComponent = createClient<DataModel, typeof authSchema>(
+export const authComponent = createClient<DataModel, typeof authSchema>(
   components.betterAuth,
   {
     local: {
       schema: authSchema,
     },
-    verbose: false,
   },
 );
 
@@ -28,15 +28,51 @@ export const createAuth = (
     logger: {
       disabled: optionsOnly,
     },
-    database: betterAuthComponent.adapter(ctx),
+    database: authComponent.adapter(ctx),
+    user: {
+      additionalFields: {
+        hasEarlyAccess: {
+          type: "boolean",
+          defaultValue: false,
+        },
+      },
+    },
     emailAndPassword: {
       enabled: true,
-      requireEmailVerification: false, // Simplified for now
+      requireEmailVerification: true,
+      async sendResetPassword({ user, url }) {
+        const { sendPasswordResetEmail } = await import("../src/lib/email");
+        await sendPasswordResetEmail({
+          email: user.email,
+          url,
+          name: user.name,
+        });
+      },
+      resetPasswordTokenExpiresIn: 3600,
+    },
+    emailVerification: {
+      async sendVerificationEmail({ user, url }) {
+        const { sendVerificationEmail } = await import("../src/lib/email");
+        await sendVerificationEmail({
+          email: user.email,
+          url,
+          name: user.name,
+        });
+      },
+      async afterEmailVerification(user, request) {
+        console.log(`${user.email} has been successfully verified!`);
+      },
+      sendOnSignUp: true,
+      autoSignInAfterVerification: true,
     },
     socialProviders: {
       google: {
         clientId: process.env.GOOGLE_CLIENT_ID!,
         clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+      },
+      github: {
+        clientId: process.env.GITHUB_CLIENT_ID!,
+        clientSecret: process.env.GITHUB_CLIENT_SECRET!,
       },
     },
     plugins: [
@@ -51,17 +87,12 @@ export const createAuth = (
     ],
   } satisfies BetterAuthOptions);
 
-export const safeGetUser = async (ctx: QueryCtx) => {
-  return betterAuthComponent.safeGetAuthUser(ctx);
-};
-
-export const getUser = async (ctx: QueryCtx) => {
-  return betterAuthComponent.getAuthUser(ctx);
-};
-
 export const getCurrentUser = query({
-  args: {},
-  handler: async (ctx) => {
-    return safeGetUser(ctx);
+  args: { token: v.string() },
+  handler: async (ctx, args) => {
+    return await ctx.runQuery(
+      components.betterAuth.currentUser.getCurrentUserByToken,
+      { token: args.token },
+    );
   },
 });
