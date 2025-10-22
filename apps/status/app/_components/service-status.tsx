@@ -1,13 +1,13 @@
-import { type ServiceStatus as ServiceStatusType } from "@/lib/redis";
 import { cn } from "@/lib/utils";
+import type { ServiceStatus } from "@/types";
 
 interface ServiceStatusProps {
   name: string;
-  status: ServiceStatusType;
+  status: ServiceStatus;
   responseTime?: number;
 }
 
-const statusConfig: Record<ServiceStatusType, { dot: string; text: string }> = {
+const statusConfig: Record<ServiceStatus, { dot: string; text: string }> = {
   operational: {
     dot: "bg-green-500",
     text: "operational",
