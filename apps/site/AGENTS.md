@@ -160,14 +160,9 @@ export const myQuery = query({
 
 ### Critical Implementation Notes
 
-⚠️ **Use `authComponent.getAuthUser(ctx)` for authentication**:
+⚠️ **Standard Authentication Pattern - Use `authComponent` methods**:
 
-- Convex's `ctx.auth.getUserIdentity()` is for Convex's built-in auth, NOT Better Auth
-- Always use `authComponent.getAuthUser(ctx)` from `convex/auth.ts` to get the authenticated user
-- The Better Auth adapter automatically integrates with Convex's auth system via JWT validation
-- No manual token passing is required
-
-**Example Pattern**:
+**For queries/mutations that need authentication:**
 
 ```tsx
 import { query } from "./_generated/server";
@@ -175,13 +170,49 @@ import { authComponent } from "./auth";
 
 export const myQuery = query({
   args: {},
-  handler: async (ctx, args) => {
+  handler: async (ctx) => {
+    // Get authenticated user (throws error if not authenticated)
     const user = await authComponent.getAuthUser(ctx);
     if (!user) throw new Error("Unauthenticated");
-    return { userId: user._id, name: user.name };
+
+    // Access user._id, user.email, user.hasEarlyAccess, etc.
+    return await ctx.db
+      .query("vms")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .collect();
   },
 });
 ```
+
+**For queries that handle both logged-in and logged-out states:**
+
+```tsx
+import { query } from "./_generated/server";
+import { authComponent } from "./auth";
+
+export const myQuery = query({
+  args: {},
+  handler: async (ctx) => {
+    // Returns user or null (doesn't throw error)
+    const user = await authComponent.safeGetAuthUser(ctx);
+
+    if (!user) {
+      return { message: "Please log in" };
+    }
+
+    return { message: `Hello ${user.name}` };
+  },
+});
+```
+
+**Key Points:**
+
+- **Always** use `authComponent.getAuthUser(ctx)` for protected queries/mutations
+- Use `authComponent.safeGetAuthUser(ctx)` for `getCurrentUser` or public-facing queries
+- **Never** pass `userId` as an argument - it's a security vulnerability!
+- User ID is accessed via `user._id` from the authenticated user object
+- Custom fields like `hasEarlyAccess` are available on the user object
+- No manual token passing is required - Better Auth handles this automatically
 
 ### User Table Schema
 
@@ -230,10 +261,13 @@ console.log(user.myCustomField);
 
 ### Common Auth Issues & Solutions
 
-**Issue**: `getUserIdentity()` returns null / "Unauthenticated" errors
+**Issue**: "Unauthenticated" errors in Convex functions
 
-- **Cause**: Using Convex's built-in `ctx.auth.getUserIdentity()` instead of Better Auth's method
-- **Solution**: Always use `authComponent.getAuthUser(ctx)` from `convex/auth.ts`
+- **Cause**: Missing `convex/auth.config.ts` or `expectAuth: true` in ConvexReactClient
+- **Solution**:
+  1. Ensure `convex/auth.config.ts` exists with Better Auth JWT provider configuration
+  2. Verify `expectAuth: true` is set in `src/providers/convexClientProvider.tsx`
+  3. Use either `ctx.auth.getUserIdentity()` or `authComponent.getAuthUser(ctx)` for auth checks
 
 **Issue**: User data not loading on protected pages
 
@@ -247,10 +281,11 @@ console.log(user.myCustomField);
 
 ### Critical Gotchas
 
-⚠️ **Always use `authComponent.getAuthUser(ctx)`, NEVER `ctx.auth.getUserIdentity()`**
+⚠️ **Use `authComponent` methods consistently**
 
-- `ctx.auth.getUserIdentity()` is for Convex's built-in auth, not Better Auth
-- Use `authComponent.getAuthUser(ctx)` from `convex/auth.ts` for Better Auth
+- Always use `authComponent.getAuthUser(ctx)` for authentication
+- Never pass `userId` as an argument - get it from the authenticated user
+- Use `authComponent.safeGetAuthUser(ctx)` for public queries that can handle logged-out users
 
 ⚠️ **Set `expectAuth: true` in ConvexReactClient**
 
