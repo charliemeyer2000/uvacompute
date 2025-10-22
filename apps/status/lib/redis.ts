@@ -1,4 +1,5 @@
 import Redis from "ioredis";
+import type { ServiceStatus, StatusCheck } from "@/types";
 
 let redis: Redis | null = null;
 
@@ -15,15 +16,6 @@ function getRedisClient(): Redis {
     });
   }
   return redis;
-}
-
-export type ServiceStatus = "operational" | "degraded" | "down";
-
-export interface StatusCheck {
-  status: ServiceStatus;
-  responseTime: number;
-  timestamp: number;
-  error?: string;
 }
 
 const NINETY_DAYS_SECONDS = 90 * 24 * 60 * 60;
