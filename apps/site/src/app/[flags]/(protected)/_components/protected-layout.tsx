@@ -1,8 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useQuery, useMutation } from "convex/react";
 import { useRouter, usePathname } from "next/navigation";
+import { useQuery, useMutation } from "convex/react";
 import { authClient } from "@/lib/auth-client";
 import { api } from "../../../../../convex/_generated/api";
 import { Button } from "@/components/ui/button";
@@ -10,6 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import Link from "next/link";
 import { toast } from "sonner";
 import { EarlyAccessProvider } from "./early-access-context";
+import { useRedirectLogic } from "./use-redirect-logic";
 
 export default function ProtectedLayout({
   children,
@@ -20,7 +20,6 @@ export default function ProtectedLayout({
 }) {
   const router = useRouter();
   const pathname = usePathname();
-  const [mounted, setMounted] = useState(false);
   const user = useQuery(api.auth.getCurrentUser);
   const hasDevAccess = useQuery(api.devAccess.hasDevAccess);
   const hasEarlyAccess = useQuery(api.earlyAccess.hasEarlyAccess);
@@ -29,48 +28,15 @@ export default function ProtectedLayout({
   );
   const syncEarlyAccess = useMutation(api.earlyAccess.syncEarlyAccessFromToken);
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  useEffect(() => {
-    if (user && !user.emailVerified) {
-      router.push(`/verify-email?email=${encodeURIComponent(user.email)}`);
-    }
-  }, [user, router]);
-
-  useEffect(() => {
-    if (user && earlyAccessEnabled) {
-      syncEarlyAccess();
-    }
-  }, [user, earlyAccessEnabled, syncEarlyAccess]);
-
-  useEffect(() => {
-    if (!user) return;
-
-    const isOnOnboarding = mounted && pathname?.includes("/onboarding");
-
-    if (
-      earlyAccessEnabled &&
-      hasEarlyAccess === false &&
-      !isOnOnboarding &&
-      hasPendingRequest !== undefined
-    ) {
-      if (hasPendingRequest) {
-        router.push("/pending-approval");
-      } else {
-        router.push("/early-access");
-      }
-    }
-  }, [
+  const { isLoading: isRedirecting } = useRedirectLogic({
     user,
+    earlyAccessEnabled,
     hasEarlyAccess,
     hasPendingRequest,
-    earlyAccessEnabled,
-    router,
-    mounted,
     pathname,
-  ]);
+    syncEarlyAccess,
+    router,
+  });
 
   const handleSignOut = async () => {
     try {
@@ -85,10 +51,10 @@ export default function ProtectedLayout({
   };
 
   const firstName = user?.name ? user.name.split(" ")[0].toLowerCase() : "";
-  const isOnProfile = mounted && pathname?.includes("/profile");
-  const isOnDevTools = mounted && pathname?.includes("/dev-tools");
-  const isOnDashboard = mounted && pathname?.includes("/dashboard");
-  const isOnOnboarding = mounted && pathname?.includes("/onboarding");
+  const isOnProfile = pathname?.includes("/profile");
+  const isOnDevTools = pathname?.includes("/dev-tools");
+  const isOnDashboard = pathname?.includes("/dashboard");
+  const isOnOnboarding = pathname?.includes("/onboarding");
 
   return (
     <EarlyAccessProvider earlyAccessEnabled={earlyAccessEnabled}>
@@ -119,28 +85,41 @@ export default function ProtectedLayout({
               </div>
             </div>
             <div className="flex gap-2">
-              {(!isOnOnboarding || hasEarlyAccess) && (
+              {isRedirecting ? (
                 <>
-                  <Button
-                    variant={isOnDashboard ? "default" : "outline"}
-                    asChild
-                  >
-                    <Link href="/dashboard">dashboard</Link>
-                  </Button>
-                  <Button variant={isOnProfile ? "default" : "outline"} asChild>
-                    <Link href="/profile">profile</Link>
-                  </Button>
-                  {hasDevAccess && (
-                    <Button
-                      variant={isOnDevTools ? "default" : "outline"}
-                      asChild
-                    >
-                      <Link href="/dev-tools">dev tools</Link>
-                    </Button>
+                  <Skeleton className="h-10 w-24" />
+                  <Skeleton className="h-10 w-20" />
+                  <Skeleton className="h-10 w-20" />
+                </>
+              ) : (
+                <>
+                  {(!isOnOnboarding || hasEarlyAccess) && (
+                    <>
+                      <Button
+                        variant={isOnDashboard ? "default" : "outline"}
+                        asChild
+                      >
+                        <Link href="/dashboard">dashboard</Link>
+                      </Button>
+                      <Button
+                        variant={isOnProfile ? "default" : "outline"}
+                        asChild
+                      >
+                        <Link href="/profile">profile</Link>
+                      </Button>
+                      {hasDevAccess && (
+                        <Button
+                          variant={isOnDevTools ? "default" : "outline"}
+                          asChild
+                        >
+                          <Link href="/dev-tools">dev tools</Link>
+                        </Button>
+                      )}
+                    </>
                   )}
+                  <Button onClick={handleSignOut}>sign out</Button>
                 </>
               )}
-              <Button onClick={handleSignOut}>sign out</Button>
             </div>
           </div>
 

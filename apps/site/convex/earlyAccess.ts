@@ -15,6 +15,12 @@ export const hasEarlyAccess = query({
         return true;
       }
 
+      const adminUsers =
+        process.env.ADMIN_USERS?.split(",").map((email) => email.trim()) || [];
+      if (adminUsers.includes(user.email)) {
+        return true;
+      }
+
       const approvedToken = await ctx.db
         .query("earlyAccessTokens")
         .withIndex("by_email_and_approved", (q) =>
