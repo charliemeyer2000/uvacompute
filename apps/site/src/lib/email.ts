@@ -52,3 +52,26 @@ export async function sendPasswordResetEmail({
     `,
   });
 }
+
+export async function sendEarlyAccessApprovalEmail({
+  email,
+  name,
+}: {
+  email: string;
+  name: string;
+}) {
+  const firstName = name.split(" ")[0];
+
+  await resend.emails.send({
+    from: FROM_EMAIL,
+    to: email,
+    subject: "early access approved - uvacompute",
+    text: `Hey ${firstName},
+
+You can now log in and start using the uvacompute CLI and platform. Thanks for being an early adopter.
+
+If you have any questions or need help getting started, just email me personally: charlie@uvacompute.com
+
+- Charlie`,
+  });
+}

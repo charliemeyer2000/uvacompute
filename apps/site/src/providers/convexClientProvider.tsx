@@ -7,6 +7,7 @@ import { authClient } from "@/lib/auth-client";
 
 const convex = new ConvexReactClient(process.env.NEXT_PUBLIC_CONVEX_URL!, {
   verbose: true,
+  expectAuth: true,
 });
 
 export function ConvexClientProvider({ children }: { children: ReactNode }) {
