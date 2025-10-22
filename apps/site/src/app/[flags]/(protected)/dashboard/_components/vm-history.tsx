@@ -120,7 +120,10 @@ export default function VMHistory() {
   const { data: session } = authClient.useSession();
   const [currentPage, setCurrentPage] = useState(1);
 
-  const inactiveVMs = useQuery(api.vms.listInactiveByUser);
+  const inactiveVMs = useQuery(
+    api.vms.listInactiveByUser,
+    session?.user ? {} : "skip",
+  );
 
   const totalPages = inactiveVMs
     ? Math.ceil(inactiveVMs.length / ITEMS_PER_PAGE)
