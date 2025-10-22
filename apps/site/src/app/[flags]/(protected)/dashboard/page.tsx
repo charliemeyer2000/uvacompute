@@ -3,10 +3,9 @@
 import { useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
-import { Suspense } from "react";
 import VMList from "./_components/vm-list";
 
-function DashboardContent() {
+export default function DashboardPage() {
   const searchParams = useSearchParams();
 
   useEffect(() => {
@@ -21,19 +20,5 @@ function DashboardContent() {
     <div className="border-t border-gray-200 pt-8">
       <VMList />
     </div>
-  );
-}
-
-export default function DashboardPage() {
-  return (
-    <Suspense
-      fallback={
-        <div className="border-t border-gray-200 pt-8">
-          <VMList />
-        </div>
-      }
-    >
-      <DashboardContent />
-    </Suspense>
   );
 }
