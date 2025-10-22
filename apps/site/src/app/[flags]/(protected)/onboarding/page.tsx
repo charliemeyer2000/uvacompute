@@ -5,10 +5,15 @@ import { useQuery } from "convex/react";
 import { api } from "../../../../../convex/_generated/api";
 import { Button } from "@/components/ui/button";
 import { useEarlyAccessEnabled } from "../_components/early-access-context";
+import { authClient } from "@/lib/auth-client";
 
 export default function OnboardingPage() {
+  const { data: session } = authClient.useSession();
   const earlyAccessEnabled = useEarlyAccessEnabled();
-  const hasEarlyAccess = useQuery(api.earlyAccess.hasEarlyAccess);
+  const hasEarlyAccess = useQuery(
+    api.earlyAccess.hasEarlyAccess,
+    session?.user ? {} : "skip",
+  );
 
   return (
     <div className="space-y-8">
