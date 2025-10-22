@@ -1,36 +1,17 @@
 import { NextResponse } from "next/server";
-import { getCurrentStatus, getRecentChecks } from "@/lib/redis";
+import { getStatus } from "@/app/actions/status-actions";
 
 export async function GET() {
   try {
-    const current = await getCurrentStatus();
-    const history = await getRecentChecks(24);
+    const data = await getStatus();
 
-    const operationalChecks = history.filter(
-      (check) => check.status === "operational",
-    ).length;
-    const uptime =
-      history.length > 0 ? (operationalChecks / history.length) * 100 : 0;
-
-    return NextResponse.json(
-      {
-        current: current || {
-          status: "down",
-          responseTime: 0,
-          timestamp: Date.now(),
-          error: "No data available",
-        },
-        history,
-        uptime: Math.round(uptime * 100) / 100,
+    return NextResponse.json(data, {
+      headers: {
+        "Cache-Control": "public, s-maxage=30, stale-while-revalidate=60",
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET",
       },
-      {
-        headers: {
-          "Cache-Control": "public, s-maxage=30, stale-while-revalidate=60",
-          "Access-Control-Allow-Origin": "*",
-          "Access-Control-Allow-Methods": "GET",
-        },
-      },
-    );
+    });
   } catch (error) {
     console.error("Failed to fetch status:", error);
     return NextResponse.json(

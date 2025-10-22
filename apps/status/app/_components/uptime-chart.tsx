@@ -1,92 +1,31 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { format, subDays } from "date-fns";
+import { useState } from "react";
+import { format } from "date-fns";
 import { cn } from "@/lib/utils";
-
-interface DayData {
-  date: string;
-  operational: number;
-  degraded: number;
-  down: number;
-  total: number;
-  uptimePercentage: number;
-  avgResponseTime: number;
-}
+import type { DayAggregate } from "@/types";
 
 interface UptimeChartProps {
-  days?: number;
+  data: DayAggregate[];
+  days: number;
 }
 
-export function UptimeChart({ days = 90 }: UptimeChartProps) {
-  const [data, setData] = useState<DayData[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [hoveredDay, setHoveredDay] = useState<DayData | null>(null);
+export function UptimeChart({ data, days }: UptimeChartProps) {
+  const [hoveredDay, setHoveredDay] = useState<DayAggregate | null>(null);
 
-  useEffect(() => {
-    async function fetchData() {
-      try {
-        const response = await fetch(`/api/status/history?days=${days}`);
-        const result = await response.json();
-
-        const allDays: DayData[] = [];
-        const today = new Date();
-        const dataMap = new Map<string, DayData>(
-          result.aggregated.map((d: DayData) => [d.date, d]),
-        );
-
-        for (let i = days - 1; i >= 0; i--) {
-          const date = format(subDays(today, i), "yyyy-MM-dd");
-          const dayData = dataMap.get(date);
-
-          if (dayData) {
-            allDays.push(dayData);
-          } else {
-            allDays.push({
-              date,
-              operational: 0,
-              degraded: 0,
-              down: 0,
-              total: 0,
-              uptimePercentage: 100,
-              avgResponseTime: 0,
-            });
-          }
-        }
-
-        setData(allDays);
-      } catch (error) {
-        console.error("Failed to fetch uptime data:", error);
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    fetchData();
-  }, [days]);
-
-  function getStatusColor(day: DayData): string {
+  function getStatusColor(day: DayAggregate): string {
     if (day.total === 0) return "bg-gray-200";
     if (day.uptimePercentage >= 99) return "bg-green-500";
     if (day.uptimePercentage >= 95) return "bg-yellow-500";
     return "bg-red-600";
   }
 
+  const daysWithData = data.filter((d) => d.total > 0);
   const overallUptime =
-    data.length > 0
-      ? data.reduce((sum, d) => sum + d.uptimePercentage, 0) / data.length
+    daysWithData.length > 0
+      ? daysWithData.reduce((sum, d) => sum + d.uptimePercentage, 0) /
+        daysWithData.length
       : 0;
-
-  if (loading) {
-    return (
-      <div className="border border-black p-6">
-        <div className="text-lg font-medium mb-4">uptime last {days} days</div>
-        <div className="h-24 flex items-center justify-center text-muted-foreground">
-          loading...
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="border border-black p-6">

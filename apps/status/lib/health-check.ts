@@ -1,11 +1,4 @@
-import { ServiceStatus } from "./redis";
-
-export interface HealthCheckResult {
-  status: ServiceStatus;
-  responseTime: number;
-  timestamp: Date;
-  error?: string;
-}
+import type { HealthCheckResult } from "@/types";
 
 const TIMEOUT_MS = 10000;
 const DEGRADED_THRESHOLD_MS = 2000;

@@ -1,5 +1,5 @@
-import { ServiceStatus } from "@/lib/redis";
 import { cn } from "@/lib/utils";
+import type { ServiceStatus } from "@/types";
 
 interface StatusBadgeProps {
   status: ServiceStatus;
