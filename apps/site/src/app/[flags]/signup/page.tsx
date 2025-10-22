@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "@tanstack/react-form";
 import { authClient } from "@/lib/auth-client";
@@ -23,19 +23,6 @@ export default function SignUpPage() {
   const [socialLoading, setSocialLoading] = useState<
     "github" | "google" | null
   >(null);
-  const { data: session, isPending } = authClient.useSession();
-
-  useEffect(() => {
-    if (!isPending && session) {
-      if (session.user.emailVerified) {
-        router.push("/dashboard");
-      } else {
-        router.push(
-          `/verify-email?email=${encodeURIComponent(session.user.email)}`,
-        );
-      }
-    }
-  }, [isPending, session, router]);
 
   const form = useForm({
     defaultValues: {
