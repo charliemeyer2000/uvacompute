@@ -18,5 +18,8 @@ export async function middleware(request: NextRequest) {
     request.url,
   );
 
-  return NextResponse.rewrite(nextUrl, { request });
+  const response = NextResponse.rewrite(nextUrl, { request });
+  response.headers.set("x-invoke-path", request.nextUrl.pathname);
+
+  return response;
 }
