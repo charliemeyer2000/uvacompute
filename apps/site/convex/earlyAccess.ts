@@ -1,16 +1,14 @@
-import { query, mutation } from "./_generated/server";
+import { query, mutation, internalAction } from "./_generated/server";
 import { v } from "convex/values";
-import { components } from "./_generated/api";
+import { components, internal } from "./_generated/api";
+import { authComponent } from "./auth";
 
 export const hasEarlyAccess = query({
-  args: { token: v.string() },
+  args: {},
   returns: v.boolean(),
-  handler: async (ctx, args) => {
+  handler: async (ctx) => {
     try {
-      const user = await ctx.runQuery(
-        components.betterAuth.currentUser.getCurrentUserByToken,
-        { token: args.token },
-      );
+      const user = await authComponent.getAuthUser(ctx);
       if (!user) return false;
 
       if (user.hasEarlyAccess) {
@@ -31,18 +29,48 @@ export const hasEarlyAccess = query({
   },
 });
 
-export const syncEarlyAccessFromToken = mutation({
-  args: { token: v.string() },
+export const hasPendingEarlyAccessRequest = query({
+  args: {},
   returns: v.boolean(),
-  handler: async (ctx, args) => {
+  handler: async (ctx) => {
     try {
-      const user = await ctx.runMutation(
-        components.betterAuth.currentUser.getCurrentUserByTokenMutation,
-        { token: args.token },
-      );
+      const user = await authComponent.getAuthUser(ctx);
+      if (!user) return false;
+
+      const token = await ctx.db
+        .query("earlyAccessTokens")
+        .withIndex("by_email", (q) => q.eq("email", user.email))
+        .first();
+
+      return !!token;
+    } catch (error) {
+      return false;
+    }
+  },
+});
+
+export const syncEarlyAccessFromToken = mutation({
+  args: {},
+  returns: v.boolean(),
+  handler: async (ctx) => {
+    try {
+      const user = await authComponent.getAuthUser(ctx);
       if (!user) return false;
 
       if (user.hasEarlyAccess) {
+        return true;
+      }
+
+      const adminUsers =
+        process.env.ADMIN_USERS?.split(",").map((email) => email.trim()) || [];
+      if (adminUsers.includes(user.email)) {
+        await ctx.runMutation(
+          components.betterAuth.userHelpers.updateUserEarlyAccess,
+          {
+            userId: user._id,
+            hasEarlyAccess: true,
+          },
+        );
         return true;
       }
 
@@ -72,23 +100,27 @@ export const syncEarlyAccessFromToken = mutation({
 });
 
 export const grantAccess = mutation({
-  args: { userId: v.string(), token: v.string() },
+  args: { userId: v.string() },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const adminUser = await ctx.runMutation(
-      components.betterAuth.currentUser.getCurrentUserByTokenMutation,
-      { token: args.token },
-    );
+    const adminUser = await authComponent.getAuthUser(ctx);
     if (!adminUser?.email) {
       throw new Error("Unauthorized");
     }
 
     const allowedAdmins =
-      process.env.DEV_TOOLS_ALLOWED_USERS?.split(",").map((email) =>
-        email.trim(),
-      ) || [];
+      process.env.ADMIN_USERS?.split(",").map((email) => email.trim()) || [];
     if (!allowedAdmins.includes(adminUser.email)) {
       throw new Error("Unauthorized");
+    }
+
+    const user = await ctx.runQuery(
+      components.betterAuth.userHelpers.getUserById,
+      { userId: args.userId as any },
+    );
+
+    if (!user) {
+      throw new Error("User not found");
     }
 
     await ctx.runMutation(
@@ -99,26 +131,26 @@ export const grantAccess = mutation({
       },
     );
 
+    await ctx.scheduler.runAfter(0, internal.earlyAccess.sendApprovalEmail, {
+      email: user.email,
+      name: user.name,
+    });
+
     return null;
   },
 });
 
 export const revokeAccess = mutation({
-  args: { userId: v.string(), token: v.string() },
+  args: { userId: v.string() },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const adminUser = await ctx.runMutation(
-      components.betterAuth.currentUser.getCurrentUserByTokenMutation,
-      { token: args.token },
-    );
+    const adminUser = await authComponent.getAuthUser(ctx);
     if (!adminUser?.email) {
       throw new Error("Unauthorized");
     }
 
     const allowedAdmins =
-      process.env.DEV_TOOLS_ALLOWED_USERS?.split(",").map((email) =>
-        email.trim(),
-      ) || [];
+      process.env.ADMIN_USERS?.split(",").map((email) => email.trim()) || [];
     if (!allowedAdmins.includes(adminUser.email)) {
       throw new Error("Unauthorized");
     }
@@ -136,7 +168,7 @@ export const revokeAccess = mutation({
 });
 
 export const listEarlyAccessRequests = query({
-  args: { token: v.string() },
+  args: {},
   returns: v.array(
     v.object({
       _id: v.string(),
@@ -148,20 +180,15 @@ export const listEarlyAccessRequests = query({
       hasApprovedToken: v.boolean(),
     }),
   ),
-  handler: async (ctx, args) => {
+  handler: async (ctx) => {
     try {
-      const adminUser = await ctx.runQuery(
-        components.betterAuth.currentUser.getCurrentUserByToken,
-        { token: args.token },
-      );
+      const adminUser = await authComponent.getAuthUser(ctx);
       if (!adminUser?.email) {
         return [];
       }
 
       const allowedAdmins =
-        process.env.DEV_TOOLS_ALLOWED_USERS?.split(",").map((email) =>
-          email.trim(),
-        ) || [];
+        process.env.ADMIN_USERS?.split(",").map((email) => email.trim()) || [];
       if (!allowedAdmins.includes(adminUser.email)) {
         return [];
       }
@@ -189,7 +216,7 @@ export const listEarlyAccessRequests = query({
 });
 
 export const listPendingTokens = query({
-  args: { token: v.string() },
+  args: {},
   returns: v.array(
     v.object({
       _id: v.id("earlyAccessTokens"),
@@ -199,20 +226,15 @@ export const listPendingTokens = query({
       createdAt: v.number(),
     }),
   ),
-  handler: async (ctx, args) => {
+  handler: async (ctx) => {
     try {
-      const adminUser = await ctx.runQuery(
-        components.betterAuth.currentUser.getCurrentUserByToken,
-        { token: args.token },
-      );
+      const adminUser = await authComponent.getAuthUser(ctx);
       if (!adminUser?.email) {
         return [];
       }
 
       const allowedAdmins =
-        process.env.DEV_TOOLS_ALLOWED_USERS?.split(",").map((email) =>
-          email.trim(),
-        ) || [];
+        process.env.ADMIN_USERS?.split(",").map((email) => email.trim()) || [];
       if (!allowedAdmins.includes(adminUser.email)) {
         return [];
       }
@@ -235,5 +257,18 @@ export const listPendingTokens = query({
     } catch (error) {
       return [];
     }
+  },
+});
+
+export const sendApprovalEmail = internalAction({
+  args: { email: v.string(), name: v.string() },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const { sendEarlyAccessApprovalEmail } = await import("../src/lib/email");
+    await sendEarlyAccessApprovalEmail({
+      email: args.email,
+      name: args.name,
+    });
+    return null;
   },
 });

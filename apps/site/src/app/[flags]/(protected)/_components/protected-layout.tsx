@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useQuery, useMutation } from "convex/react";
+import { useQuery, useMutation, Authenticated } from "convex/react";
 import { useRouter, usePathname } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
 import { api } from "../../../../../convex/_generated/api";
@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import Link from "next/link";
 import { toast } from "sonner";
+import { EarlyAccessProvider } from "./early-access-context";
 
 export default function ProtectedLayout({
   children,
@@ -20,19 +21,11 @@ export default function ProtectedLayout({
   const router = useRouter();
   const pathname = usePathname();
   const [mounted, setMounted] = useState(false);
-  const { data: session } = authClient.useSession();
-  const sessionToken = session?.session?.token;
-  const user = useQuery(
-    api.auth.getCurrentUser,
-    sessionToken ? { token: sessionToken } : "skip",
-  );
-  const hasDevAccess = useQuery(
-    api.devAccess.hasDevAccess,
-    sessionToken ? { token: sessionToken } : "skip",
-  );
-  const hasEarlyAccess = useQuery(
-    api.earlyAccess.hasEarlyAccess,
-    sessionToken ? { token: sessionToken } : "skip",
+  const user = useQuery(api.auth.getCurrentUser);
+  const hasDevAccess = useQuery(api.devAccess.hasDevAccess);
+  const hasEarlyAccess = useQuery(api.earlyAccess.hasEarlyAccess);
+  const hasPendingRequest = useQuery(
+    api.earlyAccess.hasPendingEarlyAccessRequest,
   );
   const syncEarlyAccess = useMutation(api.earlyAccess.syncEarlyAccessFromToken);
 
@@ -47,18 +40,32 @@ export default function ProtectedLayout({
   }, [user, router]);
 
   useEffect(() => {
-    if (user && earlyAccessEnabled && sessionToken) {
-      syncEarlyAccess({ token: sessionToken });
+    if (user && earlyAccessEnabled) {
+      syncEarlyAccess();
     }
-  }, [user, earlyAccessEnabled, sessionToken, syncEarlyAccess]);
+  }, [user, earlyAccessEnabled, syncEarlyAccess]);
 
   useEffect(() => {
     if (!user) return;
 
-    if (earlyAccessEnabled && hasEarlyAccess === false) {
-      router.push("/pending-approval");
+    const isOnOnboarding = mounted && pathname?.includes("/onboarding");
+
+    if (earlyAccessEnabled && hasEarlyAccess === false && !isOnOnboarding) {
+      if (hasPendingRequest) {
+        router.push("/pending-approval");
+      } else {
+        router.push("/early-access");
+      }
     }
-  }, [user, hasEarlyAccess, earlyAccessEnabled, router]);
+  }, [
+    user,
+    hasEarlyAccess,
+    hasPendingRequest,
+    earlyAccessEnabled,
+    router,
+    mounted,
+    pathname,
+  ]);
 
   const handleSignOut = async () => {
     try {
@@ -76,51 +83,65 @@ export default function ProtectedLayout({
   const isOnProfile = mounted && pathname?.includes("/profile");
   const isOnDevTools = mounted && pathname?.includes("/dev-tools");
   const isOnDashboard = mounted && pathname?.includes("/dashboard");
+  const isOnOnboarding = mounted && pathname?.includes("/onboarding");
 
   return (
-    <main className="max-w-7xl mx-auto px-8 py-8 min-h-screen font-mono">
-      <div>
-        <div className="flex items-start justify-between mb-8">
-          <div>
-            <Link
-              href="/dashboard"
-              className="text-4xl font-normal leading-tight hover:text-gray-700"
-            >
-              uvacompute
-            </Link>
-            <div className="mt-2 text-base text-gray-600">
-              welcome back
-              {user ? (
-                firstName ? (
-                  `, ${firstName}`
+    <EarlyAccessProvider earlyAccessEnabled={earlyAccessEnabled}>
+      <main className="max-w-7xl mx-auto px-8 py-8 min-h-screen font-mono">
+        <div>
+          <div className="flex items-start justify-between mb-8">
+            <div>
+              <Link
+                href="/dashboard"
+                className="text-4xl font-normal leading-tight hover:text-gray-700"
+              >
+                uvacompute
+              </Link>
+              <div className="mt-2 text-base text-gray-600">
+                {isOnOnboarding ? "welcome" : "welcome back"}
+                {user ? (
+                  firstName ? (
+                    `, ${firstName}`
+                  ) : (
+                    ""
+                  )
                 ) : (
-                  ""
-                )
-              ) : (
+                  <>
+                    ,{" "}
+                    <Skeleton className="inline-block h-5 w-24 align-middle" />
+                  </>
+                )}
+              </div>
+            </div>
+            <div className="flex gap-2">
+              {(!isOnOnboarding || hasEarlyAccess) && (
                 <>
-                  , <Skeleton className="inline-block h-5 w-24 align-middle" />
+                  <Button
+                    variant={isOnDashboard ? "default" : "outline"}
+                    asChild
+                  >
+                    <Link href="/dashboard">dashboard</Link>
+                  </Button>
+                  <Button variant={isOnProfile ? "default" : "outline"} asChild>
+                    <Link href="/profile">profile</Link>
+                  </Button>
+                  {hasDevAccess && (
+                    <Button
+                      variant={isOnDevTools ? "default" : "outline"}
+                      asChild
+                    >
+                      <Link href="/dev-tools">dev tools</Link>
+                    </Button>
+                  )}
                 </>
               )}
+              <Button onClick={handleSignOut}>sign out</Button>
             </div>
           </div>
-          <div className="flex gap-2">
-            <Button variant={isOnDashboard ? "default" : "outline"} asChild>
-              <Link href="/dashboard">dashboard</Link>
-            </Button>
-            <Button variant={isOnProfile ? "default" : "outline"} asChild>
-              <Link href="/profile">profile</Link>
-            </Button>
-            {hasDevAccess && (
-              <Button variant={isOnDevTools ? "default" : "outline"} asChild>
-                <Link href="/dev-tools">dev tools</Link>
-              </Button>
-            )}
-            <Button onClick={handleSignOut}>sign out</Button>
-          </div>
-        </div>
 
-        {children}
-      </div>
-    </main>
+          {children}
+        </div>
+      </main>
+    </EarlyAccessProvider>
   );
 }

@@ -1,31 +1,26 @@
-import Link from "next/link";
-import { areWeLive, rootFlags } from "@/lib/flags";
-import { Button } from "@/components/ui/button";
+"use client";
 
-export default async function Page({
-  params,
-}: {
-  params: Promise<{ flags: string }>;
-}) {
-  const { flags } = await params;
-  let live = false;
-  try {
-    live = await areWeLive(flags, rootFlags);
-  } catch {
-    live = false;
-  }
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import LandingHeader from "./_components/landing-header";
+import { authClient } from "@/lib/auth-client";
+import { useQuery } from "convex/react";
+import { api } from "../../../convex/_generated/api";
+
+export default function Page() {
+  const { data: session, isPending } = authClient.useSession();
+  const isLoggedIn = !isPending && !!session?.user;
+  const hasEarlyAccess = useQuery(
+    api.earlyAccess.hasEarlyAccess,
+    isLoggedIn ? {} : "skip",
+  );
+
+  const shouldShowAccessSection = !isLoggedIn || hasEarlyAccess === false;
 
   return (
     <main className="max-w-3xl mx-auto px-8 py-8 min-h-screen font-mono">
       <div>
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-4xl font-normal leading-tight">uvacompute</h1>
-          {live && (
-            <Link href="/login" className="text-orange-accent underline">
-              sign in
-            </Link>
-          )}
-        </div>
+        <LandingHeader />
         <p className="mb-4 text-base leading-relaxed">
           your friendly local supercomputing company (at uva)
         </p>
@@ -46,18 +41,22 @@ export default async function Page({
           we're working to build serverless containers and k8s vclusters.
         </p>
 
-        <h2 className="text-xl font-semibold mt-8 mb-4 text-black">access</h2>
-        <p className="mb-4 text-base leading-relaxed">
-          uvacompute is currently in closed beta. fill out the form to be an
-          early adopter.
-        </p>
-        <div className="flex gap-3 mt-6">
-          {!live && (
-            <Button asChild>
-              <Link href="/early-access">get early access</Link>
-            </Button>
-          )}
-        </div>
+        {shouldShowAccessSection && (
+          <>
+            <h2 className="text-xl font-semibold mt-8 mb-4 text-black">
+              access
+            </h2>
+            <p className="mb-4 text-base leading-relaxed">
+              uvacompute is currently in closed beta. fill out the form to be an
+              early adopter.
+            </p>
+            <div className="flex gap-3 mt-6">
+              <Button asChild>
+                <Link href="/early-access">get early access</Link>
+              </Button>
+            </div>
+          </>
+        )}
 
         <footer className="mt-16 pt-4 border-t border-gray-200">
           <h3 className="text-base font-normal text-footer-grey italic">

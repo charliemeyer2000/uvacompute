@@ -88,11 +88,8 @@ export const createAuth = (
   } satisfies BetterAuthOptions);
 
 export const getCurrentUser = query({
-  args: { token: v.string() },
-  handler: async (ctx, args) => {
-    return await ctx.runQuery(
-      components.betterAuth.currentUser.getCurrentUserByToken,
-      { token: args.token },
-    );
+  args: {},
+  handler: async (ctx) => {
+    return await authComponent.getAuthUser(ctx);
   },
 });
