@@ -7,11 +7,39 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 export default async function StatusPage() {
-  const initialData = await getStatus();
+  let initialData;
+  let loadError = null;
+
+  try {
+    initialData = await getStatus();
+  } catch (error) {
+    console.error("Failed to load initial status:", error);
+    loadError =
+      error instanceof Error ? error.message : "failed to load status data";
+    initialData = {
+      current: {
+        status: "down" as const,
+        responseTime: 0,
+        timestamp: Date.now(),
+        error: loadError,
+      },
+      history: [],
+      uptime: 0,
+    };
+  }
 
   return (
     <div className="min-h-screen bg-white p-8">
       <div className="max-w-4xl mx-auto space-y-6">
+        {loadError && (
+          <div className="border border-red-600 bg-red-50 p-4 mb-6">
+            <div className="font-medium text-red-900 mb-1">
+              failed to load status data
+            </div>
+            <div className="text-sm text-red-700">{loadError}</div>
+          </div>
+        )}
+
         <StatusContent initialData={initialData} />
 
         <Suspense fallback={<ChartSkeleton />}>

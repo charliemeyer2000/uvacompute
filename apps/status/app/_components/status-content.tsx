@@ -13,14 +13,19 @@ interface StatusContentProps {
 export function StatusContent({ initialData }: StatusContentProps) {
   const [statusData, setStatusData] = useState<StatusData>(initialData);
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   async function fetchStatus() {
     try {
       const data = await getStatus();
       setStatusData(data);
       setLastUpdate(new Date());
+      setFetchError(null);
     } catch (error) {
       console.error("Failed to fetch status:", error);
+      setFetchError(
+        error instanceof Error ? error.message : "failed to fetch status",
+      );
     }
   }
 
@@ -39,6 +44,11 @@ export function StatusContent({ initialData }: StatusContentProps) {
           <span>•</span>
           <span>last updated {lastUpdate.toLocaleTimeString()}</span>
         </div>
+        {fetchError && (
+          <div className="mt-2 text-sm text-red-600">
+            update failed: {fetchError}
+          </div>
+        )}
       </div>
 
       <StatusBadge status={statusData.current.status} />
