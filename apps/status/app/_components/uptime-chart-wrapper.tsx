@@ -1,4 +1,4 @@
-import { format, subDays } from "date-fns";
+import { subDays } from "date-fns";
 import type { DayAggregate } from "@/types";
 import { getStatusHistory } from "../actions/status-actions";
 import { UptimeChart } from "./uptime-chart";
@@ -20,7 +20,7 @@ export async function UptimeChartWrapper({
     );
 
     for (let i = days - 1; i >= 0; i--) {
-      const date = format(subDays(today, i), "yyyy-MM-dd");
+      const date = subDays(today, i).toISOString().split("T")[0];
       const dayData = dataMap.get(date);
 
       if (dayData) {
