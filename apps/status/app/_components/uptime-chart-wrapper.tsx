@@ -32,7 +32,7 @@ export async function UptimeChartWrapper({
           degraded: 0,
           down: 0,
           total: 0,
-          uptimePercentage: 100,
+          uptimePercentage: 0,
           avgResponseTime: 0,
         });
       }
