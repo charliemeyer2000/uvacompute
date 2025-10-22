@@ -50,7 +50,12 @@ export default function ProtectedLayout({
 
     const isOnOnboarding = mounted && pathname?.includes("/onboarding");
 
-    if (earlyAccessEnabled && hasEarlyAccess === false && !isOnOnboarding) {
+    if (
+      earlyAccessEnabled &&
+      hasEarlyAccess === false &&
+      !isOnOnboarding &&
+      hasPendingRequest !== undefined
+    ) {
       if (hasPendingRequest) {
         router.push("/pending-approval");
       } else {
