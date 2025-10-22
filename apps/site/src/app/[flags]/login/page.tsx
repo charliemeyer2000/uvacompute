@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useForm } from "@tanstack/react-form";
 import { authClient } from "@/lib/auth-client";
 import Link from "next/link";
@@ -11,13 +11,17 @@ import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { toast } from "sonner";
 import { Eye, EyeOff } from "lucide-react";
 import { loginSchema } from "./_schemas/login-schema";
+import { getSafeRedirect } from "@/lib/redirect";
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [showPassword, setShowPassword] = useState(false);
   const [socialLoading, setSocialLoading] = useState<
     "github" | "google" | null
   >(null);
+
+  const redirectTo = getSafeRedirect(searchParams.get("redirect"));
 
   const form = useForm({
     defaultValues: {
@@ -36,7 +40,7 @@ export default function LoginPage() {
         {
           onSuccess: () => {
             toast.success("signed in successfully!");
-            router.push("/dashboard");
+            router.push(redirectTo);
           },
           onError: (ctx) => {
             if (ctx.error.status === 403) {
@@ -77,7 +81,7 @@ export default function LoginPage() {
     await authClient.signIn.social(
       {
         provider,
-        callbackURL: "/dashboard",
+        callbackURL: redirectTo,
         newUserCallbackURL: "/onboarding",
       },
       {
