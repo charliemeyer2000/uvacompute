@@ -11,6 +11,7 @@ import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { toast } from "sonner";
 import { Eye, EyeOff } from "lucide-react";
 import { loginSchema } from "./_schemas/login-schema";
+import { getSafeRedirect } from "@/lib/redirect";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -20,7 +21,7 @@ export default function LoginPage() {
     "github" | "google" | null
   >(null);
 
-  const redirectTo = searchParams.get("redirect") || "/dashboard";
+  const redirectTo = getSafeRedirect(searchParams.get("redirect"));
 
   const form = useForm({
     defaultValues: {
