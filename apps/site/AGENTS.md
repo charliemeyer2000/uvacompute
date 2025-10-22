@@ -123,7 +123,6 @@ import { authClient } from "@/lib/auth-client";
 const { data: session } = authClient.useSession();
 const userName = session?.user?.name;
 const userEmail = session?.user?.email;
-const sessionToken = session?.session?.token;
 ```
 
 **Frontend (Convex Queries)**:
@@ -131,16 +130,9 @@ const sessionToken = session?.session?.token;
 ```tsx
 import { useQuery } from "convex/react";
 import { api } from "../convex/_generated/api";
-import { authClient } from "@/lib/auth-client";
 
-const { data: session } = authClient.useSession();
-const sessionToken = session?.session?.token;
-
-// IMPORTANT: Must pass session token to queries
-const user = useQuery(
-  api.auth.getCurrentUser,
-  sessionToken ? { token: sessionToken } : "skip",
-);
+// No token passing needed - auth is automatic via ctx.auth
+const user = useQuery(api.auth.getCurrentUser);
 ```
 
 **Backend (Convex Queries/Mutations)**:
@@ -148,16 +140,13 @@ const user = useQuery(
 ```tsx
 import { query } from "./_generated/server";
 import { v } from "convex/values";
-import { components } from "./_generated/api";
+import { authComponent } from "./auth";
 
 export const myQuery = query({
-  args: { token: v.string() }, // Must accept token parameter
+  args: {}, // No token parameter needed
   handler: async (ctx, args) => {
-    // Get user by token
-    const user = await ctx.runQuery(
-      components.betterAuth.currentUser.getCurrentUserByToken,
-      { token: args.token },
-    );
+    // Get authenticated user via ctx.auth
+    const user = await authComponent.getAuthUser(ctx);
 
     if (!user) {
       throw new Error("Unauthenticated");
@@ -171,23 +160,27 @@ export const myQuery = query({
 
 ### Critical Implementation Notes
 
-⚠️ **Session Token Passing**:
+⚠️ **Use `authComponent.getAuthUser(ctx)` for authentication**:
 
-- Due to limitations with local install, session tokens must be passed **manually** to all Convex queries
-- `ConvexBetterAuthProvider` wraps the app but doesn't automatically pass tokens to `ctx.auth`
-- Always extract `session?.session?.token` and pass it as a query parameter
-- Use `"skip"` when token is not available to prevent errors
+- Convex's `ctx.auth.getUserIdentity()` is for Convex's built-in auth, NOT Better Auth
+- Always use `authComponent.getAuthUser(ctx)` from `convex/auth.ts` to get the authenticated user
+- The Better Auth adapter automatically integrates with Convex's auth system via JWT validation
+- No manual token passing is required
 
 **Example Pattern**:
 
 ```tsx
-const { data: session } = authClient.useSession();
-const sessionToken = session?.session?.token;
+import { query } from "./_generated/server";
+import { authComponent } from "./auth";
 
-const myData = useQuery(
-  api.myModule.myQuery,
-  sessionToken ? { token: sessionToken, otherArg: "value" } : "skip",
-);
+export const myQuery = query({
+  args: {},
+  handler: async (ctx, args) => {
+    const user = await authComponent.getAuthUser(ctx);
+    if (!user) throw new Error("Unauthenticated");
+    return { userId: user._id, name: user.name };
+  },
+});
 ```
 
 ### User Table Schema
@@ -229,10 +222,9 @@ npx @better-auth/cli generate -y
 3. Access in queries:
 
 ```tsx
-const user = await ctx.runQuery(
-  components.betterAuth.currentUser.getCurrentUserByToken,
-  { token },
-);
+import { authComponent } from "./auth";
+
+const user = await authComponent.getAuthUser(ctx);
 console.log(user.myCustomField);
 ```
 
@@ -240,63 +232,30 @@ console.log(user.myCustomField);
 
 **Issue**: `getUserIdentity()` returns null / "Unauthenticated" errors
 
-- **Cause**: Convex's `ctx.auth.getUserIdentity()` is for Convex's built-in auth, not Better Auth
-- **Solution**: Always pass session tokens manually to queries (see examples above)
+- **Cause**: Using Convex's built-in `ctx.auth.getUserIdentity()` instead of Better Auth's method
+- **Solution**: Always use `authComponent.getAuthUser(ctx)` from `convex/auth.ts`
 
 **Issue**: User data not loading on protected pages
 
-- **Cause**: Missing session token parameter in query
-- **Solution**: Ensure you extract and pass `session?.session?.token` to all auth queries
-
-**Issue**: Session exists but user is null
-
-- **Cause**: Token mismatch between Better Auth session and Convex query
-- **Solution**: Verify token matches by logging both `session?.session?.token` and checking Convex database sessions
+- **Cause**: Not using the proper auth method or missing `expectAuth: true` in ConvexReactClient
+- **Solution**: Verify `expectAuth: true` is set in `convexClientProvider.tsx` and use `authComponent.getAuthUser(ctx)` in backend
 
 **Issue**: Schema changes not reflected in queries
 
 - **Cause**: Need to regenerate Better Auth schema
 - **Solution**: Run `cd convex/betterAuth && npx @better-auth/cli generate -y`
 
-**Issue**: `ArgumentValidationError: Object is missing the required field token`
-
-- **Cause**: Frontend not passing session token to Convex query/mutation
-- **Solution**: Use the `sessionToken ? { token: sessionToken } : "skip"` pattern for all auth queries
-
-### Why Manual Token Passing?
-
-The manual token passing pattern is a **workaround** for the local install setup. With the local install:
-
-- `ctx.auth.getUserIdentity()` does not automatically receive Better Auth tokens
-- The `ConvexBetterAuthProvider` wraps the app but doesn't inject tokens into Convex's auth context
-- Direct database queries via the `session` table are required to authenticate users
-
-This approach provides:
-
-- ✅ Full control over auth schema and custom fields
-- ✅ Direct access to Better Auth component tables
-- ✅ Support for all Better Auth plugins
-- ⚠️ Requires manual token passing to all queries/mutations
-
 ### Critical Gotchas
 
-⚠️ **Don't use `ctx.auth.getUserIdentity()`**
+⚠️ **Always use `authComponent.getAuthUser(ctx)`, NEVER `ctx.auth.getUserIdentity()`**
 
-- This is for Convex's built-in auth, not Better Auth
-- Will always return `null` with Better Auth local install
-- Use `components.betterAuth.currentUser.getCurrentUserByToken` instead
+- `ctx.auth.getUserIdentity()` is for Convex's built-in auth, not Better Auth
+- Use `authComponent.getAuthUser(ctx)` from `convex/auth.ts` for Better Auth
 
-⚠️ **Always pass tokens to queries AND mutations**
+⚠️ **Set `expectAuth: true` in ConvexReactClient**
 
-- Both queries and mutations need authentication
-- Use `getCurrentUserByToken` for queries
-- Use `getCurrentUserByTokenMutation` for mutations
-
-⚠️ **Use "skip" pattern for conditional queries**
-
-- Don't call queries until token is available
-- Pattern: `sessionToken ? { token: sessionToken } : "skip"`
-- Prevents validation errors on initial render
+- This ensures queries wait for authentication before running
+- Located in `src/providers/convexClientProvider.tsx`
 
 ⚠️ **Regenerate schema after adding custom fields**
 
@@ -697,16 +656,16 @@ Test these scenarios:
 ### Internal Files
 
 - `convex/schema.ts` - Main database schema (VMs, SSH keys, etc.)
-- `convex/auth.ts` - Better Auth configuration and `getCurrentUser` query
+- `convex/auth.ts` - Better Auth configuration and `authComponent` export
+- `convex/auth.config.ts` - Convex auth configuration (JWT issuer)
 - `convex/betterAuth/` - Local Better Auth component
   - `schema.ts` - Auto-generated auth tables (user, session, account, etc.)
-  - `currentUser.ts` - User retrieval by session token
   - `userHelpers.ts` - Type-safe user queries/mutations
   - `adapter.ts` - Database adapter for Better Auth
   - `auth.ts` - Static auth instance for CLI
   - `convex.config.ts` - Component definition
 - `src/lib/auth-client.ts` - Frontend auth client setup
-- `src/providers/convexClientProvider.tsx` - Convex + Better Auth provider
+- `src/providers/convexClientProvider.tsx` - Convex + Better Auth provider (with `expectAuth: true`)
 - `src/components/ui/` - Reusable UI components
 
 ## Quick Start for New Developers
@@ -723,9 +682,9 @@ Test these scenarios:
 ### First Time Working with Auth?
 
 1. **Read the Local Install docs**: [Convex Better Auth Local Install](https://convex-better-auth.netlify.app/features/local-install)
-2. **Understand the pattern**: All auth queries require manual token passing
+2. **Understand the pattern**: Use `authComponent.getAuthUser(ctx)` for authentication
 3. **Check existing implementations**: Look at `protected-layout.tsx` or `profile/page.tsx` for examples
-4. **When adding new queries**: Always add `token: v.string()` to args and use `getCurrentUserByToken`
+4. **When adding new queries**: Use `authComponent.getAuthUser(ctx)` from `convex/auth.ts` to get the authenticated user
 
 ### Adding a New Protected Query
 
@@ -735,19 +694,15 @@ Test these scenarios:
 // In convex/myFeature.ts
 import { query } from "./_generated/server";
 import { v } from "convex/values";
-import { components } from "./_generated/api";
+import { authComponent } from "./auth";
 
 export const myQuery = query({
   args: {
-    token: v.string(),
-    // ... other args
+    // ... your args
   },
   handler: async (ctx, args) => {
     // Get authenticated user
-    const user = await ctx.runQuery(
-      components.betterAuth.currentUser.getCurrentUserByToken,
-      { token: args.token },
-    );
+    const user = await authComponent.getAuthUser(ctx);
 
     if (!user) {
       throw new Error("Unauthenticated");
@@ -762,13 +717,10 @@ export const myQuery = query({
 **Frontend usage**:
 
 ```tsx
-const { data: session } = authClient.useSession();
-const sessionToken = session?.session?.token;
+import { useQuery } from "convex/react";
+import { api } from "../convex/_generated/api";
 
-const data = useQuery(
-  api.myFeature.myQuery,
-  sessionToken ? { token: sessionToken } : "skip",
-);
+const data = useQuery(api.myFeature.myQuery);
 ```
 
 ## Quick Reference
@@ -879,36 +831,42 @@ export const debugSessions = query({
 // Frontend debugging
 const { data: session } = authClient.useSession();
 console.log("Better Auth session:", session);
-console.log("Session token:", session?.session?.token);
 
-const user = useQuery(
-  api.auth.getCurrentUser,
-  sessionToken ? { token: sessionToken } : "skip",
-);
+const user = useQuery(api.auth.getCurrentUser);
 console.log("Convex user:", user);
+```
+
+**Backend debugging**:
+
+```tsx
+// In your Convex query
+import { authComponent } from "./auth";
+
+const user = await authComponent.getAuthUser(ctx);
+console.log("Authenticated user:", user);
 ```
 
 ### Common Debugging Steps
 
 1. **Verify Better Auth session exists**:
    - Check browser console for `session` object
-   - Verify `session?.session?.token` is present
+   - Verify `session?.user` has expected data
 
-2. **Verify Convex is receiving the token**:
-   - Add console.log in Convex query handler
-   - Check Convex dashboard logs
+2. **Verify ConvexReactClient has `expectAuth: true`**:
+   - Check `src/providers/convexClientProvider.tsx`
+   - Ensure `expectAuth: true` is set in the client configuration
 
-3. **Verify session exists in database**:
-   - Check Convex dashboard → Data → `session` table
-   - Look for matching token
+3. **Verify JWT auth config exists**:
+   - Check `convex/auth.config.ts` exists and defines the Better Auth JWT issuer
+   - Restart Convex dev server after changes
 
 4. **Verify user exists**:
-   - Check Convex dashboard → Data → `user` table
-   - Verify `userId` from session matches a user `_id`
+   - Check Convex dashboard → Data → `user` table (in betterAuth component)
+   - Verify user has expected fields
 
 5. **Check for expired sessions**:
    - Sessions expire after 30 days by default
-   - Compare `expiresAt` timestamp with current time
+   - Check Convex dashboard → Data → `session` table (in betterAuth component)
 
 ## Understanding the Component Architecture
 
@@ -916,38 +874,34 @@ console.log("Convex user:", user);
 
 The `convex/betterAuth/` directory is a **Convex component** - a self-contained module with its own:
 
-- Schema (`schema.ts`)
-- Functions (`currentUser.ts`, `userHelpers.ts`, `adapter.ts`)
-- Configuration (`convex.config.ts`)
+- Schema (`schema.ts`) - Auto-generated Better Auth tables
+- Adapter (`adapter.ts`) - Database adapter functions
+- Configuration (`convex.config.ts`) - Component definition
+- User helpers (`userHelpers.ts`) - Type-safe user mutations/queries
 
 Components are **never exposed to the internet**, even if functions are public. They're only accessible from parent components or the main app via `ctx.runQuery/ctx.runMutation`.
 
 ### How Components Communicate
 
-**Parent → Component**:
+**Main App → Better Auth Component**:
 
 ```tsx
-// From main app
-import { components } from "./_generated/api";
-const user = await ctx.runQuery(
-  components.betterAuth.currentUser.getCurrentUserByToken,
-  { token: args.token },
-);
+// From main app (convex/auth.ts)
+import { authComponent } from "./auth";
+
+// Get authenticated user via the Better Auth adapter
+const user = await authComponent.getAuthUser(ctx);
 ```
 
-**Component → Database**:
+**Component Functions**:
+
+You can also call component functions directly for advanced use cases:
 
 ```tsx
-// Inside component
-export const getCurrentUserByToken = query({
-  handler: async (ctx, args) => {
-    // Component has direct access to its tables
-    const session = await ctx.db
-      .query("session")
-      .withIndex("token", (q) => q.eq("token", args.token))
-      .first();
-    return await ctx.db.get(session.userId);
-  },
+// Update user early access status
+await ctx.runMutation(components.betterAuth.userHelpers.updateUserEarlyAccess, {
+  userId: user._id,
+  hasEarlyAccess: true,
 });
 ```
 

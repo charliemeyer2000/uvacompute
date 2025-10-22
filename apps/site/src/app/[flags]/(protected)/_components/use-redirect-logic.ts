@@ -1,4 +1,4 @@
-import { useEffect, useRef, useMemo } from "react";
+import { useEffect, useRef, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { FunctionReturnType } from "convex/server";
 import { api } from "../../../../../convex/_generated/api";
@@ -28,9 +28,15 @@ export function useRedirectLogic({
   router,
 }: RedirectLogicProps): RedirectState {
   const hasSyncedRef = useRef(false);
+  const [isSyncing, setIsSyncing] = useState(false);
 
   const state = useMemo((): RedirectState => {
     if (!user) {
+      return { shouldRedirect: false, isLoading: true };
+    }
+
+    // Still syncing - show loading
+    if (isSyncing) {
       return { shouldRedirect: false, isLoading: true };
     }
 
@@ -53,37 +59,57 @@ export function useRedirectLogic({
       shouldRedirect: !user.emailVerified || needsEarlyAccessRedirect,
       isLoading: false,
     };
-  }, [user, earlyAccessEnabled, hasEarlyAccess, hasPendingRequest, pathname]);
-
-  useEffect(() => {
-    if (!user) return;
-
-    if (!user.emailVerified) {
-      router.push(`/verify-email?email=${encodeURIComponent(user.email)}`);
-      return;
-    }
-
-    if (earlyAccessEnabled && !hasSyncedRef.current) {
-      syncEarlyAccess();
-      hasSyncedRef.current = true;
-    }
-
-    const isOnOnboarding = pathname?.includes("/onboarding");
-    if (
-      earlyAccessEnabled &&
-      hasEarlyAccess === false &&
-      !isOnOnboarding &&
-      hasPendingRequest !== undefined
-    ) {
-      router.push(hasPendingRequest ? "/pending-approval" : "/early-access");
-    }
   }, [
     user,
+    isSyncing,
     earlyAccessEnabled,
     hasEarlyAccess,
     hasPendingRequest,
     pathname,
-    syncEarlyAccess,
+  ]);
+
+  // Email verification redirect
+  useEffect(() => {
+    if (!user) return;
+    if (!user.emailVerified) {
+      router.push(`/verify-email?email=${encodeURIComponent(user.email)}`);
+    }
+  }, [user, router]);
+
+  // Sync early access (wait for it to complete)
+  useEffect(() => {
+    if (!user) return;
+    if (!earlyAccessEnabled) return;
+    if (hasSyncedRef.current) return;
+
+    async function sync() {
+      setIsSyncing(true);
+      await syncEarlyAccess();
+      hasSyncedRef.current = true;
+      setIsSyncing(false);
+    }
+
+    sync();
+  }, [user, earlyAccessEnabled, syncEarlyAccess]);
+
+  // Early access redirect (only after sync is done)
+  useEffect(() => {
+    if (!user) return;
+    if (isSyncing) return; // DON'T redirect while syncing
+    if (!earlyAccessEnabled) return;
+    if (hasEarlyAccess === undefined || hasPendingRequest === undefined) return;
+
+    const isOnOnboarding = pathname?.includes("/onboarding");
+    if (hasEarlyAccess === false && !isOnOnboarding) {
+      router.push(hasPendingRequest ? "/pending-approval" : "/early-access");
+    }
+  }, [
+    user,
+    isSyncing,
+    earlyAccessEnabled,
+    hasEarlyAccess,
+    hasPendingRequest,
+    pathname,
     router,
   ]);
 
