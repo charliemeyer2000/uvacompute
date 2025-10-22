@@ -13,7 +13,6 @@ import type * as betterAuth__generated_api from "../betterAuth/_generated/api.js
 import type * as betterAuth__generated_server from "../betterAuth/_generated/server.js";
 import type * as betterAuth_adapter from "../betterAuth/adapter.js";
 import type * as betterAuth_auth from "../betterAuth/auth.js";
-import type * as betterAuth_currentUser from "../betterAuth/currentUser.js";
 import type * as betterAuth_userHelpers from "../betterAuth/userHelpers.js";
 import type * as devAccess from "../devAccess.js";
 import type * as earlyAccess from "../earlyAccess.js";
@@ -43,7 +42,6 @@ declare const fullApi: ApiFromModules<{
   "betterAuth/_generated/server": typeof betterAuth__generated_server;
   "betterAuth/adapter": typeof betterAuth_adapter;
   "betterAuth/auth": typeof betterAuth_auth;
-  "betterAuth/currentUser": typeof betterAuth_currentUser;
   "betterAuth/userHelpers": typeof betterAuth_userHelpers;
   devAccess: typeof devAccess;
   earlyAccess: typeof earlyAccess;
@@ -1184,26 +1182,18 @@ export declare const components: {
         any
       >;
     };
-    currentUser: {
-      getCurrentUserByToken: FunctionReference<
-        "query",
-        "internal",
-        { token: string },
-        any
-      >;
-      getCurrentUserByTokenMutation: FunctionReference<
-        "mutation",
-        "internal",
-        { token: string },
-        any
-      >;
-    };
     userHelpers: {
       getAllUsers: FunctionReference<"query", "internal", {}, any>;
       getUserByEmail: FunctionReference<
         "query",
         "internal",
         { email: string },
+        any
+      >;
+      getUserById: FunctionReference<
+        "query",
+        "internal",
+        { userId: string },
         any
       >;
       updateUserEarlyAccess: FunctionReference<

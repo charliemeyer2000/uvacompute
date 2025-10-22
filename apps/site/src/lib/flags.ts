@@ -1,12 +1,5 @@
 import { flag } from "flags/next";
 
-export const areWeLive = flag({
-  key: "areWeLive",
-  decide() {
-    return false;
-  },
-});
-
 export const earlyAccessEnabled = flag({
   key: "earlyAccessEnabled",
   decide() {
@@ -14,4 +7,4 @@ export const earlyAccessEnabled = flag({
   },
 });
 
-export const rootFlags = [areWeLive, earlyAccessEnabled] as const;
+export const rootFlags = [earlyAccessEnabled] as const;
