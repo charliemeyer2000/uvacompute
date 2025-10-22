@@ -3,6 +3,7 @@ import { authClient } from "@/lib/auth-client";
 import { fetchMutation, fetchQuery } from "convex/nextjs";
 import { api } from "../../../../convex/_generated/api";
 import { createAuthHeaders } from "@/lib/orchestration-auth";
+import { getToken } from "@/lib/auth-server";
 
 const VM_ORCHESTRATION_SERVICE_URL =
   process.env.VM_ORCHESTRATION_SERVICE_URL || "http://localhost:8080";
@@ -22,9 +23,8 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const vms = await fetchQuery(api.vms.listByUser, {
-      userId: session.user.id,
-    });
+    const token = await getToken();
+    const vms = await fetchQuery(api.vms.listByUser, {}, { token });
 
     return NextResponse.json({ vms }, { status: 200 });
   } catch (error: any) {
@@ -54,9 +54,12 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
 
-    const sshPublicKeys = await fetchQuery(api.sshKeys.getAllPublicKeys, {
-      userId: session.user.id,
-    });
+    const token = await getToken();
+    const sshPublicKeys = await fetchQuery(
+      api.sshKeys.getAllPublicKeys,
+      {},
+      { token },
+    );
 
     if (sshPublicKeys.length === 0) {
       console.warn(`User ${session.user.id} has no SSH keys configured`);
