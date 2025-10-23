@@ -3,7 +3,6 @@ import { authClient } from "@/lib/auth-client";
 import { fetchMutation, fetchQuery } from "convex/nextjs";
 import { api } from "../../../../convex/_generated/api";
 import { createAuthHeaders } from "@/lib/orchestration-auth";
-import { getToken } from "@/lib/auth-server";
 
 const VM_ORCHESTRATION_SERVICE_URL =
   process.env.VM_ORCHESTRATION_SERVICE_URL || "http://localhost:8080";
@@ -23,14 +22,9 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    // Get token: if CLI request (bearer token), use it directly; otherwise use session cookie
-    const authHeader = request.headers.get("authorization");
-    const bearerToken = authHeader?.startsWith("Bearer ")
-      ? authHeader.substring(7)
-      : null;
-    const token = bearerToken || (await getToken());
-
-    const vms = await fetchQuery(api.vms.listByUser, {}, { token });
+    const vms = await fetchQuery(api.vms.listByUser, {
+      userId: session.user.id,
+    });
 
     return NextResponse.json({ vms }, { status: 200 });
   } catch (error: any) {
@@ -60,18 +54,9 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
 
-    // Get token: if CLI request (bearer token), use it directly; otherwise use session cookie
-    const authHeader = request.headers.get("authorization");
-    const bearerToken = authHeader?.startsWith("Bearer ")
-      ? authHeader.substring(7)
-      : null;
-    const token = bearerToken || (await getToken());
-
-    const sshPublicKeys = await fetchQuery(
-      api.sshKeys.getAllPublicKeys,
-      {},
-      { token },
-    );
+    const sshPublicKeys = await fetchQuery(api.sshKeys.getAllPublicKeys, {
+      userId: session.user.id,
+    });
 
     if (sshPublicKeys.length === 0) {
       console.warn(`User ${session.user.id} has no SSH keys configured`);
