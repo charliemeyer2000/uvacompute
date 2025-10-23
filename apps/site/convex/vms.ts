@@ -1,6 +1,5 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
-import { authComponent } from "./auth";
 
 /**
  * Create a new VM record in the database
@@ -122,16 +121,13 @@ export const markAsFailed = mutation({
  * Get all VMs for the authenticated user
  */
 export const listByUser = query({
-  args: {},
-  handler: async (ctx) => {
-    const user = await authComponent.getAuthUser(ctx);
-    if (!user) {
-      throw new Error("Unauthenticated");
-    }
-
+  args: {
+    userId: v.string(),
+  },
+  handler: async (ctx, args) => {
     const vms = await ctx.db
       .query("vms")
-      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .withIndex("by_user", (q) => q.eq("userId", args.userId))
       .order("desc")
       .collect();
 
@@ -143,17 +139,14 @@ export const listByUser = query({
  * Get active (running) VMs for the authenticated user
  */
 export const listActiveByUser = query({
-  args: {},
-  handler: async (ctx) => {
-    const user = await authComponent.getAuthUser(ctx);
-    if (!user) {
-      throw new Error("Unauthenticated");
-    }
-
+  args: {
+    userId: v.string(),
+  },
+  handler: async (ctx, args) => {
     const vms = await ctx.db
       .query("vms")
       .withIndex("by_user_and_status", (q) =>
-        q.eq("userId", user._id).eq("status", "running"),
+        q.eq("userId", args.userId).eq("status", "running"),
       )
       .order("desc")
       .collect();
@@ -166,16 +159,13 @@ export const listActiveByUser = query({
  * Get inactive (deleted, expired, failed) VMs for the authenticated user
  */
 export const listInactiveByUser = query({
-  args: {},
-  handler: async (ctx) => {
-    const user = await authComponent.getAuthUser(ctx);
-    if (!user) {
-      throw new Error("Unauthenticated");
-    }
-
+  args: {
+    userId: v.string(),
+  },
+  handler: async (ctx, args) => {
     const allVms = await ctx.db
       .query("vms")
-      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .withIndex("by_user", (q) => q.eq("userId", args.userId))
       .order("desc")
       .collect();
 

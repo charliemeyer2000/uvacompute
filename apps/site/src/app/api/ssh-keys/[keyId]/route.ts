@@ -3,7 +3,6 @@ import { authClient } from "@/lib/auth-client";
 import { fetchMutation } from "convex/nextjs";
 import { api } from "../../../../../convex/_generated/api";
 import { Id } from "../../../../../convex/_generated/dataModel";
-import { getToken } from "@/lib/auth-server";
 
 export async function DELETE(
   request: NextRequest,
@@ -26,14 +25,10 @@ export async function DELETE(
     const { keyId: keyIdParam } = await params;
     const keyId = keyIdParam as Id<"sshKeys">;
 
-    // Get token: if CLI request (bearer token), use it directly; otherwise use session cookie
-    const authHeader = request.headers.get("authorization");
-    const bearerToken = authHeader?.startsWith("Bearer ")
-      ? authHeader.substring(7)
-      : null;
-    const token = bearerToken || (await getToken());
-
-    await fetchMutation(api.sshKeys.remove, { keyId }, { token });
+    await fetchMutation(api.sshKeys.remove, {
+      userId: session.user.id,
+      keyId,
+    });
 
     return NextResponse.json({ success: true }, { status: 200 });
   } catch (error: any) {
@@ -70,14 +65,10 @@ export async function PATCH(
       const { keyId: keyIdParam } = await params;
       const keyId = keyIdParam as Id<"sshKeys">;
 
-      // Get token: if CLI request (bearer token), use it directly; otherwise use session cookie
-      const authHeader = request.headers.get("authorization");
-      const bearerToken = authHeader?.startsWith("Bearer ")
-        ? authHeader.substring(7)
-        : null;
-      const token = bearerToken || (await getToken());
-
-      await fetchMutation(api.sshKeys.setPrimary, { keyId }, { token });
+      await fetchMutation(api.sshKeys.setPrimary, {
+        userId: session.user.id,
+        keyId,
+      });
 
       return NextResponse.json({ success: true }, { status: 200 });
     }

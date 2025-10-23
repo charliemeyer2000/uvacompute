@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { authClient } from "@/lib/auth-client";
 import { fetchMutation, fetchQuery } from "convex/nextjs";
 import { api } from "../../../../convex/_generated/api";
-import { getToken } from "@/lib/auth-server";
 import crypto from "crypto";
 
 function parseSSHPublicKey(publicKeyContent: string): {
@@ -53,14 +52,9 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    // Get token: if CLI request (bearer token), use it directly; otherwise use session cookie
-    const authHeader = request.headers.get("authorization");
-    const bearerToken = authHeader?.startsWith("Bearer ")
-      ? authHeader.substring(7)
-      : null;
-    const token = bearerToken || (await getToken());
-
-    const keys = await fetchQuery(api.sshKeys.list, {}, { token });
+    const keys = await fetchQuery(api.sshKeys.list, {
+      userId: session.user.id,
+    });
 
     return NextResponse.json({ keys }, { status: 200 });
   } catch (error: any) {
@@ -101,22 +95,12 @@ export async function POST(request: NextRequest) {
 
     const { fingerprint, keyType } = parseSSHPublicKey(publicKey);
 
-    // Get token: if CLI request (bearer token), use it directly; otherwise use session cookie
-    const authHeader = request.headers.get("authorization");
-    const bearerToken = authHeader?.startsWith("Bearer ")
-      ? authHeader.substring(7)
-      : null;
-    const token = bearerToken || (await getToken());
-
-    const keyId = await fetchMutation(
-      api.sshKeys.add,
-      {
-        name: keyName,
-        publicKey: publicKey.trim(),
-        fingerprint,
-      },
-      { token },
-    );
+    const keyId = await fetchMutation(api.sshKeys.add, {
+      userId: session.user.id,
+      name: keyName,
+      publicKey: publicKey.trim(),
+      fingerprint,
+    });
 
     return NextResponse.json(
       {
