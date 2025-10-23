@@ -122,7 +122,7 @@ export default function VMHistory() {
 
   const inactiveVMs = useQuery(
     api.vms.listInactiveByUser,
-    session?.user ? {} : "skip",
+    session?.user?.id ? { userId: session.user.id } : "skip",
   );
 
   const totalPages = inactiveVMs

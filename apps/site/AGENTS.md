@@ -160,59 +160,177 @@ export const myQuery = query({
 
 ### Critical Implementation Notes
 
-⚠️ **Standard Authentication Pattern - Use `authComponent` methods**:
+⚠️ **Two Authentication Patterns**:
 
-**For queries/mutations that need authentication:**
+uvacompute uses **two distinct patterns** for Convex authentication depending on the caller:
+
+#### Pattern 1: Frontend → Convex (Direct)
+
+**For queries/mutations called directly from the frontend:**
 
 ```tsx
 import { query } from "./_generated/server";
 import { authComponent } from "./auth";
 
-export const myQuery = query({
+export const getCurrentUser = query({
   args: {},
   handler: async (ctx) => {
-    // Get authenticated user (throws error if not authenticated)
+    // Get authenticated user via Better Auth session
+    const user = await authComponent.safeGetAuthUser(ctx);
+    return user;
+  },
+});
+
+export const hasEarlyAccess = query({
+  args: {},
+  handler: async (ctx) => {
     const user = await authComponent.getAuthUser(ctx);
     if (!user) throw new Error("Unauthenticated");
+    return user.hasEarlyAccess || false;
+  },
+});
+```
 
-    // Access user._id, user.email, user.hasEarlyAccess, etc.
+**Key points:**
+
+- ✅ Use `authComponent.getAuthUser(ctx)` or `authComponent.safeGetAuthUser(ctx)`
+- ✅ Auth handled automatically via session cookies + `expectAuth: true`
+- ❌ **Never** accept `userId` as an argument from frontend - security vulnerability!
+
+#### Pattern 2: API Route → Convex (Trusted)
+
+**For queries/mutations called from Next.js API routes:**
+
+```tsx
+import { query, mutation } from "./_generated/server";
+import { v } from "convex/values";
+
+export const listByUser = query({
+  args: { userId: v.string() },
+  handler: async (ctx, args) => {
+    // userId already validated by API route
     return await ctx.db
       .query("vms")
-      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .withIndex("by_user", (q) => q.eq("userId", args.userId))
       .collect();
   },
 });
-```
 
-**For queries that handle both logged-in and logged-out states:**
-
-```tsx
-import { query } from "./_generated/server";
-import { authComponent } from "./auth";
-
-export const myQuery = query({
-  args: {},
-  handler: async (ctx) => {
-    // Returns user or null (doesn't throw error)
-    const user = await authComponent.safeGetAuthUser(ctx);
-
-    if (!user) {
-      return { message: "Please log in" };
-    }
-
-    return { message: `Hello ${user.name}` };
+export const addSSHKey = mutation({
+  args: {
+    userId: v.string(),
+    name: v.string(),
+    publicKey: v.string(),
+    fingerprint: v.string(),
+  },
+  handler: async (ctx, args) => {
+    // userId already validated by API route
+    await ctx.db.insert("sshKeys", {
+      userId: args.userId,
+      name: args.name,
+      publicKey: args.publicKey,
+      fingerprint: args.fingerprint,
+      createdAt: Date.now(),
+    });
   },
 });
 ```
 
-**Key Points:**
+**API route implementation:**
 
-- **Always** use `authComponent.getAuthUser(ctx)` for protected queries/mutations
-- Use `authComponent.safeGetAuthUser(ctx)` for `getCurrentUser` or public-facing queries
-- **Never** pass `userId` as an argument - it's a security vulnerability!
-- User ID is accessed via `user._id` from the authenticated user object
-- Custom fields like `hasEarlyAccess` are available on the user object
-- No manual token passing is required - Better Auth handles this automatically
+```tsx
+import { authClient } from "@/lib/auth-client";
+import { fetchQuery } from "convex/nextjs";
+import { api } from "../../../../convex/_generated/api";
+
+export async function GET(request: NextRequest) {
+  // 1. Validate auth (works for both web cookies and CLI bearer tokens)
+  const { data: session, error } = await authClient.getSession({
+    fetchOptions: { headers: request.headers },
+  });
+
+  if (error || !session) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // 2. Call Convex with validated userId
+  const data = await fetchQuery(api.vms.listByUser, {
+    userId: session.user.id,
+  });
+
+  return NextResponse.json({ data }, { status: 200 });
+}
+```
+
+**Key points:**
+
+- ✅ API route validates auth first with `authClient.getSession()`
+- ✅ Supports both web sessions (cookies) and CLI auth (bearer tokens)
+- ✅ API route passes **trusted** `session.user.id` to Convex
+- ✅ Security boundary is at the API route level
+- ✅ Convex functions can still validate ownership (e.g., `key.userId !== args.userId`)
+
+**When to use each pattern:**
+
+| Caller           | Pattern                          | Example Use Cases                                    |
+| ---------------- | -------------------------------- | ---------------------------------------------------- |
+| Frontend (React) | `authComponent.getAuthUser(ctx)` | User profile, early access status, dashboard queries |
+| API Routes       | `userId` argument                | VM operations, SSH keys, CLI commands                |
+
+### Security Model
+
+**Why accept `userId` from API routes but not frontend?**
+
+The key is understanding **where the security boundary is**:
+
+#### ❌ Insecure: Frontend → Convex with userId argument
+
+```tsx
+// INSECURE - Frontend can pass any userId!
+const data = useQuery(api.vms.listByUser, { userId: "any-user-id" });
+```
+
+**Problem**: Malicious user can pass any `userId` and access other users' data.
+
+#### ✅ Secure: Frontend → API Route → Convex
+
+```
+1. Frontend makes request (with session cookie or bearer token)
+2. API route validates auth with authClient.getSession()
+3. If invalid → 401 error (never reaches Convex)
+4. If valid → API route passes session.user.id to Convex
+5. Convex operates on trusted userId
+```
+
+**Security guarantees:**
+
+- ✅ API route is the security boundary
+- ✅ Only authenticated users can call the API route
+- ✅ API route only passes the authenticated user's own ID
+- ✅ No way for malicious user to pass different userId
+- ✅ Works for both web sessions (cookies) and CLI (bearer tokens)
+
+**Additional validation in Convex:**
+
+Even with trusted `userId`, Convex functions can still validate ownership:
+
+```tsx
+export const deleteVM = mutation({
+  args: { userId: v.string(), vmId: v.id("vms") },
+  handler: async (ctx, args) => {
+    const vm = await ctx.db.get(args.vmId);
+
+    if (!vm) throw new Error("VM not found");
+
+    // Double-check ownership
+    if (vm.userId !== args.userId) {
+      throw new Error("Unauthorized: VM belongs to another user");
+    }
+
+    await ctx.db.delete(args.vmId);
+  },
+});
+```
 
 ### User Table Schema
 
@@ -281,11 +399,12 @@ console.log(user.myCustomField);
 
 ### Critical Gotchas
 
-⚠️ **Use `authComponent` methods consistently**
+⚠️ **Choose the correct auth pattern**
 
-- Always use `authComponent.getAuthUser(ctx)` for authentication
-- Never pass `userId` as an argument - get it from the authenticated user
-- Use `authComponent.safeGetAuthUser(ctx)` for public queries that can handle logged-out users
+- **Frontend-facing functions**: Use `authComponent.getAuthUser(ctx)` - **never** accept `userId` from frontend
+- **API-route-only functions**: Accept `userId` as argument - API route validates auth first
+- Use `authComponent.safeGetAuthUser(ctx)` for functions that handle logged-out users
+- Never mix patterns - a function should use one or the other, not both
 
 ⚠️ **Set `expectAuth: true` in ConvexReactClient**
 
@@ -700,6 +819,7 @@ Test these scenarios:
   - `auth.ts` - Static auth instance for CLI
   - `convex.config.ts` - Component definition
 - `src/lib/auth-client.ts` - Frontend auth client setup
+- `src/lib/auth-server.ts` - Server-side token helper (for potential future use)
 - `src/providers/convexClientProvider.tsx` - Convex + Better Auth provider (with `expectAuth: true`)
 - `src/components/ui/` - Reusable UI components
 
@@ -717,13 +837,19 @@ Test these scenarios:
 ### First Time Working with Auth?
 
 1. **Read the Local Install docs**: [Convex Better Auth Local Install](https://convex-better-auth.netlify.app/features/local-install)
-2. **Understand the pattern**: Use `authComponent.getAuthUser(ctx)` for authentication
-3. **Check existing implementations**: Look at `protected-layout.tsx` or `profile/page.tsx` for examples
-4. **When adding new queries**: Use `authComponent.getAuthUser(ctx)` from `convex/auth.ts` to get the authenticated user
+2. **Understand the two patterns**:
+   - **Frontend queries**: Use `authComponent.getAuthUser(ctx)` - no `userId` argument
+   - **API-route queries**: Accept `userId` argument - auth validated by API route
+3. **Check existing implementations**:
+   - Frontend pattern: `convex/auth.ts` (`getCurrentUser`), `convex/earlyAccess.ts` (`hasEarlyAccess`)
+   - API route pattern: `convex/vms.ts` (`listByUser`), `convex/sshKeys.ts` (`add`)
+4. **Choose the right pattern**: Ask yourself "Who calls this function?" to decide which pattern to use
 
 ### Adding a New Protected Query
 
-**Template**:
+**Choose the right pattern based on the caller:**
+
+#### Frontend-Called Query
 
 ```tsx
 // In convex/myFeature.ts
@@ -731,20 +857,20 @@ import { query } from "./_generated/server";
 import { v } from "convex/values";
 import { authComponent } from "./auth";
 
-export const myQuery = query({
+export const myFrontendQuery = query({
   args: {
-    // ... your args
+    // ... your args (NO userId)
   },
   handler: async (ctx, args) => {
-    // Get authenticated user
+    // Get authenticated user from session
     const user = await authComponent.getAuthUser(ctx);
+    if (!user) throw new Error("Unauthenticated");
 
-    if (!user) {
-      throw new Error("Unauthenticated");
-    }
-
-    // Your query logic here
-    return { userId: user._id };
+    // Use user._id for queries
+    return await ctx.db
+      .query("myTable")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .collect();
   },
 });
 ```
@@ -755,7 +881,53 @@ export const myQuery = query({
 import { useQuery } from "convex/react";
 import { api } from "../convex/_generated/api";
 
-const data = useQuery(api.myFeature.myQuery);
+const data = useQuery(api.myFeature.myFrontendQuery);
+```
+
+#### API-Route-Called Query
+
+```tsx
+// In convex/myFeature.ts
+import { query } from "./_generated/server";
+import { v } from "convex/values";
+
+export const myApiQuery = query({
+  args: {
+    userId: v.string(), // API route passes validated userId
+    // ... other args
+  },
+  handler: async (ctx, args) => {
+    // userId already validated by API route
+    return await ctx.db
+      .query("myTable")
+      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .collect();
+  },
+});
+```
+
+**API route usage**:
+
+```tsx
+import { authClient } from "@/lib/auth-client";
+import { fetchQuery } from "convex/nextjs";
+import { api } from "../../../../convex/_generated/api";
+
+export async function GET(request: NextRequest) {
+  const { data: session, error } = await authClient.getSession({
+    fetchOptions: { headers: request.headers },
+  });
+
+  if (error || !session) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const data = await fetchQuery(api.myFeature.myApiQuery, {
+    userId: session.user.id,
+  });
+
+  return NextResponse.json({ data }, { status: 200 });
+}
 ```
 
 ## Quick Reference

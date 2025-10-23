@@ -147,7 +147,7 @@ export default function ActiveVMs() {
 
   const activeVMs = useQuery(
     api.vms.listActiveByUser,
-    session?.user ? {} : "skip",
+    session?.user?.id ? { userId: session.user.id } : "skip",
   );
 
   const totalPages = activeVMs
