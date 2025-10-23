@@ -30,16 +30,18 @@ export function ServiceStatus({
   const config = statusConfig[status];
 
   return (
-    <div className="border border-black p-4 flex items-center justify-between">
-      <div className="flex items-center gap-3">
-        <div className={cn("w-3 h-3", config.dot)} />
-        <div>
-          <div className="text-base font-medium">{name}</div>
+    <div className="border border-black p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+      <div className="flex items-center gap-3 min-w-0">
+        <div className={cn("w-3 h-3 flex-shrink-0", config.dot)} />
+        <div className="min-w-0">
+          <div className="text-base font-medium break-words">{name}</div>
           <div className="text-sm text-muted-foreground">{config.text}</div>
         </div>
       </div>
       {responseTime !== undefined && status !== "down" && (
-        <div className="text-sm text-muted-foreground">{responseTime}ms</div>
+        <div className="text-sm text-muted-foreground sm:ml-auto">
+          {responseTime}ms
+        </div>
       )}
     </div>
   );
