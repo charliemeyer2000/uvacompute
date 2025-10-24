@@ -27,9 +27,17 @@ export function StatusBadge({ status }: StatusBadgeProps) {
   const config = statusConfig[status];
 
   return (
-    <div className={cn("border border-black p-6", config.bg, config.textColor)}>
+    <div
+      className={cn(
+        "border border-black p-4 sm:p-6",
+        config.bg,
+        config.textColor,
+      )}
+    >
       <div className="text-sm uppercase tracking-wide mb-1">status</div>
-      <div className="text-2xl font-medium">{config.text}</div>
+      <div className="text-xl sm:text-2xl font-medium break-words">
+        {config.text}
+      </div>
     </div>
   );
 }
