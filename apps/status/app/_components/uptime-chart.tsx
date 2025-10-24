@@ -28,8 +28,8 @@ export function UptimeChart({ data, days }: UptimeChartProps) {
       : 0;
 
   return (
-    <div className="border border-black p-6">
-      <div className="flex justify-between items-start mb-4">
+    <div className="border border-black p-6 relative">
+      <div className="flex flex-wrap justify-between items-start gap-3 mb-4">
         <div className="text-lg font-medium">uptime last {days} days</div>
         <div className="text-sm">
           <span className="text-2xl font-medium">
@@ -39,38 +39,40 @@ export function UptimeChart({ data, days }: UptimeChartProps) {
         </div>
       </div>
 
-      <div className="grid grid-cols-10 gap-1 mb-4">
-        {data.map((day) => (
-          <div
-            key={day.date}
-            className={cn(
-              "aspect-square cursor-pointer border border-black transition-opacity hover:opacity-80",
-              getStatusColor(day),
-            )}
-            onMouseEnter={() => setHoveredDay(day)}
-            onMouseLeave={() => setHoveredDay(null)}
-            title={`${format(new Date(day.date), "MMM d, yyyy")}: ${day.uptimePercentage.toFixed(1)}% uptime`}
-          />
-        ))}
+      <div className="relative min-h-[200px]">
+        <div className="grid grid-cols-10 gap-1">
+          {data.map((day) => (
+            <div
+              key={day.date}
+              className={cn(
+                "aspect-square cursor-pointer border border-black transition-all duration-150 ease-in-out hover:scale-110 hover:z-10",
+                getStatusColor(day),
+              )}
+              onMouseEnter={() => setHoveredDay(day)}
+              onMouseLeave={() => setHoveredDay(null)}
+              title={`${format(new Date(day.date), "MMM d, yyyy")}: ${day.uptimePercentage.toFixed(1)}% uptime`}
+            />
+          ))}
+        </div>
+
+        {hoveredDay && hoveredDay.total > 0 && (
+          <div className="absolute left-0 right-0 top-[calc(100%+0.5rem)] border border-black p-3 bg-gray-50 text-sm z-20">
+            <div className="font-medium mb-1">
+              {format(new Date(hoveredDay.date), "MMMM d, yyyy")}
+            </div>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+              <div>uptime:</div>
+              <div>{hoveredDay.uptimePercentage.toFixed(2)}%</div>
+              <div>checks:</div>
+              <div>{hoveredDay.total}</div>
+              <div>avg response:</div>
+              <div>{hoveredDay.avgResponseTime}ms</div>
+            </div>
+          </div>
+        )}
       </div>
 
-      {hoveredDay && hoveredDay.total > 0 && (
-        <div className="border border-black p-3 bg-gray-50 text-sm">
-          <div className="font-medium mb-1">
-            {format(new Date(hoveredDay.date), "MMMM d, yyyy")}
-          </div>
-          <div className="grid grid-cols-2 gap-x-4 gap-y-1">
-            <div>uptime:</div>
-            <div>{hoveredDay.uptimePercentage.toFixed(2)}%</div>
-            <div>checks:</div>
-            <div>{hoveredDay.total}</div>
-            <div>avg response:</div>
-            <div>{hoveredDay.avgResponseTime}ms</div>
-          </div>
-        </div>
-      )}
-
-      <div className="flex items-center gap-4 text-xs text-muted-foreground mt-4">
+      <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground mt-4">
         <div className="flex items-center gap-2">
           <div className="w-3 h-3 bg-green-500 border border-black" />
           <span>operational</span>
