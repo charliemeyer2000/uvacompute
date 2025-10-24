@@ -29,7 +29,7 @@ export default async function StatusPage() {
   }
 
   return (
-    <div className="min-h-screen bg-white p-8">
+    <div className="min-h-screen bg-white p-4 sm:p-8">
       <div className="max-w-4xl mx-auto space-y-6">
         {loadError && (
           <div className="border border-red-600 bg-red-50 p-4 mb-6">
@@ -46,7 +46,7 @@ export default async function StatusPage() {
           <UptimeChartWrapper days={90} />
         </Suspense>
 
-        <div className="border-t border-black pt-6 mt-8">
+        <div className="pt-6 mt-8">
           <div className="text-sm text-muted-foreground">
             <p className="mb-2">
               this page shows the real-time status of uvacompute services.
