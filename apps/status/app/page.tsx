@@ -60,8 +60,8 @@ export default async function StatusPage() {
   }
 
   return (
-    <div className="min-h-screen bg-white p-4 sm:p-8">
-      <div className="max-w-6xl mx-auto space-y-8">
+    <div className="min-h-screen bg-white p-3 sm:p-4 md:p-8">
+      <div className="max-w-6xl mx-auto space-y-6 sm:space-y-8">
         {loadError && (
           <div className="border border-red-600 bg-red-50 p-4 mb-6 rounded-lg">
             <div className="font-medium text-red-900 mb-1">
@@ -73,8 +73,8 @@ export default async function StatusPage() {
 
         <StatusContent initialData={initialData} historyData={historyData} />
 
-        <div className="pt-6 mt-8 border-t border-gray-200">
-          <div className="text-sm text-gray-600">
+        <div className="pt-4 sm:pt-6 mt-6 sm:mt-8">
+          <div className="text-xs sm:text-sm text-gray-600">
             <p className="mb-2">
               This page shows the real-time status of uvacompute services.
             </p>

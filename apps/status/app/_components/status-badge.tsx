@@ -75,10 +75,10 @@ export function StatusBadge({ status }: StatusBadgeProps) {
   const config = statusConfig[status];
 
   return (
-    <div className="flex items-center gap-4 p-6 mb-8 border border-gray-200 rounded-lg bg-gray-50">
+    <div className="flex items-center gap-3 sm:gap-4 p-4 sm:p-6 mb-6 sm:mb-8 border border-gray-200 rounded-lg bg-gray-50">
       <div
         className={cn(
-          "w-12 h-12 rounded-full flex items-center justify-center shrink-0",
+          "w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center shrink-0",
           config.iconBg,
           config.iconColor,
         )}
@@ -86,10 +86,12 @@ export function StatusBadge({ status }: StatusBadgeProps) {
         {config.icon}
       </div>
       <div>
-        <div className="text-sm text-gray-500 uppercase tracking-wide mb-1">
+        <div className="text-xs sm:text-sm text-gray-500 uppercase tracking-wide mb-0.5 sm:mb-1">
           Current Status
         </div>
-        <div className={cn("text-2xl font-semibold", config.textColor)}>
+        <div
+          className={cn("text-lg sm:text-2xl font-semibold", config.textColor)}
+        >
           {config.text}
         </div>
       </div>
