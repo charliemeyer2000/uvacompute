@@ -5,6 +5,7 @@ import type { StatusData, DayAggregate } from "@/types";
 import { getStatus } from "../actions/status-actions";
 import { StatusBadge } from "./status-badge";
 import { ServiceStatus } from "./service-status";
+import { StatusIndicator } from "./status-indicator";
 
 interface StatusContentProps {
   initialData: StatusData;
@@ -40,16 +41,18 @@ export function StatusContent({
 
   return (
     <>
-      <div className="border-b border-gray-200 pb-6 mb-8">
-        <h1 className="text-4xl font-semibold mb-2">uvacompute status</h1>
-        <div className="flex items-center gap-2 text-sm text-gray-600">
-          <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+      <div className="border-b border-gray-200 pb-4 sm:pb-6 mb-6 sm:mb-8">
+        <h1 className="text-2xl sm:text-4xl font-semibold mb-2">
+          uvacompute status
+        </h1>
+        <div className="flex items-center gap-2 text-xs sm:text-sm text-gray-600 flex-wrap">
+          <StatusIndicator size="sm" />
           <span>Live updates</span>
           <span>•</span>
           <span>Last updated {lastUpdate.toLocaleTimeString()}</span>
         </div>
         {fetchError && (
-          <div className="mt-2 text-sm text-red-600">
+          <div className="mt-2 text-xs sm:text-sm text-red-600">
             Update failed: {fetchError}
           </div>
         )}
