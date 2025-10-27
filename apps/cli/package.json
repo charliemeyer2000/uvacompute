@@ -8,7 +8,6 @@
     "build:prod": "bun build --target=node --define process.env.NODE_ENV='\"production\"' index.ts --outdir ./dist",
     "build-binary": "bun build --compile ./index.ts --outfile ./dist/uvacompute",
     "build-binary:prod": "bun build --compile --define process.env.NODE_ENV='\"production\"' ./index.ts --outfile ./dist/uvacompute",
-    "dev": "bun --watch index.ts",
     "test": "bun test"
   },
   "devDependencies": {
