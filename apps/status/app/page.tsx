@@ -1,13 +1,14 @@
-import { Suspense } from "react";
+import { subDays } from "date-fns";
 import { StatusContent } from "./_components/status-content";
-import { UptimeChartWrapper } from "./_components/uptime-chart-wrapper";
-import { getStatus } from "./actions/status-actions";
+import { getStatus, getStatusHistory } from "./actions/status-actions";
+import type { DayAggregate } from "@/types";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 export default async function StatusPage() {
   let initialData;
+  let historyData: DayAggregate[] = [];
   let loadError = null;
 
   try {
@@ -28,46 +29,61 @@ export default async function StatusPage() {
     };
   }
 
+  try {
+    const days = 90;
+    const result = await getStatusHistory(days);
+    const today = new Date();
+    const dataMap = new Map<string, DayAggregate>(
+      result.aggregated.map((d) => [d.date, d]),
+    );
+
+    for (let i = days - 1; i >= 0; i--) {
+      const date = subDays(today, i).toISOString().split("T")[0];
+      const dayData = dataMap.get(date);
+
+      if (dayData) {
+        historyData.push(dayData);
+      } else {
+        historyData.push({
+          date,
+          operational: 0,
+          degraded: 0,
+          down: 0,
+          total: 0,
+          uptimePercentage: 0,
+          avgResponseTime: 0,
+        });
+      }
+    }
+  } catch (error) {
+    console.error("Failed to load history data:", error);
+  }
+
   return (
     <div className="min-h-screen bg-white p-4 sm:p-8">
-      <div className="max-w-4xl mx-auto space-y-6">
+      <div className="max-w-6xl mx-auto space-y-8">
         {loadError && (
-          <div className="border border-red-600 bg-red-50 p-4 mb-6">
+          <div className="border border-red-600 bg-red-50 p-4 mb-6 rounded-lg">
             <div className="font-medium text-red-900 mb-1">
-              failed to load status data
+              Failed to load status data
             </div>
             <div className="text-sm text-red-700">{loadError}</div>
           </div>
         )}
 
-        <StatusContent initialData={initialData} />
+        <StatusContent initialData={initialData} historyData={historyData} />
 
-        <Suspense fallback={<ChartSkeleton />}>
-          <UptimeChartWrapper days={90} />
-        </Suspense>
-
-        <div className="pt-6 mt-8">
-          <div className="text-sm text-muted-foreground">
+        <div className="pt-6 mt-8 border-t border-gray-200">
+          <div className="text-sm text-gray-600">
             <p className="mb-2">
-              this page shows the real-time status of uvacompute services.
+              This page shows the real-time status of uvacompute services.
             </p>
             <p>
-              monitoring checks run every minute. historical data is retained
+              Monitoring checks run every minute. Historical data is retained
               for 90 days.
             </p>
           </div>
         </div>
-      </div>
-    </div>
-  );
-}
-
-function ChartSkeleton() {
-  return (
-    <div className="border border-black p-6">
-      <div className="text-lg font-medium mb-4">uptime last 90 days</div>
-      <div className="h-24 flex items-center justify-center text-muted-foreground">
-        loading...
       </div>
     </div>
   );
