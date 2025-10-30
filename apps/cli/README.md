@@ -65,15 +65,35 @@ uva vm rm abc-123-def
 uva vm status abc-123-def
 ```
 
-### Planned Features (Not Yet Implemented)
+#### List VMs
 
-`uva vm list`: list all VMs
+`uva vm list`: list all your virtual machines
+
+**Example:**
+
+```bash
+uva vm list
+```
+
+#### SSH to VM
+
+`uva vm ssh <nameOrVmId>`: connect to a virtual machine via SSH
+
+**Example:**
+
+```bash
+# Connect using VM name
+uva vm ssh my-training-vm
+
+# Connect using VM ID
+uva vm ssh abc-123-def
+```
+
+### Planned Features (Not Yet Implemented)
 
 `uva vm extend [id]`: extend vm lifetime
 
 - `--hours / -h` (number): hours to extend for
-
-`uva vm ssh [id]`: prints ssh command/opens session
 
 `uva k8s create`: create vcluster
 
