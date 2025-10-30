@@ -1,14 +1,9 @@
 import type { Command } from "commander";
 import ora from "ora";
-import boxen from "boxen";
-import chalk from "chalk";
 import open from "open";
 import { getBaseUrl, saveToken, loadToken, validateToken } from "./lib/utils";
-import {
-  type DeviceCodeResponse,
-  type TokenResponse,
-  type TokenSuccessResponse,
-} from "./lib/types";
+import { theme, createInfoBox } from "./lib/theme";
+import { type TokenSuccessResponse } from "./lib/types";
 import {
   CLIENT_ID,
   DEFAULT_DEVICE_EXPIRES_SECONDS,
@@ -52,22 +47,16 @@ async function deviceAuthorization(): Promise<TokenSuccessResponse> {
     spinner.succeed("Device authorization requested");
     spinner.stop();
 
-    const authBox = boxen(
-      chalk.bold("CLI Authentication Required") +
+    const authBox = createInfoBox(
+      theme.emphasis("CLI Authentication Required") +
         "\n\n" +
-        "1. Open this URL in your browser:\n" +
-        chalk.cyan(`${verification_uri}`) +
+        theme.muted("Visit: ") +
+        theme.accent(verification_uri) +
         "\n\n" +
-        "2. Enter this code:\n" +
-        chalk.yellow.bold(user_code) +
+        theme.muted("Enter code: ") +
+        theme.emphasis(user_code) +
         "\n\n" +
         "Waiting for verification...",
-      {
-        padding: 1,
-        margin: 1,
-        borderStyle: "round",
-        borderColor: "blue",
-      },
     );
 
     console.log(authBox);
@@ -77,10 +66,10 @@ async function deviceAuthorization(): Promise<TokenSuccessResponse> {
 
     try {
       await open(urlToOpen);
-      console.log(chalk.gray("Browser opened automatically\n"));
+      console.log(theme.muted("Browser opened automatically\n"));
     } catch (error) {
       console.log(
-        chalk.yellow(
+        theme.warning(
           "Could not open browser automatically. Please visit the URL above manually.\n",
         ),
       );
@@ -139,7 +128,9 @@ async function pollForToken(
               const user = (userData as any).user;
               if (user) {
                 console.log(
-                  chalk.green(`Welcome, ${user.name || user.email || "User"}!`),
+                  theme.success(
+                    `Welcome, ${user.name || user.email || "User"}!`,
+                  ),
                 );
               }
             }
@@ -205,15 +196,15 @@ export function registerLoginCommand(program: Command) {
             spinner.stop();
 
             if (isValid) {
-              console.log(chalk.green("Already logged in!"));
+              console.log(theme.success("Already logged in!"));
               console.log(
-                chalk.gray(`Token: ${existingToken.substring(0, 20)}...`),
+                theme.muted(`Token: ${existingToken.substring(0, 20)}...`),
               );
-              console.log(chalk.gray("\nUse --force to re-authenticate\n"));
+              console.log(theme.muted("\nUse --force to re-authenticate\n"));
               return;
             } else {
               console.log(
-                chalk.yellow(
+                theme.warning(
                   "Existing token is invalid or expired. Please log in again.\n",
                 ),
               );
@@ -223,10 +214,10 @@ export function registerLoginCommand(program: Command) {
 
         await deviceAuthorization();
 
-        console.log(chalk.green("\nAuthentication successful!"));
-        console.log(chalk.gray("You are now logged in to uvacompute.\n"));
+        console.log(theme.success("\nAuthentication successful!"));
+        console.log(theme.muted("You are now logged in to uvacompute.\n"));
       } catch (error: any) {
-        console.error(chalk.red("\nAuthentication failed."));
+        console.error(theme.error("\nAuthentication failed."));
         process.exit(1);
       }
     });

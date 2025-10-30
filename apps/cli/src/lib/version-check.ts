@@ -1,6 +1,6 @@
-import boxen from "boxen";
-import chalk from "chalk";
 import { getBaseUrl, loadVersionInfo, saveVersionInfo } from "./utils";
+import { theme, createInfoBox } from "./theme";
+import { VersionResponseSchema } from "./schemas";
 
 const CURRENT_VERSION = require("../../package.json").version;
 const CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000;
@@ -53,27 +53,22 @@ export async function checkForUpdate(): Promise<void> {
       return;
     }
 
-    const data = await response.json();
+    const rawData = await response.json();
+    const data = VersionResponseSchema.parse(rawData);
     const latestVersion = data.version;
 
     saveVersionInfo(versionInfo.version, now);
 
     if (compareVersions(CURRENT_VERSION, latestVersion)) {
-      const updateMessage = boxen(
-        chalk.bold("Update Available") +
+      const updateMessage = createInfoBox(
+        theme.emphasis("Update Available") +
           "\n\n" +
-          chalk.gray(`Current: ${CURRENT_VERSION}`) +
+          theme.muted(`Current: ${CURRENT_VERSION}`) +
           " → " +
-          chalk.green(`Latest: ${latestVersion}`) +
+          theme.success(`Latest: ${latestVersion}`) +
           "\n\n" +
           "To update, run:\n" +
-          chalk.cyan("curl -fsSL https://uvacompute.com/install.sh | sh"),
-        {
-          padding: 1,
-          margin: { top: 1, bottom: 1, left: 0, right: 0 },
-          borderStyle: "round",
-          borderColor: "blue",
-        },
+          theme.accent("curl -fsSL https://uvacompute.com/install.sh | sh"),
       );
 
       console.log(updateMessage);
