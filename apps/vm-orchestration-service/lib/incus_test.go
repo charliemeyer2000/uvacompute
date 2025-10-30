@@ -41,16 +41,20 @@ func TestGenerateCloudInitUserData(t *testing.T) {
 				t.Error("Cloud-init data should start with #cloud-config")
 			}
 
-			if !strings.Contains(result, "ssh_authorized_keys:") {
-				t.Error("Cloud-init data should contain ssh_authorized_keys section")
-			}
-
 			if !strings.Contains(result, "users:") {
 				t.Error("Cloud-init data should contain users section")
 			}
 
 			if !strings.Contains(result, "name: root") {
 				t.Error("Cloud-init data should configure root user")
+			}
+
+			if !strings.Contains(result, "ssh_pwauth: false") {
+				t.Error("Cloud-init data should disable password authentication")
+			}
+
+			if !strings.Contains(result, "disable_root: false") {
+				t.Error("Cloud-init data should explicitly allow root login")
 			}
 
 			for _, key := range tt.sshKeys {
@@ -61,8 +65,8 @@ func TestGenerateCloudInitUserData(t *testing.T) {
 
 			if len(tt.sshKeys) > 0 {
 				keyCount := strings.Count(result, "- "+tt.sshKeys[0])
-				if keyCount != 2 {
-					t.Errorf("Each SSH key should appear twice (once in ssh_authorized_keys and once in users section), got %d", keyCount)
+				if keyCount != 1 {
+					t.Errorf("Each SSH key should appear once in users section, got %d", keyCount)
 				}
 			}
 		})
@@ -75,12 +79,12 @@ func TestGenerateCloudInitUserDataFormat(t *testing.T) {
 
 	expectedSubstrings := []string{
 		"#cloud-config",
-		"ssh_authorized_keys:",
-		"  - " + sshKey,
 		"users:",
 		"  - name: root",
 		"    ssh_authorized_keys:",
 		"      - " + sshKey,
+		"ssh_pwauth: false",
+		"disable_root: false",
 	}
 
 	for _, substr := range expectedSubstrings {
@@ -89,13 +93,13 @@ func TestGenerateCloudInitUserDataFormat(t *testing.T) {
 		}
 	}
 
-	topLevelKey := "  - " + sshKey
 	userLevelKey := "      - " + sshKey
-	if !strings.Contains(result, topLevelKey) {
-		t.Errorf("Cloud-init data should contain top-level key with 2-space indentation:\n%s", topLevelKey)
-	}
 	if !strings.Contains(result, userLevelKey) {
 		t.Errorf("Cloud-init data should contain user-level key with 6-space indentation:\n%s", userLevelKey)
+	}
+
+	if strings.Count(result, sshKey) != 1 {
+		t.Errorf("SSH key should appear exactly once, found %d occurrences", strings.Count(result, sshKey))
 	}
 }
 
@@ -110,8 +114,8 @@ func TestGenerateCloudInitUserDataMultipleKeys(t *testing.T) {
 
 	for _, key := range sshKeys {
 		count := strings.Count(result, key)
-		if count != 2 {
-			t.Errorf("SSH key should appear exactly twice in cloud-init, got %d times for key: %s", count, key)
+		if count != 1 {
+			t.Errorf("SSH key should appear exactly once in cloud-init, got %d times for key: %s", count, key)
 		}
 	}
 
@@ -136,7 +140,7 @@ func TestGenerateCloudInitUserDataNoKeys(t *testing.T) {
 		t.Error("Cloud-init data should start with #cloud-config even with no keys")
 	}
 
-	if !strings.Contains(result, "ssh_authorized_keys:") {
-		t.Error("Cloud-init data should contain ssh_authorized_keys section even if empty")
+	if !strings.Contains(result, "users:") {
+		t.Error("Cloud-init data should contain users section even if empty")
 	}
 }

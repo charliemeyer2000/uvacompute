@@ -33,20 +33,18 @@ func (i *IncusAdapter) GetVMInfo(vmId string) (*structs.IncusVMInfo, error) {
 }
 
 func generateCloudInitUserData(sshPublicKeys []string) string {
-	var topLevelKeys []string
 	var userLevelKeys []string
 	for _, key := range sshPublicKeys {
-		topLevelKeys = append(topLevelKeys, fmt.Sprintf("  - %s", key))
 		userLevelKeys = append(userLevelKeys, fmt.Sprintf("      - %s", key))
 	}
 
 	cloudInit := fmt.Sprintf(`#cloud-config
-ssh_authorized_keys:
-%s
 users:
   - name: root
     ssh_authorized_keys:
-%s`, strings.Join(topLevelKeys, "\n"), strings.Join(userLevelKeys, "\n"))
+%s
+ssh_pwauth: false
+disable_root: false`, strings.Join(userLevelKeys, "\n"))
 
 	return cloudInit
 }
