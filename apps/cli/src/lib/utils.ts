@@ -46,3 +46,19 @@ export function loadToken(): string | null {
 export function getStoredToken(): string | null {
   return loadToken();
 }
+
+export async function validateToken(
+  token: string,
+  baseUrl: string,
+): Promise<boolean> {
+  try {
+    const response = await fetch(`${baseUrl}/api/user`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
