@@ -20,8 +20,6 @@ import {
   VMConnectionInfoSchema,
   SSHKeyListResponseSchema,
 } from "./lib/schemas";
-import { updateSSHConfig } from "./lib/ssh-config";
-
 const BASE_URL = getBaseUrl();
 
 async function createVM(options: {
@@ -321,10 +319,7 @@ async function listVMs(): Promise<void> {
   }
 }
 
-async function sshToVM(
-  nameOrVmId: string,
-  options: { setupOnly?: boolean },
-): Promise<void> {
+async function sshToVM(nameOrVmId: string): Promise<void> {
   const spinner = ora("Fetching VM connection info...").start();
 
   try {
@@ -422,32 +417,20 @@ async function sshToVM(
 
     spinner.succeed(chalk.green("VM connection info retrieved!"));
 
-    const hostAlias = vm.name || vm.vmId;
-
-    updateSSHConfig(hostAlias, {
-      hostName: connectionInfo.sshHost,
-      user: `${connectionInfo.user}@${vm.vmId}`,
-      port: connectionInfo.sshPort,
-      strictHostKeyChecking: "no",
-      userKnownHostsFile: "/dev/null",
-    });
-
-    console.log(chalk.green(`\nSSH config updated for '${hostAlias}'`));
-    console.log(chalk.gray(`  Added to ~/.ssh/config`));
-    console.log(chalk.gray(`  Backup saved to ~/.ssh/config.backup`));
+    console.log(chalk.blue("\nConnecting to VM..."));
     console.log();
 
-    if (options.setupOnly) {
-      console.log(chalk.blue("Setup complete! Connect with:"));
-      console.log(chalk.cyan(`  ssh ${hostAlias}`));
-      console.log();
-      return;
-    }
+    const sshArgs = [
+      "-p",
+      connectionInfo.sshPort.toString(),
+      "-o",
+      "StrictHostKeyChecking=no",
+      "-o",
+      "UserKnownHostsFile=/dev/null",
+      `${connectionInfo.user}@${vm.vmId}@${connectionInfo.sshHost}`,
+    ];
 
-    console.log(chalk.blue("Connecting..."));
-    console.log();
-
-    const sshProcess = spawn("ssh", [hostAlias], {
+    const sshProcess = spawn("ssh", sshArgs, {
       stdio: "inherit",
     });
 
@@ -494,8 +477,7 @@ export function registerVMCommands(program: Command) {
   vm.command("list").description("List all VMs").action(listVMs);
 
   vm.command("ssh")
-    .description("Setup SSH config and connect to VM")
+    .description("Connect to VM via SSH")
     .argument("<nameOrVmId>", "VM name or VM ID")
-    .option("--setup-only", "Only setup SSH config without connecting")
     .action(sshToVM);
 }
