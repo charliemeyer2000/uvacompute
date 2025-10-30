@@ -3,7 +3,7 @@ import ora from "ora";
 import boxen from "boxen";
 import chalk from "chalk";
 import open from "open";
-import { getBaseUrl, saveToken, loadToken } from "./lib/utils";
+import { getBaseUrl, saveToken, loadToken, validateToken } from "./lib/utils";
 import {
   type DeviceCodeResponse,
   type TokenResponse,
@@ -200,12 +200,24 @@ export function registerLoginCommand(program: Command) {
         if (!options.force) {
           const existingToken = loadToken();
           if (existingToken) {
-            console.log(chalk.green("Already logged in!"));
-            console.log(
-              chalk.gray(`Token: ${existingToken.substring(0, 20)}...`),
-            );
-            console.log(chalk.gray("\nUse --force to re-authenticate\n"));
-            return;
+            const spinner = ora("Validating token...").start();
+            const isValid = await validateToken(existingToken, BASE_URL);
+            spinner.stop();
+
+            if (isValid) {
+              console.log(chalk.green("Already logged in!"));
+              console.log(
+                chalk.gray(`Token: ${existingToken.substring(0, 20)}...`),
+              );
+              console.log(chalk.gray("\nUse --force to re-authenticate\n"));
+              return;
+            } else {
+              console.log(
+                chalk.yellow(
+                  "Existing token is invalid or expired. Please log in again.\n",
+                ),
+              );
+            }
           }
         }
 
