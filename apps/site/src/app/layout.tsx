@@ -15,10 +15,20 @@ const ibmPlexMono = IBM_Plex_Mono({
 
 export const metadata: Metadata = {
   title: "uvacompute",
-  description:
-    "High-performance cloud compute with NVIDIA RTX 5090 GPUs, flexible VMs, and serverless containers",
+  description: "your friendly local supercomputing company (at uva)",
   icons: {
     icon: "/favicon.svg",
+  },
+  openGraph: {
+    title: "uvacompute",
+    description: "your friendly local supercomputing company (at uva)",
+    images: ["/api/og"],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "uvacompute",
+    description: "your friendly local supercomputing company (at uva)",
+    images: ["/api/og"],
   },
 };
 
