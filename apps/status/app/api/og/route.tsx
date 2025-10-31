@@ -11,7 +11,7 @@ async function loadGoogleFont(font: string, text: string) {
 
   if (resource) {
     const response = await fetch(resource[1]);
-    if (response.status == 200) {
+    if (response.ok) {
       return await response.arrayBuffer();
     }
   }
