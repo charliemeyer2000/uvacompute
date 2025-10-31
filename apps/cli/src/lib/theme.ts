@@ -25,11 +25,12 @@ export const theme = {
 } as const;
 
 export const statusColors = {
-  running: chalk.green,
   creating: chalk.yellow,
-  stopped: chalk.red,
-  pending: chalk.yellow,
+  running: chalk.green,
   failed: chalk.red,
+  deleting: chalk.yellow,
+  deleted: chalk.red,
+  expired: chalk.red,
 } as const;
 
 export function createInfoBox(content: string): string {
