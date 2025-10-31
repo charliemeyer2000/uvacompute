@@ -4,7 +4,7 @@ import { rootFlags } from "@/lib/flags";
 
 export const config = { matcher: ["/((?!_next|api|\.well-known|.*\\..*).*)"] };
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const segments = request.nextUrl.pathname.split("/").filter(Boolean);
   const alreadyHasFlags = segments.length > 0 && segments[0].includes(".");
 
