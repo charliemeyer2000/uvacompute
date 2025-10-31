@@ -168,3 +168,22 @@ export const UserSchema = z.object({
 export const UserResponseSchema = z.object({
   user: UserSchema,
 });
+
+export const ApiErrorResponseSchema = z.object({
+  error: z.string(),
+  message: z.string().optional(),
+});
+
+export const SSHKeyRemoveResponseSchema = z.object({
+  success: z.boolean(),
+  message: z.string().optional(),
+});
+
+export const SSHKeySetPrimaryResponseSchema = z.object({
+  success: z.boolean(),
+  message: z.string().optional(),
+});
+
+export const VersionResponseSchema = z.object({
+  version: z.string(),
+});
