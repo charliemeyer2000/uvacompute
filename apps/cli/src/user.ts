@@ -2,6 +2,7 @@ import type { Command } from "commander";
 import ora from "ora";
 import { loadToken, getBaseUrl } from "./lib/utils";
 import { UserResponseSchema } from "./lib/schemas";
+import { theme } from "./lib/theme";
 
 const BASE_URL = getBaseUrl();
 
@@ -32,10 +33,10 @@ async function whoami(): Promise<void> {
 
     const data = UserResponseSchema.parse(rawData);
 
-    spinner.succeed("User information retrieved!");
+    spinner.succeed(theme.success("User information retrieved!"));
 
     console.log(
-      `You're logged in as \x1b[1m${data.user.name}\x1b[0m with email \x1b[1m${data.user.email}\x1b[0m`,
+      `You're logged in as ${theme.emphasis(data.user.name)} with email ${theme.emphasis(data.user.email)}`,
     );
   } catch (error: any) {
     spinner.fail(`Error: ${error.message}`);
