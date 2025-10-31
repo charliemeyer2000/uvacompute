@@ -14,6 +14,17 @@ export const metadata: Metadata = {
   icons: {
     icon: "/favicon.svg",
   },
+  openGraph: {
+    title: "uvacompute status",
+    description: "Status page for uvacompute services",
+    images: ["/api/og"],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "uvacompute status",
+    description: "Status page for uvacompute services",
+    images: ["/api/og"],
+  },
 };
 
 export default function RootLayout({
