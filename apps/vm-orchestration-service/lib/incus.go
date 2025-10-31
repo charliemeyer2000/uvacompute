@@ -50,7 +50,7 @@ disable_root: false`, strings.Join(userLevelKeys, "\n"))
 }
 
 func createIncusVM(vmId string, cpus int, ram int, disk int, gpus int, sshPublicKeys []string) error {
-	cmd := []string{"incus", "init", "images:ubuntu/24.04/cloud", vmId, "--vm", "-c", "limits.cpu=" + strconv.Itoa(cpus), "-c", "limits.memory=" + strconv.Itoa(ram) + "GiB", "-d", "root,size=" + strconv.Itoa(disk) + "GiB", "-d", "root,io.bus=nvme", "-c", "security.secureboot=false"}
+	cmd := []string{"incus", "init", "local:ubuntu24-dl", vmId, "--vm", "-c", "limits.cpu=" + strconv.Itoa(cpus), "-c", "limits.memory=" + strconv.Itoa(ram) + "GiB", "-d", "root,size=" + strconv.Itoa(disk) + "GiB", "-d", "root,io.bus=nvme", "-c", "security.secureboot=false"}
 
 	if len(sshPublicKeys) > 0 {
 		cloudInitUserData := generateCloudInitUserData(sshPublicKeys)
