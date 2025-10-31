@@ -71,7 +71,7 @@ func createIncusVM(vmId string, cpus int, ram int, disk int, gpus int, sshPublic
 
 	if gpus > 0 {
 
-		var cmd = []string{"incus", "device", "add", vmId, "gpu0", "type=gpu", "gputype=physical", "pci=0000:c1:00.0"}
+		var cmd = []string{"incus", "config", "device", "add", vmId, "gpu0", "type=gpu", "gputype=physical", "pci=0000:c1:00.0"}
 		_, err = exec.Command(cmd[0], cmd[1:]...).Output()
 		if err != nil {
 			_ = destroyIncusVM(vmId)
