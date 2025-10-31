@@ -1,11 +1,14 @@
 import type { Command } from "commander";
 import ora from "ora";
-import chalk from "chalk";
 import { readFileSync, existsSync } from "fs";
 import { getBaseUrl, loadToken } from "./lib/utils";
+import { theme, formatSectionHeader, formatDetail } from "./lib/theme";
 import {
   SSHKeyListResponseSchema,
   SSHKeyAddResponseSchema,
+  ApiErrorResponseSchema,
+  SSHKeyRemoveResponseSchema,
+  SSHKeySetPrimaryResponseSchema,
 } from "./lib/schemas";
 
 const BASE_URL = getBaseUrl();
@@ -50,19 +53,18 @@ async function addSSHKey(
     const rawData = await response.json();
 
     if (!response.ok) {
-      spinner.fail(
-        `Failed to add SSH key: ${rawData.error || "Unknown error"}`,
-      );
+      const errorData = ApiErrorResponseSchema.parse(rawData);
+      spinner.fail(`Failed to add SSH key: ${errorData.error}`);
       process.exit(1);
     }
 
     const data = SSHKeyAddResponseSchema.parse(rawData);
 
-    spinner.succeed(chalk.green("SSH key added successfully!"));
-    console.log(chalk.blue("\nKey Details:"));
-    console.log(chalk.gray(`- Name: ${data.name}`));
-    console.log(chalk.gray(`- Fingerprint: ${data.fingerprint}`));
-    console.log(chalk.gray(`- Key Type: ${data.keyType}`));
+    spinner.succeed(theme.success("SSH key added successfully!"));
+    console.log(formatSectionHeader("Key Details"));
+    console.log(formatDetail("Name", data.name));
+    console.log(formatDetail("Fingerprint", data.fingerprint));
+    console.log(formatDetail("Key Type", data.keyType));
     console.log();
   } catch (error: any) {
     spinner.fail(`Error: ${error.message}`);
@@ -90,34 +92,33 @@ async function listSSHKeys(): Promise<void> {
     const rawData = await response.json();
 
     if (!response.ok) {
-      spinner.fail(
-        `Failed to fetch SSH keys: ${rawData.error || "Unknown error"}`,
-      );
+      const errorData = ApiErrorResponseSchema.parse(rawData);
+      spinner.fail(`Failed to fetch SSH keys: ${errorData.error}`);
       process.exit(1);
     }
 
     const data = SSHKeyListResponseSchema.parse(rawData);
 
-    spinner.succeed(chalk.green("SSH keys retrieved!"));
+    spinner.succeed(theme.success("SSH keys retrieved!"));
 
     if (data.keys.length === 0) {
-      console.log(chalk.yellow("\nNo SSH keys found."));
+      console.log(theme.warning("\nNo SSH keys found."));
       console.log(
-        chalk.gray("Add a key with: uva ssh-key add ~/.ssh/id_rsa.pub\n"),
+        theme.muted("Add a key with: uva ssh-key add ~/.ssh/id_rsa.pub\n"),
       );
       return;
     }
 
-    console.log(chalk.blue("\nYour SSH Keys:"));
+    console.log(formatSectionHeader("Your SSH Keys"));
     console.log();
 
     for (const key of data.keys) {
-      const primaryLabel = key.isPrimary ? chalk.green(" [PRIMARY]") : "";
-      console.log(chalk.bold(`${key.name}${primaryLabel}`));
-      console.log(chalk.gray(`  ID: ${key._id}`));
-      console.log(chalk.gray(`  Fingerprint: ${key.fingerprint}`));
+      const primaryLabel = key.isPrimary ? theme.success(" [PRIMARY]") : "";
+      console.log(theme.emphasis(`${key.name}${primaryLabel}`));
+      console.log(theme.muted(`  ID: ${key._id}`));
+      console.log(theme.muted(`  Fingerprint: ${key.fingerprint}`));
       console.log(
-        chalk.gray(
+        theme.muted(
           `  Created: ${new Date(key.createdAt).toLocaleDateString()}`,
         ),
       );
@@ -149,13 +150,13 @@ async function removeSSHKey(keyId: string): Promise<void> {
     const rawData = await response.json();
 
     if (!response.ok) {
-      spinner.fail(
-        `Failed to remove SSH key: ${rawData.error || "Unknown error"}`,
-      );
+      const errorData = ApiErrorResponseSchema.parse(rawData);
+      spinner.fail(`Failed to remove SSH key: ${errorData.error}`);
       process.exit(1);
     }
 
-    spinner.succeed(chalk.green(`SSH key ${keyId} removed successfully!`));
+    const data = SSHKeyRemoveResponseSchema.parse(rawData);
+    spinner.succeed(theme.success(`SSH key ${keyId} removed successfully!`));
   } catch (error: any) {
     spinner.fail(`Error: ${error.message}`);
     process.exit(1);
@@ -184,13 +185,13 @@ async function setPrimaryKey(keyId: string): Promise<void> {
     const rawData = await response.json();
 
     if (!response.ok) {
-      spinner.fail(
-        `Failed to set primary key: ${rawData.error || "Unknown error"}`,
-      );
+      const errorData = ApiErrorResponseSchema.parse(rawData);
+      spinner.fail(`Failed to set primary key: ${errorData.error}`);
       process.exit(1);
     }
 
-    spinner.succeed(chalk.green(`SSH key ${keyId} set as primary!`));
+    const data = SSHKeySetPrimaryResponseSchema.parse(rawData);
+    spinner.succeed(theme.success(`SSH key ${keyId} set as primary!`));
   } catch (error: any) {
     spinner.fail(`Error: ${error.message}`);
     process.exit(1);

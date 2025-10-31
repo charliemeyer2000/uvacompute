@@ -1,18 +1,16 @@
 import type { Command } from "commander";
 import ora from "ora";
-import chalk from "chalk";
 import { spawn } from "child_process";
 import { getBaseUrl, loadToken } from "./lib/utils";
 import {
-  type VMCreationRequest,
-  type VMCreationResponse,
-  type VMDeletionResponse,
-  type VMStatusResponse,
-  type VMListResponse,
-  type VMConnectionInfo,
-} from "./lib/types";
+  theme,
+  statusColors,
+  formatSectionHeader,
+  formatDetail,
+  formatCommand,
+} from "./lib/theme";
+import { type VMCreationRequest } from "./lib/types";
 import {
-  VMCreationRequestSchema,
   VMCreationResponseSchema,
   VMDeletionResponseSchema,
   VMStatusResponseSchema,
@@ -113,17 +111,17 @@ async function createVM(options: {
     const data = VMCreationResponseSchema.parse(rawData);
 
     if (data.status === "success") {
-      spinner.succeed(chalk.green("VM created successfully!"));
-      console.log(chalk.blue("\nVM Details:"));
-      console.log(chalk.gray(`- VM ID: ${data.vmId}`));
-      if (options.name) console.log(chalk.gray(`- Name: ${options.name}`));
-      console.log(chalk.gray(`- Duration: ${hours} hour(s)`));
-      if (options.cpus) console.log(chalk.gray(`- CPUs: ${options.cpus}`));
-      if (options.ram) console.log(chalk.gray(`- RAM: ${options.ram} GB`));
-      if (options.disk) console.log(chalk.gray(`- Disk: ${options.disk} GB`));
-      if (options.gpus) console.log(chalk.gray(`- GPUs: ${options.gpus}`));
+      spinner.succeed(theme.success("VM created successfully!"));
+      console.log(formatSectionHeader("VM Details"));
+      if (data.vmId) console.log(formatDetail("VM ID", data.vmId));
+      if (options.name) console.log(formatDetail("Name", options.name));
+      console.log(formatDetail("Duration", `${hours} hour(s)`));
+      if (options.cpus) console.log(formatDetail("CPUs", String(options.cpus)));
+      if (options.ram) console.log(formatDetail("RAM", `${options.ram} GB`));
+      if (options.disk) console.log(formatDetail("Disk", `${options.disk} GB`));
+      if (options.gpus) console.log(formatDetail("GPUs", String(options.gpus)));
       if (options.gpuType)
-        console.log(chalk.gray(`- GPU Type: ${options.gpuType}`));
+        console.log(formatDetail("GPU Type", options.gpuType));
       console.log();
 
       const keysResponse = await fetch(`${BASE_URL}/api/ssh-keys`, {
@@ -140,21 +138,21 @@ async function createVM(options: {
 
         if (keysData.keys.length === 0) {
           console.log(
-            chalk.yellow(
+            theme.warning(
               "No SSH keys configured. Add one to enable SSH access:",
             ),
           );
           console.log(
-            chalk.gray(
-              "  uva ssh-key add ~/.ssh/id_rsa.pub --name 'Some Key Name'",
+            formatCommand(
+              "uva ssh-key add ~/.ssh/id_rsa.pub --name 'Some Key Name'",
             ),
           );
           console.log();
         } else {
-          console.log(chalk.green("SSH access configured"));
-          console.log(chalk.gray("\nTo connect:"));
-          const identifier = options.name || data.vmId;
-          console.log(chalk.cyan(`  uva vm ssh ${identifier}`));
+          console.log(theme.success("SSH access configured"));
+          console.log(theme.muted("\nTo connect:"));
+          const identifier = options.name || data.vmId || "vm-id";
+          console.log(formatCommand(`uva vm ssh ${identifier}`));
           console.log();
         }
       }
@@ -197,7 +195,7 @@ async function deleteVM(vmId: string): Promise<void> {
     const data = VMDeletionResponseSchema.parse(rawData);
 
     if (data.status === "deletion_success") {
-      spinner.succeed(chalk.green(`VM ${vmId} deleted successfully!`));
+      spinner.succeed(theme.success(`VM ${vmId} deleted successfully!`));
     } else {
       spinner.fail(`VM deletion failed: ${data.msg}`);
       process.exit(1);
@@ -236,12 +234,12 @@ async function getVMStatus(vmId: string): Promise<void> {
 
     const data = VMStatusResponseSchema.parse(rawData);
 
-    spinner.succeed(chalk.green("VM status retrieved!"));
-    console.log(chalk.blue("\nVM Status:"));
-    console.log(chalk.gray(`- Status: ${data.status}`));
-    console.log(chalk.gray(`- Message: ${data.msg}`));
+    spinner.succeed(theme.success("VM status retrieved!"));
+    console.log(formatSectionHeader("VM Status"));
+    console.log(formatDetail("Status", data.status));
+    console.log(formatDetail("Message", data.msg));
     if (data.info) {
-      console.log(chalk.gray(`- Info: ${JSON.stringify(data.info, null, 2)}`));
+      console.log(formatDetail("Info", JSON.stringify(data.info, null, 2)));
     }
     console.log();
   } catch (error: any) {
@@ -250,7 +248,7 @@ async function getVMStatus(vmId: string): Promise<void> {
   }
 }
 
-async function listVMs(): Promise<void> {
+async function listVMs(options: { all?: boolean }): Promise<void> {
   const spinner = ora("Fetching VMs...").start();
 
   try {
@@ -276,40 +274,51 @@ async function listVMs(): Promise<void> {
 
     const data = VMListResponseSchema.parse(rawData);
 
-    spinner.succeed(chalk.green("VMs retrieved!"));
+    const filteredVMs = options.all
+      ? data.vms
+      : data.vms.filter((vm) => vm.status === "running");
 
-    if (data.vms.length === 0) {
-      console.log(chalk.yellow("\nNo VMs found."));
-      console.log(chalk.gray("Create one with: uva vm create -h 1 -n myvm\n"));
+    spinner.succeed(theme.success("VMs retrieved!"));
+
+    if (filteredVMs.length === 0) {
+      if (options.all) {
+        console.log(theme.warning("\nNo VMs found."));
+        console.log(
+          theme.muted("Create one with: uva vm create -h 1 -n myvm\n"),
+        );
+      } else {
+        console.log(theme.warning("\nNo running VMs found."));
+        console.log(theme.muted("Use 'uva vm list --all' to see all VMs\n"));
+      }
       return;
     }
 
-    console.log(chalk.blue("\nYour VMs:"));
+    if (options.all) {
+      console.log(formatSectionHeader("All VMs"));
+    } else {
+      console.log(formatSectionHeader("Running VMs"));
+    }
     console.log();
 
-    for (const vm of data.vms) {
+    for (const vm of filteredVMs) {
       const statusColor =
-        vm.status === "running"
-          ? chalk.green
-          : vm.status === "creating"
-            ? chalk.yellow
-            : chalk.red;
+        statusColors[vm.status as keyof typeof statusColors] || theme.muted;
 
       const nameDisplay = vm.name
-        ? chalk.bold(vm.name)
-        : chalk.gray("(unnamed)");
+        ? theme.emphasis(vm.name)
+        : theme.muted("(unnamed)");
       console.log(`${nameDisplay} ${statusColor(`[${vm.status}]`)}`);
-      console.log(chalk.gray(`  VM ID: ${vm.vmId}`));
+      console.log(theme.muted(`  VM ID: ${vm.vmId}`));
       console.log(
-        chalk.gray(
+        theme.muted(
           `  Resources: ${vm.cpus} vCPU | ${vm.ram}GB RAM | ${vm.disk}GB disk${vm.gpus > 0 ? ` | ${vm.gpus}x ${vm.gpuType}` : ""}`,
         ),
       );
       console.log(
-        chalk.gray(`  Created: ${new Date(vm.createdAt).toLocaleString()}`),
+        theme.muted(`  Created: ${new Date(vm.createdAt).toLocaleString()}`),
       );
       console.log(
-        chalk.gray(`  Expires: ${new Date(vm.expiresAt).toLocaleString()}`),
+        theme.muted(`  Expires: ${new Date(vm.expiresAt).toLocaleString()}`),
       );
       console.log();
     }
@@ -348,7 +357,7 @@ async function sshToVM(nameOrVmId: string): Promise<void> {
 
     if (!vm) {
       spinner.fail(`VM not found: ${nameOrVmId}`);
-      console.log(chalk.gray("\nRun 'uva vm list' to see all VMs\n"));
+      console.log(theme.muted("\nRun 'uva vm list' to see all VMs\n"));
       process.exit(1);
     }
 
@@ -376,7 +385,7 @@ async function sshToVM(nameOrVmId: string): Promise<void> {
       if (connectionResponse.status === 409 && errorData.status) {
         spinner.fail(`VM is not running (current status: ${errorData.status})`);
         if (errorData.message) {
-          console.log(chalk.yellow(errorData.message));
+          console.log(theme.warning(errorData.message));
         }
       } else {
         spinner.fail(
@@ -405,19 +414,19 @@ async function sshToVM(nameOrVmId: string): Promise<void> {
       );
 
       if (keysData.keys.length === 0) {
-        spinner.warn(chalk.yellow("No SSH keys configured"));
+        spinner.warn(theme.warning("No SSH keys configured"));
+        console.log(theme.muted("\nAdd an SSH key to enable access:"));
         console.log(
-          chalk.gray(
-            "\nAdd an SSH key to enable access:\n  uva ssh-key add ~/.ssh/id_rsa.pub --name 'My Key'\n",
-          ),
+          formatCommand("uva ssh-key add ~/.ssh/id_rsa.pub --name 'My Key'"),
         );
+        console.log();
         process.exit(1);
       }
     }
 
-    spinner.succeed(chalk.green("VM connection info retrieved!"));
+    spinner.succeed(theme.success("VM connection info retrieved!"));
 
-    console.log(chalk.blue("\nConnecting to VM..."));
+    console.log(formatSectionHeader("Connecting to VM"));
     console.log();
 
     const sshArgs = [
@@ -436,7 +445,7 @@ async function sshToVM(nameOrVmId: string): Promise<void> {
 
     sshProcess.on("exit", (code) => {
       if (code !== 0) {
-        console.log(chalk.yellow(`\nSSH process exited with code ${code}`));
+        console.log(theme.warning(`\nSSH process exited with code ${code}`));
       }
     });
   } catch (error: any) {
@@ -474,7 +483,10 @@ export function registerVMCommands(program: Command) {
     .argument("<vmId>", "VM ID to check")
     .action(getVMStatus);
 
-  vm.command("list").description("List all VMs").action(listVMs);
+  vm.command("list")
+    .description("List running VMs")
+    .option("-a, --all", "Show all VMs (including non-running)")
+    .action(listVMs);
 
   vm.command("ssh")
     .description("Connect to VM via SSH")
