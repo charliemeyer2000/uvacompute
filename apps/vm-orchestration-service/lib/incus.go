@@ -53,9 +53,9 @@ func createIncusVM(vmId string, cpus int, ram int, disk int, gpus int, sshPublic
 
 	var vmImage string
 	if gpus > 0 {
-		vmImage = "local:ubuntu24-gpu"
+		vmImage = "local:ubuntu24-dev-gpu"
 	} else {
-		vmImage = "local:ubuntu24-cpu"
+		vmImage = "local:ubuntu24-dev-cpu"
 	}
 	cmd := []string{"incus", "init", vmImage, vmId, "--vm", "-c", "limits.cpu=" + strconv.Itoa(cpus), "-c", "limits.memory=" + strconv.Itoa(ram) + "GiB", "-d", "root,size=" + strconv.Itoa(disk) + "GiB", "-d", "root,io.bus=nvme", "-c", "security.secureboot=false"}
 
