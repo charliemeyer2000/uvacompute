@@ -84,6 +84,10 @@ export const VMStatusResponseSchema = z.object({
   status: z.enum([
     "not_found",
     "creating",
+    "initializing",
+    "starting",
+    "waiting_for_agent",
+    "configuring",
     "failed",
     "running",
     "deleting",
