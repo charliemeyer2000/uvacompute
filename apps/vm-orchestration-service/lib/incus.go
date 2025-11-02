@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+	"time"
 
 	"vm-orchestration-service/structs"
 )
@@ -117,8 +118,13 @@ func createIncusVM(vmId string, cpus int, ram int, disk int, gpus int, sshPublic
 }
 
 func waitForCloudInit(vmId string) error {
+	err := waitForVMAgent(vmId)
+	if err != nil {
+		return fmt.Errorf("VM agent failed to start: %w", err)
+	}
+
 	cmd := []string{"incus", "exec", vmId, "--", "cloud-init", "status", "--wait"}
-	_, err := exec.Command(cmd[0], cmd[1:]...).Output()
+	_, err = exec.Command(cmd[0], cmd[1:]...).Output()
 	if err != nil {
 		switch e := err.(type) {
 		case *exec.Error:
@@ -131,6 +137,20 @@ func waitForCloudInit(vmId string) error {
 	}
 
 	return nil
+}
+
+func waitForVMAgent(vmId string) error {
+	cmd := []string{"incus", "exec", vmId, "--", "true"}
+
+	for i := 0; i < 60; i++ {
+		_, err := exec.Command(cmd[0], cmd[1:]...).Output()
+		if err == nil {
+			return nil
+		}
+		time.Sleep(1 * time.Second)
+	}
+
+	return errors.New("timeout waiting for VM agent to start")
 }
 
 func destroyIncusVM(vmId string) error {
