@@ -3,6 +3,10 @@ import { authClient } from "@/lib/auth-client";
 import { fetchMutation, fetchQuery } from "convex/nextjs";
 import { api } from "../../../../../convex/_generated/api";
 import { createAuthHeaders } from "@/lib/orchestration-auth";
+import {
+  VMDeletionResponseSchema,
+  VMStatusResponseSchema,
+} from "@/lib/vm-schemas";
 
 const VM_ORCHESTRATION_SERVICE_URL =
   process.env.VM_ORCHESTRATION_SERVICE_URL || "http://localhost:8080";
@@ -57,7 +61,8 @@ export async function DELETE(
       },
     );
 
-    const data = await response.json();
+    const rawData = await response.json();
+    const data = VMDeletionResponseSchema.parse(rawData);
 
     if (response.ok && data.status === "deletion_success") {
       try {
@@ -140,11 +145,23 @@ export async function GET(
       },
     );
 
-    const data = await response.json();
+    const rawData = await response.json();
+    const data = VMStatusResponseSchema.parse(rawData);
 
     return NextResponse.json(data, { status: response.status });
   } catch (error: any) {
     console.error("Error getting VM status:", error);
+
+    if (error.name === "ZodError") {
+      return NextResponse.json(
+        {
+          status: "not_found",
+          msg: "Invalid response from orchestration service",
+        },
+        { status: 500 },
+      );
+    }
+
     return NextResponse.json(
       {
         status: "not_found",
