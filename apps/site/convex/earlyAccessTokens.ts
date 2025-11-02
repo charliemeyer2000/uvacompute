@@ -66,11 +66,6 @@ export const approveByToken = mutation({
       return { success: false as const, error: "Token expired" };
     }
 
-    await ctx.db.patch(tokenRecord._id, {
-      used: true,
-      approved: true,
-    });
-
     const result = await ctx.runMutation(
       internal.earlyAccess.approveUserByEmail,
       {
@@ -81,6 +76,11 @@ export const approveByToken = mutation({
     if (!result.success) {
       return { success: false as const, error: result.error };
     }
+
+    await ctx.db.patch(tokenRecord._id, {
+      used: true,
+      approved: true,
+    });
 
     return { success: true as const, email: tokenRecord.email };
   },
@@ -137,11 +137,6 @@ export const approveTokenByEmail = mutation({
       throw new Error("No early access token found for this email");
     }
 
-    await ctx.db.patch(token._id, {
-      approved: true,
-      used: true,
-    });
-
     const result = await ctx.runMutation(
       internal.earlyAccess.approveUserByEmail,
       {
@@ -152,6 +147,11 @@ export const approveTokenByEmail = mutation({
     if (!result.success) {
       throw new Error(result.error);
     }
+
+    await ctx.db.patch(token._id, {
+      approved: true,
+      used: true,
+    });
 
     return null;
   },
