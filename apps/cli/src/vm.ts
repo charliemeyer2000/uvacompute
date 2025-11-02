@@ -327,7 +327,7 @@ async function getVMStatus(vmId: string): Promise<void> {
       process.exit(1);
     }
 
-    const response = await fetch(`${BASE_URL}/api/vms/${vmId}`, {
+    const response = await fetch(`${BASE_URL}/api/vms/${vmId}/status`, {
       method: "GET",
       headers: {
         Authorization: `Bearer ${token}`,
