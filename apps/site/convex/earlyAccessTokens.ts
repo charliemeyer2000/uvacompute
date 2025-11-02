@@ -71,9 +71,16 @@ export const approveByToken = mutation({
       approved: true,
     });
 
-    await ctx.runMutation(internal.earlyAccess.approveUserByEmail, {
-      email: tokenRecord.email,
-    });
+    const result = await ctx.runMutation(
+      internal.earlyAccess.approveUserByEmail,
+      {
+        email: tokenRecord.email,
+      },
+    );
+
+    if (!result.success) {
+      return { success: false as const, error: result.error };
+    }
 
     return { success: true as const, email: tokenRecord.email };
   },
@@ -126,16 +133,25 @@ export const approveTokenByEmail = mutation({
       .withIndex("by_email", (q) => q.eq("email", args.email))
       .first();
 
-    if (token) {
-      await ctx.db.patch(token._id, {
-        approved: true,
-        used: true,
-      });
+    if (!token) {
+      throw new Error("No early access token found for this email");
     }
 
-    await ctx.runMutation(internal.earlyAccess.approveUserByEmail, {
-      email: args.email,
+    await ctx.db.patch(token._id, {
+      approved: true,
+      used: true,
     });
+
+    const result = await ctx.runMutation(
+      internal.earlyAccess.approveUserByEmail,
+      {
+        email: args.email,
+      },
+    );
+
+    if (!result.success) {
+      throw new Error(result.error);
+    }
 
     return null;
   },
