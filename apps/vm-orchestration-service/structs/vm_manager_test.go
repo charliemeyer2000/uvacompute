@@ -9,7 +9,7 @@ type MockIncusProvider struct {
 	LastSSHKeys []string
 }
 
-func (m *MockIncusProvider) CreateVM(vmId string, cpus, ram, disk, gpus int, sshPublicKeys []string) error {
+func (m *MockIncusProvider) CreateVM(vmId string, cpus, ram, disk, gpus int, sshPublicKeys []string, statusCallback StatusCallback) error {
 	m.LastSSHKeys = sshPublicKeys
 	return nil
 }
@@ -24,6 +24,10 @@ func (m *MockIncusProvider) GetVMStatus(vmId string) (string, error) {
 
 func (m *MockIncusProvider) GetVMInfo(vmId string) (*IncusVMInfo, error) {
 	return &IncusVMInfo{}, nil
+}
+
+func (m *MockIncusProvider) ListVMs() ([]IncusListVM, error) {
+	return []IncusListVM{}, nil
 }
 
 func TestCreateVM(t *testing.T) {

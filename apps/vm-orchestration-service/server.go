@@ -58,6 +58,10 @@ func main() {
 	incusAdapter := lib.NewIncusAdapter()
 	app := structs.NewApp(incusAdapter, callbackClient)
 
+	if err := app.VMManager.InitializeFromIncus(); err != nil {
+		fmt.Printf("Warning: Failed to sync state from Incus: %v\n", err)
+	}
+
 	app.Router.Use(middleware.Logger)
 	app.Router.Use(middleware.RequestID)
 	app.Router.Use(middleware.RealIP)

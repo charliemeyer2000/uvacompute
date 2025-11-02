@@ -18,7 +18,110 @@ import {
   VMConnectionInfoSchema,
   SSHKeyListResponseSchema,
 } from "./lib/schemas";
+import {
+  VMError,
+  VMOperationError,
+  VMValidationError,
+  VMNetworkError,
+  shouldStopRetrying,
+  isTransientError,
+  parseErrorResponse,
+} from "./lib/errors";
 const BASE_URL = getBaseUrl();
+
+function getStatusMessage(status: string): string {
+  const messages: Record<string, string> = {
+    creating: "Creating VM...",
+    initializing: "Initializing VM instance...",
+    starting: "Starting VM...",
+    waiting_for_agent: "Waiting for VM agent...",
+    configuring: "Configuring VM (running cloud-init)...",
+    running: "VM is running!",
+    failed: "VM creation failed",
+  };
+  return messages[status] || `Status: ${status}`;
+}
+
+async function pollVMStatus(
+  vmId: string,
+  token: string,
+  spinner: any,
+): Promise<void> {
+  const maxAttempts = 180;
+  let attempts = 0;
+  let consecutiveTransientErrors = 0;
+  const maxConsecutiveTransientErrors = 5;
+
+  while (attempts < maxAttempts) {
+    try {
+      const statusResponse = await fetch(`${BASE_URL}/api/vms/${vmId}/status`, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!statusResponse.ok) {
+        const error = await parseErrorResponse(statusResponse);
+
+        if (isTransientError(error)) {
+          consecutiveTransientErrors++;
+          if (consecutiveTransientErrors >= maxConsecutiveTransientErrors) {
+            throw new VMError(
+              `${error.message} (persisted after ${maxConsecutiveTransientErrors} attempts)`,
+              "PERSISTENT_ERROR",
+            );
+          }
+        } else {
+          throw error;
+        }
+      } else {
+        consecutiveTransientErrors = 0;
+
+        const statusData = VMStatusResponseSchema.parse(
+          await statusResponse.json(),
+        );
+
+        spinner.text = getStatusMessage(statusData.status);
+
+        if (statusData.status === "running") {
+          return;
+        } else if (statusData.status === "failed") {
+          throw new VMOperationError(statusData.msg || "VM creation failed");
+        }
+      }
+    } catch (error: unknown) {
+      if (error instanceof Error && error.name === "ZodError") {
+        throw new VMValidationError(
+          `Invalid response from server: ${error.message || "Schema validation failed"}`,
+        );
+      }
+
+      if (error instanceof TypeError || error instanceof SyntaxError) {
+        throw new VMNetworkError(`Network or parsing error: ${error.message}`);
+      }
+
+      if (error instanceof VMError && error.code === "PERSISTENT_ERROR") {
+        throw error;
+      }
+
+      if (shouldStopRetrying(error)) {
+        throw error;
+      }
+
+      if (error instanceof VMError) {
+        console.warn(`Transient error during status poll: ${error.message}`);
+      } else if (error instanceof Error) {
+        console.warn(`Unexpected error during status poll: ${error.message}`);
+      }
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    attempts++;
+  }
+
+  throw new VMError("Timeout waiting for VM to be ready", "TIMEOUT");
+}
 
 async function createVM(options: {
   hours: string;
@@ -111,9 +214,17 @@ async function createVM(options: {
     const data = VMCreationResponseSchema.parse(rawData);
 
     if (data.status === "success") {
+      if (!data.vmId) {
+        spinner.fail("VM creation succeeded but no VM ID returned");
+        process.exit(1);
+      }
+
+      spinner.text = getStatusMessage("creating");
+      await pollVMStatus(data.vmId, token, spinner);
+
       spinner.succeed(theme.success("VM created successfully!"));
       console.log(formatSectionHeader("VM Details"));
-      if (data.vmId) console.log(formatDetail("VM ID", data.vmId));
+      console.log(formatDetail("VM ID", data.vmId));
       if (options.name) console.log(formatDetail("Name", options.name));
       console.log(formatDetail("Duration", `${hours} hour(s)`));
       if (options.cpus) console.log(formatDetail("CPUs", String(options.cpus)));

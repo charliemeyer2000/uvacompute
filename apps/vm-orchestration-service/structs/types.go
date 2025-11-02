@@ -27,13 +27,17 @@ const (
 type VMStatus string
 
 const (
-	VM_STATUS_NOT_FOUND VMStatus = "not_found" // vm not found
-	VM_STATUS_CREATING  VMStatus = "creating"  // creating vm
-	VM_STATUS_FAILED    VMStatus = "failed"    // vm failed to create
-	VM_STATUS_RUNNING   VMStatus = "running"   // vm is running
-	VM_STATUS_DELETING  VMStatus = "deleting"  // vm is being deleted
-	VM_STATUS_DELETED   VMStatus = "deleted"   // vm is deleted (likely will never be used)
-	VM_STATUS_UPDATING  VMStatus = "updating"  // vm is being updated (extended, update config)
+	VM_STATUS_NOT_FOUND         VMStatus = "not_found"         // vm not found
+	VM_STATUS_CREATING          VMStatus = "creating"          // creating vm (initial state)
+	VM_STATUS_INITIALIZING      VMStatus = "initializing"      // initializing incus instance
+	VM_STATUS_STARTING          VMStatus = "starting"          // starting the vm
+	VM_STATUS_WAITING_FOR_AGENT VMStatus = "waiting_for_agent" // waiting for vm agent to be ready
+	VM_STATUS_CONFIGURING       VMStatus = "configuring"       // waiting for cloud-init
+	VM_STATUS_FAILED            VMStatus = "failed"            // vm failed to create
+	VM_STATUS_RUNNING           VMStatus = "running"           // vm is running
+	VM_STATUS_DELETING          VMStatus = "deleting"          // vm is being deleted
+	VM_STATUS_DELETED           VMStatus = "deleted"           // vm is deleted (likely will never be used)
+	VM_STATUS_UPDATING          VMStatus = "updating"          // vm is being updated (extended, update config)
 )
 
 type GPUType string
@@ -113,5 +117,14 @@ type VMState struct {
 	Gpus    int     `json:"gpus"`
 	GPUType GPUType `json:"gpu-type"`
 
-	Status VMStatus `json:"status"`
+	Status       VMStatus `json:"status"`
+	ErrorMessage string   `json:"errorMessage,omitempty"`
+}
+
+type IncusListVM struct {
+	Name      string            `json:"name"`
+	Status    string            `json:"status"`
+	Type      string            `json:"type"`
+	Config    map[string]string `json:"config"`
+	CreatedAt string            `json:"created_at"`
 }
