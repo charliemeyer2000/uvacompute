@@ -2,15 +2,25 @@ package structs
 
 import (
 	"strings"
+	"sync"
 	"testing"
 )
 
 type MockIncusProvider struct {
+	mu          sync.Mutex
 	LastSSHKeys []string
 }
 
 func (m *MockIncusProvider) CreateVM(vmId string, cpus, ram, disk, gpus int, sshPublicKeys []string, statusCallback StatusCallback) error {
+	m.mu.Lock()
 	m.LastSSHKeys = sshPublicKeys
+	m.mu.Unlock()
+
+	statusCallback(VM_STATUS_INITIALIZING)
+	statusCallback(VM_STATUS_STARTING)
+	statusCallback(VM_STATUS_WAITING_FOR_AGENT)
+	statusCallback(VM_STATUS_CONFIGURING)
+
 	return nil
 }
 
@@ -180,16 +190,22 @@ func TestCreateVMWithSSHKeys(t *testing.T) {
 		t.Fatal("vmId should not be empty")
 	}
 
-	if len(mockIncus.LastSSHKeys) != 2 {
-		t.Fatalf("expected 2 SSH keys passed to provider, got %d", len(mockIncus.LastSSHKeys))
+	vm.WaitForStatus(vmId, VM_STATUS_RUNNING)
+
+	mockIncus.mu.Lock()
+	keysCount := len(mockIncus.LastSSHKeys)
+	keysMatch := keysCount == 2
+	if keysMatch {
+		keysMatch = mockIncus.LastSSHKeys[0] == sshKeys[0] && mockIncus.LastSSHKeys[1] == sshKeys[1]
+	}
+	mockIncus.mu.Unlock()
+
+	if keysCount != 2 {
+		t.Fatalf("expected 2 SSH keys passed to provider, got %d", keysCount)
 	}
 
-	if mockIncus.LastSSHKeys[0] != sshKeys[0] {
-		t.Fatal("SSH key 1 not passed correctly to provider")
-	}
-
-	if mockIncus.LastSSHKeys[1] != sshKeys[1] {
-		t.Fatal("SSH key 2 not passed correctly to provider")
+	if !keysMatch {
+		t.Fatal("SSH keys not passed correctly to provider")
 	}
 }
 
@@ -213,8 +229,14 @@ func TestCreateVMWithoutSSHKeys(t *testing.T) {
 		t.Fatal("vmId should not be empty")
 	}
 
-	if len(mockIncus.LastSSHKeys) != 0 {
-		t.Fatalf("expected 0 SSH keys passed to provider, got %d", len(mockIncus.LastSSHKeys))
+	vm.WaitForStatus(vmId, VM_STATUS_RUNNING)
+
+	mockIncus.mu.Lock()
+	keysCount := len(mockIncus.LastSSHKeys)
+	mockIncus.mu.Unlock()
+
+	if keysCount != 0 {
+		t.Fatalf("expected 0 SSH keys passed to provider, got %d", keysCount)
 	}
 }
 
@@ -240,11 +262,18 @@ func TestCreateVMWithSingleSSHKey(t *testing.T) {
 		t.Fatal("vmId should not be empty")
 	}
 
-	if len(mockIncus.LastSSHKeys) != 1 {
-		t.Fatalf("expected 1 SSH key passed to provider, got %d", len(mockIncus.LastSSHKeys))
+	vm.WaitForStatus(vmId, VM_STATUS_RUNNING)
+
+	mockIncus.mu.Lock()
+	keysCount := len(mockIncus.LastSSHKeys)
+	keyMatch := keysCount == 1 && mockIncus.LastSSHKeys[0] == sshKey
+	mockIncus.mu.Unlock()
+
+	if keysCount != 1 {
+		t.Fatalf("expected 1 SSH key passed to provider, got %d", keysCount)
 	}
 
-	if mockIncus.LastSSHKeys[0] != sshKey {
+	if !keyMatch {
 		t.Fatal("SSH key not passed correctly to provider")
 	}
 }
@@ -275,7 +304,7 @@ func TestCreateVMWithSSHKeysAndCustomResources(t *testing.T) {
 		t.Fatalf("CreateVM with SSH keys and custom resources failed: %v", err)
 	}
 
-	vmState := vm.vmMap[vmId]
+	vmState := vm.WaitForStatus(vmId, VM_STATUS_RUNNING)
 	if vmState.Cpus != 4 {
 		t.Fatalf("expected 4 CPUs, got %d", vmState.Cpus)
 	}
@@ -288,7 +317,11 @@ func TestCreateVMWithSSHKeysAndCustomResources(t *testing.T) {
 		t.Fatalf("expected name 'ssh-test-vm', got %s", vmState.Name)
 	}
 
-	if len(mockIncus.LastSSHKeys) != 1 {
-		t.Fatalf("expected 1 SSH key passed to provider, got %d", len(mockIncus.LastSSHKeys))
+	mockIncus.mu.Lock()
+	keysCount := len(mockIncus.LastSSHKeys)
+	mockIncus.mu.Unlock()
+
+	if keysCount != 1 {
+		t.Fatalf("expected 1 SSH key passed to provider, got %d", keysCount)
 	}
 }

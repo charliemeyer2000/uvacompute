@@ -140,6 +140,19 @@ func (vm *VMManager) GetVM(vmId string) (VMState, bool) {
 	return vmState, exists
 }
 
+func (vm *VMManager) WaitForStatus(vmId string, targetStatus VMStatus) VMState {
+	for {
+		vm.mu.Lock()
+		vmState, exists := vm.vmMap[vmId]
+		if exists && vmState.Status == targetStatus {
+			vm.mu.Unlock()
+			return vmState
+		}
+		vm.mu.Unlock()
+		time.Sleep(1 * time.Millisecond)
+	}
+}
+
 func (vm *VMManager) UpdateVMStatus(vmId string, status VMStatus, errorMessage string) {
 	vm.mu.Lock()
 	defer vm.mu.Unlock()
