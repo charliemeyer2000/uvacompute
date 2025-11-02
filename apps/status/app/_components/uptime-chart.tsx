@@ -15,8 +15,8 @@ export function UptimeChart({ data, days }: UptimeChartProps) {
 
   function getStatusColor(day: DayAggregate): string {
     if (day.total === 0) return "bg-gray-200";
-    if (day.uptimePercentage >= 99) return "bg-green-500";
-    if (day.uptimePercentage >= 95) return "bg-yellow-500";
+    if (day.uptimePercentage > 90) return "bg-blue-500";
+    if (day.uptimePercentage > 50) return "bg-yellow-500";
     return "bg-red-600";
   }
 
@@ -74,16 +74,16 @@ export function UptimeChart({ data, days }: UptimeChartProps) {
 
       <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground mt-4">
         <div className="flex items-center gap-2">
-          <div className="w-3 h-3 bg-green-500 border border-black" />
-          <span>operational</span>
+          <div className="w-3 h-3 bg-blue-500 border border-black" />
+          <span>&gt;90% uptime</span>
         </div>
         <div className="flex items-center gap-2">
           <div className="w-3 h-3 bg-yellow-500 border border-black" />
-          <span>degraded</span>
+          <span>50-90% uptime</span>
         </div>
         <div className="flex items-center gap-2">
           <div className="w-3 h-3 bg-red-600 border border-black" />
-          <span>down</span>
+          <span>&lt;50% uptime</span>
         </div>
         <div className="flex items-center gap-2">
           <div className="w-3 h-3 bg-gray-200 border border-black" />
