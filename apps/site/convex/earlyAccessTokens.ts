@@ -71,33 +71,9 @@ export const approveByToken = mutation({
       approved: true,
     });
 
-    try {
-      const user = await ctx.runQuery(
-        components.betterAuth.userHelpers.getUserByEmail,
-        {
-          email: tokenRecord.email,
-        },
-      );
-
-      if (user) {
-        await ctx.runMutation(
-          components.betterAuth.userHelpers.updateUserEarlyAccess,
-          {
-            userId: user._id,
-            hasEarlyAccess: true,
-          },
-        );
-
-        await ctx.scheduler.runAfter(
-          0,
-          internal.earlyAccess.sendApprovalEmail,
-          {
-            email: user.email,
-            name: user.name,
-          },
-        );
-      }
-    } catch (error) {}
+    await ctx.runMutation(internal.earlyAccess.approveUserByEmail, {
+      email: tokenRecord.email,
+    });
 
     return { success: true as const, email: tokenRecord.email };
   },
@@ -157,33 +133,9 @@ export const approveTokenByEmail = mutation({
       });
     }
 
-    try {
-      const user = await ctx.runQuery(
-        components.betterAuth.userHelpers.getUserByEmail,
-        {
-          email: args.email,
-        },
-      );
-
-      if (user) {
-        await ctx.runMutation(
-          components.betterAuth.userHelpers.updateUserEarlyAccess,
-          {
-            userId: user._id,
-            hasEarlyAccess: true,
-          },
-        );
-
-        await ctx.scheduler.runAfter(
-          0,
-          internal.earlyAccess.sendApprovalEmail,
-          {
-            email: user.email,
-            name: user.name,
-          },
-        );
-      }
-    } catch (error) {}
+    await ctx.runMutation(internal.earlyAccess.approveUserByEmail, {
+      email: args.email,
+    });
 
     return null;
   },

@@ -1,4 +1,9 @@
-import { query, mutation, internalAction } from "./_generated/server";
+import {
+  query,
+  mutation,
+  internalMutation,
+  internalAction,
+} from "./_generated/server";
 import { v } from "convex/values";
 import { components, internal } from "./_generated/api";
 import { authComponent } from "./auth";
@@ -129,18 +134,7 @@ export const grantAccess = mutation({
       throw new Error("User not found");
     }
 
-    await ctx.runMutation(
-      components.betterAuth.userHelpers.updateUserEarlyAccess,
-      {
-        userId: args.userId as any,
-        hasEarlyAccess: true,
-      },
-    );
-
-    await ctx.scheduler.runAfter(0, internal.earlyAccess.sendApprovalEmail, {
-      email: user.email,
-      name: user.name,
-    });
+    await approveUserAndSendEmail(ctx, user);
 
     return null;
   },
@@ -263,6 +257,48 @@ export const listPendingTokens = query({
     } catch (error) {
       return [];
     }
+  },
+});
+
+async function approveUserAndSendEmail(
+  ctx: any,
+  user: { _id: string; email: string; name: string },
+) {
+  await ctx.runMutation(
+    components.betterAuth.userHelpers.updateUserEarlyAccess,
+    {
+      userId: user._id,
+      hasEarlyAccess: true,
+    },
+  );
+
+  await ctx.scheduler.runAfter(0, internal.earlyAccess.sendApprovalEmail, {
+    email: user.email,
+    name: user.name,
+  });
+}
+
+export const approveUserByEmail = internalMutation({
+  args: { email: v.string() },
+  returns: v.union(
+    v.object({ success: v.literal(true), userId: v.string() }),
+    v.object({ success: v.literal(false), error: v.string() }),
+  ),
+  handler: async (ctx, args) => {
+    const user = await ctx.runQuery(
+      components.betterAuth.userHelpers.getUserByEmail,
+      {
+        email: args.email,
+      },
+    );
+
+    if (!user) {
+      return { success: false as const, error: "User not found" };
+    }
+
+    await approveUserAndSendEmail(ctx, user);
+
+    return { success: true as const, userId: user._id };
   },
 });
 
