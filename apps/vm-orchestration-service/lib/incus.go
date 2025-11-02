@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+	"time"
 
 	"vm-orchestration-service/structs"
 )
@@ -50,7 +51,14 @@ disable_root: false`, strings.Join(userLevelKeys, "\n"))
 }
 
 func createIncusVM(vmId string, cpus int, ram int, disk int, gpus int, sshPublicKeys []string) error {
-	cmd := []string{"incus", "init", "images:ubuntu/24.04/cloud", vmId, "--vm", "-c", "limits.cpu=" + strconv.Itoa(cpus), "-c", "limits.memory=" + strconv.Itoa(ram) + "GiB", "-d", "root,size=" + strconv.Itoa(disk) + "GiB", "-d", "root,io.bus=nvme", "-c", "security.secureboot=false"}
+
+	var vmImage string
+	if gpus > 0 {
+		vmImage = "local:ubuntu24-dev-gpu"
+	} else {
+		vmImage = "local:ubuntu24-dev-cpu"
+	}
+	cmd := []string{"incus", "init", vmImage, vmId, "--vm", "-c", "limits.cpu=" + strconv.Itoa(cpus), "-c", "limits.memory=" + strconv.Itoa(ram) + "GiB", "-d", "root,size=" + strconv.Itoa(disk) + "GiB", "-d", "root,io.bus=nvme", "-c", "security.secureboot=false"}
 
 	if len(sshPublicKeys) > 0 {
 		cloudInitUserData := generateCloudInitUserData(sshPublicKeys)
@@ -100,7 +108,49 @@ func createIncusVM(vmId string, cpus int, ram int, disk int, gpus int, sshPublic
 		}
 	}
 
+	err = waitForCloudInit(vmId)
+	if err != nil {
+		_ = destroyIncusVM(vmId)
+		return fmt.Errorf("cloud-init failed: %w", err)
+	}
+
 	return nil
+}
+
+func waitForCloudInit(vmId string) error {
+	err := waitForVMAgent(vmId)
+	if err != nil {
+		return fmt.Errorf("VM agent failed to start: %w", err)
+	}
+
+	cmd := []string{"incus", "exec", vmId, "--", "cloud-init", "status", "--wait"}
+	_, err = exec.Command(cmd[0], cmd[1:]...).Output()
+	if err != nil {
+		switch e := err.(type) {
+		case *exec.Error:
+			return errors.New(e.Error())
+		case *exec.ExitError:
+			return errors.New(string(e.Stderr))
+		default:
+			return errors.New(e.Error())
+		}
+	}
+
+	return nil
+}
+
+func waitForVMAgent(vmId string) error {
+	cmd := []string{"incus", "exec", vmId, "--", "true"}
+
+	for i := 0; i < 60; i++ {
+		_, err := exec.Command(cmd[0], cmd[1:]...).Output()
+		if err == nil {
+			return nil
+		}
+		time.Sleep(1 * time.Second)
+	}
+
+	return errors.New("timeout waiting for VM agent to start")
 }
 
 func destroyIncusVM(vmId string) error {
