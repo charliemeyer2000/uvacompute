@@ -1,6 +1,7 @@
 package lib
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os/exec"
@@ -17,8 +18,8 @@ func NewIncusAdapter() *IncusAdapter {
 	return &IncusAdapter{}
 }
 
-func (i *IncusAdapter) CreateVM(vmId string, cpus, ram, disk, gpus int, sshPublicKeys []string) error {
-	return createIncusVM(vmId, cpus, ram, disk, gpus, sshPublicKeys)
+func (i *IncusAdapter) CreateVM(vmId string, cpus, ram, disk, gpus int, sshPublicKeys []string, statusCallback structs.StatusCallback) error {
+	return createIncusVM(vmId, cpus, ram, disk, gpus, sshPublicKeys, statusCallback)
 }
 
 func (i *IncusAdapter) DestroyVM(vmId string) error {
@@ -31,6 +32,10 @@ func (i *IncusAdapter) GetVMStatus(vmId string) (string, error) {
 
 func (i *IncusAdapter) GetVMInfo(vmId string) (*structs.IncusVMInfo, error) {
 	return getIncusVMInfo(vmId)
+}
+
+func (i *IncusAdapter) ListVMs() ([]structs.IncusListVM, error) {
+	return listIncusVMs()
 }
 
 func generateCloudInitUserData(sshPublicKeys []string) string {
@@ -50,7 +55,8 @@ disable_root: false`, strings.Join(userLevelKeys, "\n"))
 	return cloudInit
 }
 
-func createIncusVM(vmId string, cpus int, ram int, disk int, gpus int, sshPublicKeys []string) error {
+func createIncusVM(vmId string, cpus int, ram int, disk int, gpus int, sshPublicKeys []string, statusCallback structs.StatusCallback) error {
+	statusCallback(structs.VM_STATUS_INITIALIZING)
 
 	var vmImage string
 	if gpus > 0 {
@@ -78,7 +84,7 @@ func createIncusVM(vmId string, cpus int, ram int, disk int, gpus int, sshPublic
 	}
 
 	if gpus > 0 {
-
+		statusCallback(structs.VM_STATUS_CONFIGURING)
 		var cmd = []string{"incus", "config", "device", "add", vmId, "gpu0", "gpu", "gputype=physical", "pci=0000:c1:00.0"}
 		_, err = exec.Command(cmd[0], cmd[1:]...).Output()
 		if err != nil {
@@ -94,6 +100,7 @@ func createIncusVM(vmId string, cpus int, ram int, disk int, gpus int, sshPublic
 		}
 	}
 
+	statusCallback(structs.VM_STATUS_STARTING)
 	cmd = []string{"incus", "start", vmId}
 	_, err = exec.Command(cmd[0], cmd[1:]...).Output()
 	if err != nil {
@@ -108,6 +115,7 @@ func createIncusVM(vmId string, cpus int, ram int, disk int, gpus int, sshPublic
 		}
 	}
 
+	statusCallback(structs.VM_STATUS_WAITING_FOR_AGENT)
 	err = waitForCloudInit(vmId)
 	if err != nil {
 		_ = destroyIncusVM(vmId)
@@ -208,4 +216,33 @@ func getIncusVMInfo(vmId string) (*structs.IncusVMInfo, error) {
 	}
 
 	return info, nil
+}
+
+func listIncusVMs() ([]structs.IncusListVM, error) {
+	cmd := []string{"incus", "ls", "-f", "json"}
+	out, err := exec.Command(cmd[0], cmd[1:]...).Output()
+	if err != nil {
+		switch e := err.(type) {
+		case *exec.Error:
+			return nil, errors.New(e.Error())
+		case *exec.ExitError:
+			return nil, errors.New(string(e.Stderr))
+		default:
+			return nil, errors.New(e.Error())
+		}
+	}
+
+	var instances []structs.IncusListVM
+	if err := json.Unmarshal(out, &instances); err != nil {
+		return nil, fmt.Errorf("failed to parse incus list output: %w", err)
+	}
+
+	var vms []structs.IncusListVM
+	for _, inst := range instances {
+		if inst.Type == "virtual-machine" {
+			vms = append(vms, inst)
+		}
+	}
+
+	return vms, nil
 }
