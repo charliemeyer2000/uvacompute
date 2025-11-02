@@ -107,6 +107,29 @@ func createIncusVM(vmId string, cpus int, ram int, disk int, gpus int, sshPublic
 		}
 	}
 
+	err = waitForCloudInit(vmId)
+	if err != nil {
+		_ = destroyIncusVM(vmId)
+		return fmt.Errorf("cloud-init failed: %w", err)
+	}
+
+	return nil
+}
+
+func waitForCloudInit(vmId string) error {
+	cmd := []string{"incus", "exec", vmId, "--", "cloud-init", "status", "--wait"}
+	_, err := exec.Command(cmd[0], cmd[1:]...).Output()
+	if err != nil {
+		switch e := err.(type) {
+		case *exec.Error:
+			return errors.New(e.Error())
+		case *exec.ExitError:
+			return errors.New(string(e.Stderr))
+		default:
+			return errors.New(e.Error())
+		}
+	}
+
 	return nil
 }
 
