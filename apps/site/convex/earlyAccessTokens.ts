@@ -1,6 +1,6 @@
 import { mutation } from "./_generated/server";
 import { v } from "convex/values";
-import { components } from "./_generated/api";
+import { components, internal } from "./_generated/api";
 
 function generateToken(): string {
   return Array.from(crypto.getRandomValues(new Uint8Array(32)))
@@ -87,6 +87,15 @@ export const approveByToken = mutation({
             hasEarlyAccess: true,
           },
         );
+
+        await ctx.scheduler.runAfter(
+          0,
+          internal.earlyAccess.sendApprovalEmail,
+          {
+            email: user.email,
+            name: user.name,
+          },
+        );
       }
     } catch (error) {}
 
@@ -162,6 +171,15 @@ export const approveTokenByEmail = mutation({
           {
             userId: user._id,
             hasEarlyAccess: true,
+          },
+        );
+
+        await ctx.scheduler.runAfter(
+          0,
+          internal.earlyAccess.sendApprovalEmail,
+          {
+            email: user.email,
+            name: user.name,
           },
         );
       }
