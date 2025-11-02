@@ -3,6 +3,10 @@ import { authClient } from "@/lib/auth-client";
 import { fetchMutation, fetchQuery } from "convex/nextjs";
 import { api } from "../../../../convex/_generated/api";
 import { createAuthHeaders } from "@/lib/orchestration-auth";
+import {
+  VMCreationRequestSchema,
+  VMCreationResponseSchema,
+} from "@/lib/vm-schemas";
 
 const VM_ORCHESTRATION_SERVICE_URL =
   process.env.VM_ORCHESTRATION_SERVICE_URL || "http://localhost:8080";
@@ -52,7 +56,9 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const body = await request.json();
+    const rawBody = await request.json();
+
+    const body = VMCreationRequestSchema.parse(rawBody);
 
     const sshPublicKeys = await fetchQuery(api.sshKeys.getAllPublicKeys, {
       userId: session.user.id,
@@ -80,7 +86,8 @@ export async function POST(request: NextRequest) {
       body: requestBody,
     });
 
-    const data = await response.json();
+    const rawData = await response.json();
+    const data = VMCreationResponseSchema.parse(rawData);
 
     if (response.ok && data.status === "success" && data.vmId) {
       try {
@@ -137,6 +144,17 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(data, { status: response.status });
   } catch (error: any) {
     console.error("Error creating VM:", error);
+
+    if (error.name === "ZodError") {
+      return NextResponse.json(
+        {
+          status: "validation_failed",
+          msg: "Invalid request data: " + error.message,
+        },
+        { status: 400 },
+      );
+    }
+
     return NextResponse.json(
       {
         status: "internal_error",

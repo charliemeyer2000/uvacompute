@@ -18,7 +18,7 @@ func RootHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func GetVMStatusHandler(app *structs.App, w http.ResponseWriter, r *http.Request, vmId string) {
-	_, exists := app.VMManager.GetVM(vmId)
+	vmState, exists := app.VMManager.GetVM(vmId)
 	if !exists {
 		resp := structs.VMStatusResponse{
 			Status: structs.VM_STATUS_NOT_FOUND,
@@ -30,7 +30,18 @@ func GetVMStatusHandler(app *structs.App, w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	// TODO: finish implementing this
+	msg := "VM status retrieved successfully"
+	if vmState.Status == structs.VM_STATUS_FAILED && vmState.ErrorMessage != "" {
+		msg = vmState.ErrorMessage
+	}
+
+	resp := structs.VMStatusResponse{
+		Status: vmState.Status,
+		Msg:    msg,
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(resp)
 }
 
 func CreateVMHandler(app *structs.App, w http.ResponseWriter, r *http.Request) {
