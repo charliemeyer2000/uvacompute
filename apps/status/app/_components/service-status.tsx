@@ -43,8 +43,8 @@ export function ServiceStatus({
 
   function getBarColor(day: DayAggregate): string {
     if (day.total === 0) return "bg-gray-200";
-    if (day.uptimePercentage >= 99.5) return "bg-blue-500";
-    if (day.uptimePercentage >= 95) return "bg-yellow-500";
+    if (day.uptimePercentage === 100) return "bg-blue-500";
+    if (day.uptimePercentage > 0) return "bg-yellow-500";
     return "bg-red-500";
   }
 
@@ -123,8 +123,11 @@ export function ServiceStatus({
             {hoveredDay.total > 0 ? (
               <div className="space-y-0.5">
                 <div>Uptime: {hoveredDay.uptimePercentage.toFixed(2)}%</div>
+                <div>
+                  Successful: {hoveredDay.operational} /{" "}
+                  {hoveredDay.expectedChecks}
+                </div>
                 <div>Avg Response: {hoveredDay.avgResponseTime}ms</div>
-                <div>Checks: {hoveredDay.total}</div>
               </div>
             ) : (
               <div className="text-gray-400">No data available</div>

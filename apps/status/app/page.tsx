@@ -52,6 +52,7 @@ export default async function StatusPage() {
           total: 0,
           uptimePercentage: 0,
           avgResponseTime: 0,
+          expectedChecks: 0,
         });
       }
     }
