@@ -52,7 +52,41 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 
 ## Environment Variables
 
+### Required
+
 - `VM_ORCHESTRATION_SERVICE_URL` - URL of the VM orchestration service (default: http://localhost:8080)
+
+### SSH Connection (Optional)
+
+- `SSH2INCUS_HOST` - Hostname for SSH proxy (default: "localhost")
+- `SSH2INCUS_PORT` - Port for SSH proxy (default: 2222)
+
+### SSH Access Configuration
+
+The CLI connects to VMs via an SSH proxy (ssh2incus) running on your workstation. To enable public access without requiring Tailscale:
+
+**Using Tailscale Funnel (Recommended):**
+
+```bash
+# On workstation, expose SSH via Tailscale Funnel TCP
+sudo tailscale funnel --bg --tcp=8443 tcp://localhost:2222
+
+# Then set in your site deployment:
+SSH2INCUS_HOST=ai-workstation.tail0eb43d.ts.net
+SSH2INCUS_PORT=8443
+```
+
+**Alternative (Direct public IP):**
+If your workstation has a publicly accessible IP:
+
+```bash
+# On workstation, allow port 2222 through firewall
+sudo ufw allow 2222/tcp
+
+# Then set in your site deployment:
+SSH2INCUS_HOST=your-public-ip-or-hostname
+SSH2INCUS_PORT=2222
+```
 
 ## Learn More
 

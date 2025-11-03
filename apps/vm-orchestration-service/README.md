@@ -24,6 +24,58 @@ systemctl restart vm-orchestration
 tailscale funnel status
 ```
 
+## SSH Proxy Setup
+
+The VMs are accessed via an SSH proxy (ssh2incus) running on port 2222 on the workstation. The systemd service automatically configures Tailscale Funnel to expose both:
+
+- **HTTPS (port 443)**: VM orchestration API
+- **TCP (port 8443)**: SSH proxy for VM access
+
+### Automatic Setup (via systemd)
+
+When you run `sudo make install`, the service automatically:
+
+1. Starts the VM orchestration service
+2. Exposes port 8080 via Tailscale Funnel on HTTPS port 443
+3. Exposes port 2222 (ssh2incus) via Tailscale Funnel on TCP port 8443
+
+Verify both funnels are running:
+
+```bash
+tailscale funnel status
+# Should show:
+# - https://your-hostname.ts.net:443 -> localhost:8080
+# - tcp://your-hostname.ts.net:8443 -> localhost:2222
+```
+
+Then configure your site app:
+
+```bash
+SSH2INCUS_HOST=your-hostname.ts.net
+SSH2INCUS_PORT=8443
+```
+
+### Manual Setup (Development)
+
+If running in development without systemd:
+
+```bash
+# Start Tailscale funnels manually
+tailscale funnel --bg --https=443 8080
+tailscale funnel --bg --tcp=8443 tcp://localhost:2222
+```
+
+### Alternative: Direct Public Access
+
+If your workstation has a public IP and you don't want to use Tailscale Funnel:
+
+```bash
+sudo ufw allow 2222/tcp
+# Then configure site: SSH2INCUS_HOST=your-public-ip, SSH2INCUS_PORT=2222
+```
+
+**Security:** The SSH proxy uses public key authentication (configured via `uva ssh-key add`). Each VM is isolated and users can only access their own VMs.
+
 ## Todo
 
 - no vm state persistence (e.g. if service dies, need to recover vms? or should it just die?)
@@ -32,7 +84,6 @@ tailscale funnel status
   - support extension
 - support all apis
 - incus vm creation non-atomic operations
-- ssh connection
 - mutex for creation rather than for all operations
 
 ## API Structure
