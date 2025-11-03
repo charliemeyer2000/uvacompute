@@ -1,6 +1,6 @@
 import { mutation } from "./_generated/server";
 import { v } from "convex/values";
-import { components } from "./_generated/api";
+import { components, internal } from "./_generated/api";
 
 function generateToken(): string {
   return Array.from(crypto.getRandomValues(new Uint8Array(32)))
@@ -66,29 +66,21 @@ export const approveByToken = mutation({
       return { success: false as const, error: "Token expired" };
     }
 
+    const result = await ctx.runMutation(
+      internal.earlyAccess.approveUserByEmail,
+      {
+        email: tokenRecord.email,
+      },
+    );
+
+    if (!result.success) {
+      return { success: false as const, error: result.error };
+    }
+
     await ctx.db.patch(tokenRecord._id, {
       used: true,
       approved: true,
     });
-
-    try {
-      const user = await ctx.runQuery(
-        components.betterAuth.userHelpers.getUserByEmail,
-        {
-          email: tokenRecord.email,
-        },
-      );
-
-      if (user) {
-        await ctx.runMutation(
-          components.betterAuth.userHelpers.updateUserEarlyAccess,
-          {
-            userId: user._id,
-            hasEarlyAccess: true,
-          },
-        );
-      }
-    } catch (error) {}
 
     return { success: true as const, email: tokenRecord.email };
   },
@@ -141,31 +133,25 @@ export const approveTokenByEmail = mutation({
       .withIndex("by_email", (q) => q.eq("email", args.email))
       .first();
 
-    if (token) {
-      await ctx.db.patch(token._id, {
-        approved: true,
-        used: true,
-      });
+    if (!token) {
+      throw new Error("No early access token found for this email");
     }
 
-    try {
-      const user = await ctx.runQuery(
-        components.betterAuth.userHelpers.getUserByEmail,
-        {
-          email: args.email,
-        },
-      );
+    const result = await ctx.runMutation(
+      internal.earlyAccess.approveUserByEmail,
+      {
+        email: args.email,
+      },
+    );
 
-      if (user) {
-        await ctx.runMutation(
-          components.betterAuth.userHelpers.updateUserEarlyAccess,
-          {
-            userId: user._id,
-            hasEarlyAccess: true,
-          },
-        );
-      }
-    } catch (error) {}
+    if (!result.success) {
+      throw new Error(result.error);
+    }
+
+    await ctx.db.patch(token._id, {
+      approved: true,
+      used: true,
+    });
 
     return null;
   },
