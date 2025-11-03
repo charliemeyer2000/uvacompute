@@ -25,3 +25,5 @@ pnpm dev
   - dev/staging/prod apps (all separate apps)
 - Inbound.new (for email forwarding) - using github:
   - for email forwarding from \*@inbound.new to my personal email charlie@charliemeyer.xyz
+- digital ocean using github email:
+  - $4/mo vps, password is uvaHazNoGp000s
