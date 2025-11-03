@@ -75,15 +75,15 @@ export function UptimeChart({ data, days }: UptimeChartProps) {
       <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground mt-4">
         <div className="flex items-center gap-2">
           <div className="w-3 h-3 bg-blue-500 border border-black" />
-          <span>&gt;90% uptime</span>
+          <span>&gt;90%</span>
         </div>
         <div className="flex items-center gap-2">
           <div className="w-3 h-3 bg-yellow-500 border border-black" />
-          <span>50-90% uptime</span>
+          <span>50-90%</span>
         </div>
         <div className="flex items-center gap-2">
           <div className="w-3 h-3 bg-red-600 border border-black" />
-          <span>&lt;50% uptime</span>
+          <span>&lt;50%</span>
         </div>
         <div className="flex items-center gap-2">
           <div className="w-3 h-3 bg-gray-200 border border-black" />
