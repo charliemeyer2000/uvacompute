@@ -599,6 +599,11 @@ export function registerVMCommands(program: Command) {
     .option("-a, --all", "Show all VMs (including non-running)")
     .action(listVMs);
 
+  vm.command("ls")
+    .description("List running VMs (alias for list)")
+    .option("-a, --all", "Show all VMs (including non-running)")
+    .action(listVMs);
+
   vm.command("ssh")
     .description("Connect to VM via SSH")
     .argument("<nameOrVmId>", "VM name or VM ID")
