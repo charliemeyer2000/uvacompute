@@ -27,6 +27,7 @@ export const dayAggregateSchema = z.object({
   total: z.number(),
   uptimePercentage: z.number(),
   avgResponseTime: z.number(),
+  expectedChecks: z.number(),
 });
 export type DayAggregate = z.infer<typeof dayAggregateSchema>;
 

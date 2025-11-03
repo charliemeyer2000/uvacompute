@@ -15,8 +15,8 @@ export function UptimeChart({ data, days }: UptimeChartProps) {
 
   function getStatusColor(day: DayAggregate): string {
     if (day.total === 0) return "bg-gray-200";
-    if (day.uptimePercentage > 90) return "bg-blue-500";
-    if (day.uptimePercentage >= 50) return "bg-yellow-500";
+    if (day.uptimePercentage === 100) return "bg-blue-500";
+    if (day.uptimePercentage > 0) return "bg-yellow-500";
     return "bg-red-600";
   }
 
@@ -63,8 +63,10 @@ export function UptimeChart({ data, days }: UptimeChartProps) {
             <div className="grid grid-cols-2 gap-x-4 gap-y-1">
               <div>uptime:</div>
               <div>{hoveredDay.uptimePercentage.toFixed(2)}%</div>
-              <div>checks:</div>
-              <div>{hoveredDay.total}</div>
+              <div>successful:</div>
+              <div>
+                {hoveredDay.operational} / {hoveredDay.expectedChecks}
+              </div>
               <div>avg response:</div>
               <div>{hoveredDay.avgResponseTime}ms</div>
             </div>
@@ -75,15 +77,15 @@ export function UptimeChart({ data, days }: UptimeChartProps) {
       <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground mt-4">
         <div className="flex items-center gap-2">
           <div className="w-3 h-3 bg-blue-500 border border-black" />
-          <span>&gt;90%</span>
+          <span>100%</span>
         </div>
         <div className="flex items-center gap-2">
           <div className="w-3 h-3 bg-yellow-500 border border-black" />
-          <span>50-90%</span>
+          <span>&gt;0%</span>
         </div>
         <div className="flex items-center gap-2">
           <div className="w-3 h-3 bg-red-600 border border-black" />
-          <span>&lt;50%</span>
+          <span>major outage</span>
         </div>
         <div className="flex items-center gap-2">
           <div className="w-3 h-3 bg-gray-200 border border-black" />
