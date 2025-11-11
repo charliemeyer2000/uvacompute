@@ -1,0 +1,270 @@
+.TH UVA 1 "November 2025" "uvacompute 0.0.13" "User Commands"
+.SH NAME
+uva \- command-line interface for managing UVACompute virtual machines
+.SH SYNOPSIS
+.B uva
+[\fB\-\-version\fR]
+.I command
+[\fIoptions\fR] [\fIarguments\fR]
+.SH DESCRIPTION
+.B uva
+is the command-line interface for UVACompute, a cloud computing platform for provisioning and managing virtual machines with flexible resource configurations including CPU, RAM, disk, and GPU resources.
+.PP
+The CLI uses OAuth 2.0 device authorization flow for authentication and communicates with the UVACompute API to manage virtual machine lifecycles, SSH keys, and user sessions.
+.SH COMMANDS
+.SS Authentication
+.TP
+.B login
+Authenticate with UVACompute using OAuth 2.0 device flow. Opens a browser window and prompts for authorization code entry.
+.RS
+.TP
+.B \-\-force
+Force re-authentication even if already logged in. Invalidates existing token and initiates new device authorization flow.
+.RE
+.SS User Information
+.TP
+.B whoami
+Display currently authenticated user information including name and email address.
+.SS Virtual Machine Management
+.TP
+.B vm create
+Create a new virtual machine with specified resource allocation.
+.RS
+.TP
+.BR \-h ", " \-\-hours " \fIhours\fR"
+(Required) Number of hours to run the VM. Must be a positive integer. VM will be automatically terminated after this duration.
+.TP
+.BR \-c ", " \-\-cpus " \fIcpus\fR"
+Number of virtual CPUs (default: 1). Must be a power of 2. Maximum: 16.
+.TP
+.BR \-r ", " \-\-ram " \fIram\fR"
+RAM allocation in gigabytes (default: 8). Must be a power of 2. Maximum: 64.
+.TP
+.BR \-d ", " \-\-disk " \fIdisk\fR"
+Disk size in gigabytes (default: 64). Must be a power of 2. Maximum: 1000.
+.TP
+.BR \-g ", " \-\-gpus " \fIgpus\fR"
+Number of GPUs to allocate (default: 0). Maximum: 1.
+.TP
+.BR \-t ", " \-\-gpu-type " \fItype\fR"
+GPU type (default: 5090). Currently only supports NVIDIA RTX 5090.
+.TP
+.BR \-n ", " \-\-name " \fIname\fR"
+Optional friendly name for the VM. Used for identification and SSH connection.
+.RE
+.TP
+.B vm delete \fIvmId\fR
+Delete a virtual machine by its ID. Immediately terminates and removes the VM.
+.TP
+.B vm rm \fIvmId\fR
+Alias for
+.BR "vm delete" .
+.TP
+.B vm status \fIvmId\fR
+Display current status and detailed information about a virtual machine including state, configuration, and any error messages.
+.TP
+.B vm list
+List all running virtual machines owned by the authenticated user.
+.RS
+.TP
+.BR \-a ", " \-\-all
+Show all VMs regardless of status, including stopped, failed, expired, and deleted instances.
+.RE
+.TP
+.B vm ls
+Alias for
+.BR "vm list" .
+Accepts same options.
+.TP
+.B vm ssh \fInameOrVmId\fR
+Connect to a virtual machine via SSH. Accepts either the VM ID or friendly name. VM must be in running state. Requires SSH key to be configured.
+.SS SSH Key Management
+.TP
+.B ssh-key add \fIpath\fR
+Add an SSH public key for VM access. Reads public key from specified file path.
+.RS
+.TP
+.BR \-n ", " \-\-name " \fIname\fR"
+Friendly name for the SSH key (default: "Unnamed Key"). Used for identification in key listings.
+.RE
+.TP
+.B ssh-key list
+Display all SSH public keys associated with the authenticated user. Shows key ID, name, fingerprint, creation date, and primary status.
+.TP
+.B ssh-key remove \fIkeyId\fR
+Remove an SSH public key by its ID. Prevents future use of this key for VM access.
+.TP
+.B ssh-key set-primary \fIkeyId\fR
+Set specified SSH key as the primary key. Primary key is used by default for new VM deployments.
+.SH OPTIONS
+.TP
+.B \-\-version
+Display CLI version number and exit.
+.SH FILES
+.TP
+.I ~/.uvacompute/config
+Configuration file storing authentication tokens, version information, and last update check timestamp. JSON format. Created automatically on first login.
+.SH EXIT STATUS
+.TP
+.B 0
+Successful program execution.
+.TP
+.B 1
+General error occurred. Check error message for details. Common causes include authentication failure, network errors, invalid parameters, or VM operation failures.
+.SH EXAMPLES
+.SS Authentication
+Login to UVACompute:
+.PP
+.nf
+.RS
+$ uva login
+.RE
+.fi
+.PP
+Force re-authentication:
+.PP
+.nf
+.RS
+$ uva login --force
+.RE
+.fi
+.SS Basic VM Operations
+Create a basic VM for 1 hour with default resources:
+.PP
+.nf
+.RS
+$ uva vm create -h 1
+.RE
+.fi
+.PP
+Create a VM with custom CPU and RAM for 24 hours:
+.PP
+.nf
+.RS
+$ uva vm create -h 24 -c 4 -r 16 -n training-vm
+.RE
+.fi
+.PP
+Create a GPU-accelerated VM for machine learning:
+.PP
+.nf
+.RS
+$ uva vm create -h 12 -c 8 -r 32 -d 256 -g 1 -t 5090 -n ml-training
+.RE
+.fi
+.PP
+List all running VMs:
+.PP
+.nf
+.RS
+$ uva vm list
+.RE
+.fi
+.PP
+List all VMs including stopped and expired:
+.PP
+.nf
+.RS
+$ uva vm list --all
+.RE
+.fi
+.PP
+Check VM status:
+.PP
+.nf
+.RS
+$ uva vm status abc-123-def
+.RE
+.fi
+.PP
+Delete a VM:
+.PP
+.nf
+.RS
+$ uva vm delete abc-123-def
+.RE
+.fi
+.SS SSH Access
+Connect to VM by name:
+.PP
+.nf
+.RS
+$ uva vm ssh training-vm
+.RE
+.fi
+.PP
+Connect to VM by ID:
+.PP
+.nf
+.RS
+$ uva vm ssh abc-123-def
+.RE
+.fi
+.SS SSH Key Management
+Add SSH public key:
+.PP
+.nf
+.RS
+$ uva ssh-key add ~/.ssh/id_rsa.pub --name "My Laptop"
+.RE
+.fi
+.PP
+List all SSH keys:
+.PP
+.nf
+.RS
+$ uva ssh-key list
+.RE
+.fi
+.PP
+Remove SSH key:
+.PP
+.nf
+.RS
+$ uva ssh-key remove key_abc123
+.RE
+.fi
+.PP
+Set primary SSH key:
+.PP
+.nf
+.RS
+$ uva ssh-key set-primary key_abc123
+.RE
+.fi
+.SH DIAGNOSTICS
+The CLI uses OAuth 2.0 device authorization flow. During login, if browser does not open automatically, manually visit the displayed URL and enter the provided code.
+.PP
+VM creation may take several minutes. The CLI polls status through the following stages:
+.B creating
+->
+.B initializing
+->
+.B starting
+->
+.B waiting_for_agent
+->
+.B configuring
+->
+.BR running .
+If creation fails, status will show
+.B failed
+with error details.
+.PP
+SSH connections require at least one SSH public key to be configured. Use
+.B ssh-key add
+to register your public key before attempting SSH access.
+.PP
+Version checks occur automatically once per 24 hours. Update notifications display latest version and installation command.
+.SH BUGS
+Report bugs to the UVACompute team or open an issue on the project repository.
+.SH AUTHOR
+Written by Charlie Meyer.
+.SH SEE ALSO
+.BR ssh (1),
+.BR ssh-keygen (1)
+.PP
+Full documentation and API reference: https://uvacompute.com
+.PP
+Installation script: https://uvacompute.com/install.sh
+
