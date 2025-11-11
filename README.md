@@ -1,5 +1,24 @@
 # UVACompute
 
+## Todo list
+
+- [ ] speed is horrible.
+- [ ] need a man page
+- [ ] auth flow gives you the code twice basically
+- [ ] terminate instance on web ui
+- [ ] upgrade/downgrade vCPUs, storage
+- [ ] Add UV to base images
+- [ ] allow BYO startup scripts
+- [ ] Run Docker container (via Kubernetes, probably)
+- [ ] Live tail logs in CLI/UI (modal-style)
+- [ ] Integrate vcluster (?)
+- [ ] When 2 GPUs are purchased, support 2 GPUs
+- [ ] modal notebooks implementation
+- [ ] support other computers joining uvacompute
+  - add some switch off/on supoprt easily
+- [ ] can this be rearchitected without incus and only using k8s?
+- [ ] make some market out of this (?)
+
 ## Setup
 
 ```

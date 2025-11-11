@@ -33,10 +33,11 @@ const (
 	VM_STATUS_STARTING          VMStatus = "starting"          // starting the vm
 	VM_STATUS_WAITING_FOR_AGENT VMStatus = "waiting_for_agent" // waiting for vm agent to be ready
 	VM_STATUS_CONFIGURING       VMStatus = "configuring"       // waiting for cloud-init
-	VM_STATUS_FAILED            VMStatus = "failed"            // vm failed to create
 	VM_STATUS_RUNNING           VMStatus = "running"           // vm is running
+	VM_STATUS_FAILED            VMStatus = "failed"            // vm failed to create
 	VM_STATUS_DELETING          VMStatus = "deleting"          // vm is being deleted
 	VM_STATUS_DELETED           VMStatus = "deleted"           // vm is deleted (likely will never be used)
+	VM_STATUS_EXPIRED           VMStatus = "expired"           // vm expired and was automatically deleted
 	VM_STATUS_UPDATING          VMStatus = "updating"          // vm is being updated (extended, update config)
 )
 

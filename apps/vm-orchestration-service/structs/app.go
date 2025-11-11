@@ -12,7 +12,7 @@ type App struct {
 }
 
 type CallbackClient interface {
-	NotifyVMDeleted(vmId string) error
+	NotifyVMStatusUpdate(vmId string, status string) error
 }
 
 func NewApp(incusProvider IncusProvider, callbackClient CallbackClient) *App {

@@ -103,10 +103,6 @@ export async function POST(request: NextRequest) {
           hours: body.hours,
           orchestrationResponse: data,
         });
-
-        await fetchMutation(api.vms.markAsRunning, {
-          vmId: data.vmId,
-        });
       } catch (convexError: any) {
         console.error(
           "Critical error: Failed to save VM to Convex:",
