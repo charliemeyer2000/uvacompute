@@ -66,7 +66,10 @@ export async function DELETE(
 
     if (response.ok && data.status === "deletion_success") {
       try {
-        await fetchMutation(api.vms.markAsDeleted, { vmId });
+        await fetchMutation(api.vms.updateStatus, {
+          vmId,
+          status: "deleted",
+        });
       } catch (convexError: any) {
         console.error(
           "Warning: Failed to mark VM as deleted in Convex:",
@@ -138,10 +141,12 @@ export async function GET(
       );
     }
 
+    const authHeaders = createAuthHeaders("GET", `/vms/${vmId}`, "");
     const response = await fetch(
       `${VM_ORCHESTRATION_SERVICE_URL}/vms/${vmId}`,
       {
         method: "GET",
+        headers: authHeaders,
       },
     );
 
