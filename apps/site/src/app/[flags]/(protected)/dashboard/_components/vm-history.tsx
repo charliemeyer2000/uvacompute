@@ -13,52 +13,7 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
-
-interface VM {
-  _id: string;
-  _creationTime: number;
-  userId: string;
-  vmId: string;
-  name?: string;
-  cpus: number;
-  ram: number;
-  disk: number;
-  gpus: number;
-  gpuType: string;
-  status:
-    | "creating"
-    | "running"
-    | "failed"
-    | "deleting"
-    | "deleted"
-    | "expired";
-  hours: number;
-  createdAt: number;
-  expiresAt: number;
-  deletedAt?: number;
-}
-
-function formatDate(timestamp: number) {
-  return new Date(timestamp).toLocaleString();
-}
-
-function getStatusColor(status: VM["status"]) {
-  switch (status) {
-    case "running":
-      return "bg-green-100 text-green-800 border-green-200";
-    case "creating":
-      return "bg-blue-100 text-blue-800 border-blue-200";
-    case "failed":
-      return "bg-red-100 text-red-800 border-red-200";
-    case "deleting":
-      return "bg-yellow-100 text-yellow-800 border-yellow-200";
-    case "deleted":
-    case "expired":
-      return "bg-gray-100 text-gray-800 border-gray-200";
-    default:
-      return "bg-gray-100 text-gray-800 border-gray-200";
-  }
-}
+import { VM, formatDate, getStatusColor } from "@/lib/vm-utils";
 
 function VMCard({ vm }: { vm: VM }) {
   return (

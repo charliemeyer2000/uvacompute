@@ -59,41 +59,49 @@ export const VMCreationRequestSchema = z.object({
   "gpu-type": z.enum(["5090"]).optional(),
 });
 
+const VMCreationStatusEnum = z.enum([
+  "success",
+  "validation_failed",
+  "internal_error",
+  "resources_unavailable",
+]);
+
 export const VMCreationResponseSchema = z.object({
-  status: z.enum([
-    "success",
-    "validation_failed",
-    "internal_error",
-    "resources_unavailable",
-  ]),
+  status: VMCreationStatusEnum,
   vmId: z.string().optional(),
   msg: z.string(),
 });
+
+const VMDeletionStatusEnum = z.enum([
+  "deletion_success",
+  "deletion_failed_internal",
+  "deletion_failed_not_found",
+]);
 
 export const VMDeletionResponseSchema = z.object({
-  status: z.enum([
-    "deletion_success",
-    "deletion_failed_internal",
-    "deletion_failed_not_found",
-  ]),
+  status: VMDeletionStatusEnum,
   vmId: z.string().optional(),
   msg: z.string(),
 });
 
+export const VMStatusEnum = z.enum([
+  "not_found",
+  "creating",
+  "initializing",
+  "starting",
+  "waiting_for_agent",
+  "configuring",
+  "running",
+  "failed",
+  "deleting",
+  "deleted",
+  "expired",
+  "updating",
+]);
+export type VMStatus = z.infer<typeof VMStatusEnum>;
+
 export const VMStatusResponseSchema = z.object({
-  status: z.enum([
-    "not_found",
-    "creating",
-    "initializing",
-    "starting",
-    "waiting_for_agent",
-    "configuring",
-    "failed",
-    "running",
-    "deleting",
-    "deleted",
-    "updating",
-  ]),
+  status: VMStatusEnum,
   msg: z.string(),
   info: z.any().optional(),
 });
@@ -132,14 +140,7 @@ export const VMInfoSchema = z.object({
   disk: z.number(),
   gpus: z.number(),
   gpuType: z.string(),
-  status: z.enum([
-    "creating",
-    "running",
-    "failed",
-    "deleting",
-    "deleted",
-    "expired",
-  ]),
+  status: VMStatusEnum,
   hours: z.number(),
   createdAt: z.number(),
   expiresAt: z.number(),

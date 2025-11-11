@@ -1,6 +1,21 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 
+export const VM_STATUSES = [
+  "not_found",
+  "creating",
+  "initializing",
+  "starting",
+  "waiting_for_agent",
+  "configuring",
+  "running",
+  "failed",
+  "deleting",
+  "deleted",
+  "expired",
+  "updating",
+] as const;
+
 export default defineSchema({
   vms: defineTable({
     userId: v.string(),
@@ -14,14 +29,7 @@ export default defineSchema({
     gpus: v.number(),
     gpuType: v.string(),
 
-    status: v.union(
-      v.literal("creating"),
-      v.literal("running"),
-      v.literal("failed"),
-      v.literal("deleting"),
-      v.literal("deleted"),
-      v.literal("expired"),
-    ),
+    status: v.union(...VM_STATUSES.map((s) => v.literal(s))),
     hours: v.number(),
     createdAt: v.number(),
     expiresAt: v.number(),
