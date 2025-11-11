@@ -7,10 +7,11 @@ export const VMStatusEnum = z.enum([
   "starting",
   "waiting_for_agent",
   "configuring",
-  "failed",
   "running",
+  "failed",
   "deleting",
   "deleted",
+  "expired",
   "updating",
 ]);
 

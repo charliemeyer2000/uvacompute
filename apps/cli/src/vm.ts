@@ -31,6 +31,7 @@ const BASE_URL = getBaseUrl();
 
 function getStatusMessage(status: string): string {
   const messages: Record<string, string> = {
+    not_found: "VM not found",
     creating: "Creating VM...",
     initializing: "Initializing VM instance...",
     starting: "Starting VM...",
@@ -38,6 +39,10 @@ function getStatusMessage(status: string): string {
     configuring: "Configuring VM (running cloud-init)...",
     running: "VM is running!",
     failed: "VM creation failed",
+    deleting: "Deleting VM...",
+    deleted: "VM deleted",
+    expired: "VM expired",
+    updating: "Updating VM...",
   };
   return messages[status] || `Status: ${status}`;
 }
