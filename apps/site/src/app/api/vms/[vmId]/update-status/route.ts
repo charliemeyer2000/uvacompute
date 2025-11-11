@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyRequest } from "@/lib/orchestration-auth";
 import { api } from "../../../../../../convex/_generated/api";
 import { fetchMutation } from "convex/nextjs";
+import { z } from "zod";
+import { VMStatusEnum } from "@/lib/vm-schemas";
+
+const UpdateStatusRequestSchema = z.object({
+  status: VMStatusEnum,
+});
 
 export async function POST(
   request: NextRequest,
@@ -15,19 +21,22 @@ export async function POST(
   const { vmId } = await params;
 
   try {
-    await fetchMutation(api.vms.markAsDeleted, { vmId });
+    const requestData = JSON.parse(body);
+    const { status } = UpdateStatusRequestSchema.parse(requestData);
+
+    await fetchMutation(api.vms.updateStatus, { vmId, status });
     return NextResponse.json({ success: true }, { status: 200 });
   } catch (error) {
     if (error instanceof Error) {
-      console.error("Failed to mark VM as deleted: " + error.message);
+      console.error("Failed to update VM status: " + error.message);
       return NextResponse.json(
-        { error: "Failed to mark VM as deleted: " + error.message },
+        { error: "Failed to update VM status: " + error.message },
         { status: 500 },
       );
     }
-    console.error("Failed to mark VM as deleted: Unknown error");
+    console.error("Failed to update VM status: Unknown error");
     return NextResponse.json(
-      { error: "Failed to mark VM as deleted: Unknown error" },
+      { error: "Failed to update VM status: Unknown error" },
       { status: 500 },
     );
   }

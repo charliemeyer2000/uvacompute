@@ -117,18 +117,21 @@ func (vm *VMManager) createVMAsync(vmId string, cpus, ram, disk, gpus int, sshPu
 
 		vm.mu.Lock()
 		vmState := vm.vmMap[vmId]
-		vmState.Status = VM_STATUS_DELETED
+		vmState.Status = VM_STATUS_EXPIRED
 		vm.vmMap[vmId] = vmState
-		delete(vm.vmMap, vmId)
 		vm.mu.Unlock()
 
 		if vm.callbackClient != nil {
 			go func() {
-				if err := vm.callbackClient.NotifyVMDeleted(vmId); err != nil {
-					log.Printf("ERROR: Failed to notify site about VM %s deletion: %v", vmId, err)
+				if err := vm.callbackClient.NotifyVMStatusUpdate(vmId, string(VM_STATUS_EXPIRED)); err != nil {
+					log.Printf("ERROR: Failed to notify site about VM %s expiration: %v", vmId, err)
 				}
 			}()
 		}
+
+		vm.mu.Lock()
+		delete(vm.vmMap, vmId)
+		vm.mu.Unlock()
 	})
 }
 
@@ -155,12 +158,19 @@ func (vm *VMManager) WaitForStatus(vmId string, targetStatus VMStatus) VMState {
 
 func (vm *VMManager) UpdateVMStatus(vmId string, status VMStatus, errorMessage string) {
 	vm.mu.Lock()
-	defer vm.mu.Unlock()
-
 	if vmState, exists := vm.vmMap[vmId]; exists {
 		vmState.Status = status
 		vmState.ErrorMessage = errorMessage
 		vm.vmMap[vmId] = vmState
+	}
+	vm.mu.Unlock()
+
+	if vm.callbackClient != nil {
+		go func() {
+			if err := vm.callbackClient.NotifyVMStatusUpdate(vmId, string(status)); err != nil {
+				log.Printf("ERROR: Failed to notify site about VM %s status update: %v", vmId, err)
+			}
+		}()
 	}
 }
 
