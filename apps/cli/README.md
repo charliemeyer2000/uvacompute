@@ -1,5 +1,19 @@
 # uvacompute CLI
 
+## Documentation
+
+A comprehensive man page is available. To view it:
+
+```bash
+man ./uva.1
+```
+
+Or after installation:
+
+```bash
+man uva
+```
+
 ## API
 
 ### Auth

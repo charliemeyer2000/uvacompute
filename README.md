@@ -59,6 +59,8 @@ This is the status page (status.uvacompute.com), just run with `pnpm dev` (goes 
 
 The cli. to run locally, install `bun` then do `bun run index.ts [commands]`. this will run in development, but no VMs will be created unless you have the `vm-orchestration-service` running on port 8080
 
+also ensure you update the man page if you update the cli. pls don't be lazy.
+
 ### `vm-orchestration-service`
 
 the main vm thingy. this should only really run on linux machines since it uses `incus`. if you wanna set this up on a linux box, you need to have installed
