@@ -1,9 +1,7 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
+import { VM_STATUSES } from "./schema";
 
-/**
- * Create a new VM record in the database
- */
 export const create = mutation({
   args: {
     userId: v.string(),
@@ -41,12 +39,10 @@ export const create = mutation({
   },
 });
 
-/**
- * Update VM status to running after successful creation
- */
-export const markAsRunning = mutation({
+export const updateStatus = mutation({
   args: {
     vmId: v.string(),
+    status: v.union(...VM_STATUSES.map((s) => v.literal(s))),
   },
   handler: async (ctx, args) => {
     const vm = await ctx.db
@@ -58,68 +54,20 @@ export const markAsRunning = mutation({
       throw new Error(`VM ${args.vmId} not found`);
     }
 
-    await ctx.db.patch(vm._id, {
-      status: "running",
-    });
+    const updates: any = {
+      status: args.status,
+    };
 
-    return vm._id;
-  },
-});
-
-/**
- * Mark VM as deleted
- */
-export const markAsDeleted = mutation({
-  args: {
-    vmId: v.string(),
-  },
-  handler: async (ctx, args) => {
-    const vm = await ctx.db
-      .query("vms")
-      .withIndex("by_vmId", (q) => q.eq("vmId", args.vmId))
-      .first();
-
-    if (!vm) {
-      throw new Error(`VM ${args.vmId} not found`);
+    if (args.status === "deleted" || args.status === "expired") {
+      updates.deletedAt = Date.now();
     }
 
-    await ctx.db.patch(vm._id, {
-      status: "deleted",
-      deletedAt: Date.now(),
-    });
+    await ctx.db.patch(vm._id, updates);
 
     return vm._id;
   },
 });
 
-/**
- * Mark VM as failed
- */
-export const markAsFailed = mutation({
-  args: {
-    vmId: v.string(),
-  },
-  handler: async (ctx, args) => {
-    const vm = await ctx.db
-      .query("vms")
-      .withIndex("by_vmId", (q) => q.eq("vmId", args.vmId))
-      .first();
-
-    if (!vm) {
-      throw new Error(`VM ${args.vmId} not found`);
-    }
-
-    await ctx.db.patch(vm._id, {
-      status: "failed",
-    });
-
-    return vm._id;
-  },
-});
-
-/**
- * Get all VMs for the authenticated user
- */
 export const listByUser = query({
   args: {
     userId: v.string(),
@@ -135,29 +83,33 @@ export const listByUser = query({
   },
 });
 
-/**
- * Get active (running) VMs for the authenticated user
- */
 export const listActiveByUser = query({
   args: {
     userId: v.string(),
   },
   handler: async (ctx, args) => {
-    const vms = await ctx.db
+    const allVms = await ctx.db
       .query("vms")
-      .withIndex("by_user_and_status", (q) =>
-        q.eq("userId", args.userId).eq("status", "running"),
-      )
+      .withIndex("by_user", (q) => q.eq("userId", args.userId))
       .order("desc")
       .collect();
 
-    return vms.filter((vm) => vm.expiresAt > Date.now());
+    const activeStatuses = [
+      "creating",
+      "initializing",
+      "starting",
+      "waiting_for_agent",
+      "configuring",
+      "running",
+      "updating",
+    ];
+
+    return allVms.filter(
+      (vm) => activeStatuses.includes(vm.status) && vm.expiresAt > Date.now(),
+    );
   },
 });
 
-/**
- * Get inactive (deleted, expired, failed) VMs for the authenticated user
- */
 export const listInactiveByUser = query({
   args: {
     userId: v.string(),
@@ -169,18 +121,18 @@ export const listInactiveByUser = query({
       .order("desc")
       .collect();
 
-    return allVms.filter(
-      (vm) =>
-        vm.status === "deleted" ||
-        vm.status === "expired" ||
-        vm.status === "failed",
-    );
+    const inactiveStatuses = [
+      "failed",
+      "deleted",
+      "expired",
+      "not_found",
+      "deleting",
+    ];
+
+    return allVms.filter((vm) => inactiveStatuses.includes(vm.status));
   },
 });
 
-/**
- * Get a single VM by vmId
- */
 export const getByVmId = query({
   args: {
     vmId: v.string(),
@@ -192,34 +144,5 @@ export const getByVmId = query({
       .first();
 
     return vm;
-  },
-});
-
-/**
- * Check and mark expired VMs (to be run periodically)
- */
-export const checkExpiredVMs = mutation({
-  args: {},
-  handler: async (ctx) => {
-    const now = Date.now();
-
-    const runningVms = await ctx.db
-      .query("vms")
-      .filter((q) => q.eq(q.field("status"), "running"))
-      .collect();
-
-    const expiredVmIds = [];
-
-    for (const vm of runningVms) {
-      if (vm.expiresAt <= now) {
-        await ctx.db.patch(vm._id, {
-          status: "expired",
-          deletedAt: now,
-        });
-        expiredVmIds.push(vm.vmId);
-      }
-    }
-
-    return { expiredVmIds, count: expiredVmIds.length };
   },
 });
