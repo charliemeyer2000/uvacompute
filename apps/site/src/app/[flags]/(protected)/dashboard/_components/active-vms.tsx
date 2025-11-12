@@ -34,12 +34,41 @@ import {
   formatTimeRemaining,
   getStatusColor,
 } from "@/lib/vm-utils";
-import { MoreVertical, Loader2 } from "lucide-react";
+import { MoreVertical, Loader2, Copy, Check } from "lucide-react";
 import { toast } from "sonner";
 
 function VMCard({ vm, isActive }: { vm: VM; isActive: boolean }) {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [sshCopied, setSSHCopied] = useState(false);
+
+  const handleCopySSH = async () => {
+    if (sshCopied) return;
+
+    try {
+      const response = await fetch(`/api/vms/${vm.vmId}/connection`);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "failed to fetch connection info");
+      }
+
+      const connectionInfo = await response.json();
+      const sshCommand = `ssh -p ${connectionInfo.sshPort} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${connectionInfo.user}@${vm.vmId}@${connectionInfo.sshHost}`;
+
+      await navigator.clipboard.writeText(sshCommand);
+      setSSHCopied(true);
+
+      toast.success("ssh command copied", {
+        description: "paste it into your terminal or VSCode live share!",
+      });
+
+      setTimeout(() => setSSHCopied(false), 2000);
+    } catch (error) {
+      toast.error("copy failed", {
+        description: error instanceof Error ? error.message : "unknown error",
+      });
+    }
+  };
 
   const handleDelete = async () => {
     setIsDeleting(true);
@@ -71,7 +100,7 @@ function VMCard({ vm, isActive }: { vm: VM; isActive: boolean }) {
 
   return (
     <>
-      <div className="bg-white border border-gray-200 p-6 hover:border-black transition-colors relative">
+      <div className="bg-white border border-gray-200 p-6 relative">
         <div className="flex justify-between items-start mb-4">
           <div className="flex-1">
             <h3 className="text-base font-semibold text-black">
@@ -98,6 +127,24 @@ function VMCard({ vm, isActive }: { vm: VM; isActive: boolean }) {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
+                  {vm.status === "running" && (
+                    <DropdownMenuItem
+                      onClick={handleCopySSH}
+                      className="cursor-pointer"
+                    >
+                      {sshCopied ? (
+                        <>
+                          <Check className="h-4 w-4 mr-2" />
+                          copied!
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="h-4 w-4 mr-2" />
+                          copy ssh command
+                        </>
+                      )}
+                    </DropdownMenuItem>
+                  )}
                   <DropdownMenuItem
                     variant="destructive"
                     onClick={() => setShowDeleteDialog(true)}
