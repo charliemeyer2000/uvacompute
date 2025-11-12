@@ -246,6 +246,8 @@ func (vm *VMManager) InitializeFromIncus() error {
 
 	syncedCount := 0
 	skippedCount := 0
+	var syncedVMs []string
+
 	for _, incusVM := range vms {
 		if incusVM.Status != "Running" {
 			log.Printf("Skipping VM %s (status: %s) - only running VMs are synced", incusVM.Name, incusVM.Status)
@@ -280,20 +282,24 @@ func (vm *VMManager) InitializeFromIncus() error {
 		}
 
 		vm.vmMap[incusVM.Name] = vmState
+		syncedVMs = append(syncedVMs, incusVM.Name)
 		syncedCount++
 		log.Printf("Synced VM %s from Incus (status: %s, cpus: %d, ram: %dGB)",
 			incusVM.Name, vmState.Status, vmState.Cpus, vmState.Ram)
-
-		if vm.callbackClient != nil {
-			go func(vmId string, status VMStatus) {
-				if err := vm.callbackClient.NotifyVMStatusUpdate(vmId, string(status)); err != nil {
-					log.Printf("ERROR: Failed to notify site about synced VM %s status: %v", vmId, err)
-				}
-			}(incusVM.Name, VM_STATUS_RUNNING)
-		}
 	}
 
 	log.Printf("Successfully synced %d running VMs from Incus (%d stopped/non-running VMs skipped)", syncedCount, skippedCount)
+
+	if vm.callbackClient != nil {
+		for _, vmId := range syncedVMs {
+			go func(id string) {
+				if err := vm.callbackClient.NotifyVMStatusUpdate(id, string(VM_STATUS_RUNNING)); err != nil {
+					log.Printf("ERROR: Failed to notify site about synced VM %s status: %v", id, err)
+				}
+			}(vmId)
+		}
+	}
+
 	return nil
 }
 
