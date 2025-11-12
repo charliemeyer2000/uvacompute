@@ -260,7 +260,7 @@ async function createVM(options: {
           );
           console.log(
             formatCommand(
-              "uva ssh-key add ~/.ssh/id_rsa.pub --name 'Some Key Name'",
+              "uva ssh-key add ~/.ssh/id_ed25519.pub --name 'Some Key Name'",
             ),
           );
           console.log();
@@ -533,7 +533,9 @@ async function sshToVM(nameOrVmId: string): Promise<void> {
         spinner.warn(theme.warning("No SSH keys configured"));
         console.log(theme.muted("\nAdd an SSH key to enable access:"));
         console.log(
-          formatCommand("uva ssh-key add ~/.ssh/id_rsa.pub --name 'My Key'"),
+          formatCommand(
+            "uva ssh-key add ~/.ssh/id_ed25519.pub --name 'My Key'",
+          ),
         );
         console.log();
         process.exit(1);
