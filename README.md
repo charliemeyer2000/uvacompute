@@ -7,7 +7,7 @@ Hello contributor, text charlie. rough idea of what needs to be done can be foun
 ## Todo list
 
 - [ ] speed is horrible.
-- [ ] need a man page
+- [x] need a man page
 - [ ] auth flow gives you the code twice basically
 - [ ] terminate instance on web ui
 - [ ] upgrade/downgrade vCPUs, storage
