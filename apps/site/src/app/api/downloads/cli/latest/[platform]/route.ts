@@ -9,14 +9,15 @@ export async function GET(
 ) {
   const { platform } = await params;
 
-  const binaryMap: Record<string, string> = {
+  const fileMap: Record<string, string> = {
     "uvacompute-linux": "uvacompute-linux",
     "uvacompute-macos": "uvacompute-macos",
     "uvacompute-windows.exe": "uvacompute-windows.exe",
+    "uva.1": "uva.1",
   };
 
-  const binaryName = binaryMap[platform];
-  if (!binaryName) {
+  const fileName = fileMap[platform];
+  if (!fileName) {
     return NextResponse.json({ error: "Invalid platform" }, { status: 404 });
   }
 
@@ -37,38 +38,41 @@ export async function GET(
 
     const release = await releaseResponse.json();
 
-    const asset = release.assets.find((a: any) => a.name === binaryName);
+    const asset = release.assets.find((a: any) => a.name === fileName);
     if (!asset) {
       return NextResponse.json(
-        { error: `Binary not found for ${platform}` },
+        { error: `File not found for ${platform}` },
         { status: 404 },
       );
     }
 
-    const binaryResponse = await fetch(asset.url, {
+    const fileResponse = await fetch(asset.url, {
       headers: {
         Authorization: `Bearer ${GITHUB_TOKEN}`,
         Accept: "application/octet-stream",
       },
     });
 
-    if (!binaryResponse.ok) {
-      throw new Error("Failed to download binary");
+    if (!fileResponse.ok) {
+      throw new Error("Failed to download file");
     }
 
-    const binaryData = await binaryResponse.arrayBuffer();
+    const fileData = await fileResponse.arrayBuffer();
 
-    return new NextResponse(binaryData, {
+    const contentType =
+      fileName === "uva.1" ? "text/plain" : "application/octet-stream";
+
+    return new NextResponse(fileData, {
       headers: {
-        "Content-Type": "application/octet-stream",
-        "Content-Disposition": `attachment; filename="${binaryName}"`,
-        "Content-Length": binaryData.byteLength.toString(),
+        "Content-Type": contentType,
+        "Content-Disposition": `attachment; filename="${fileName}"`,
+        "Content-Length": fileData.byteLength.toString(),
       },
     });
   } catch (error) {
-    console.error("Error serving binary:", error);
+    console.error("Error serving file:", error);
     return NextResponse.json(
-      { error: "Failed to serve binary" },
+      { error: "Failed to serve file" },
       { status: 500 },
     );
   }
