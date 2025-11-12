@@ -14,71 +14,181 @@ import {
   PaginationPrevious,
 } from "@/components/ui/pagination";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import {
   VM,
   formatDate,
   formatTimeRemaining,
   getStatusColor,
 } from "@/lib/vm-utils";
+import { MoreVertical, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 
 function VMCard({ vm, isActive }: { vm: VM; isActive: boolean }) {
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleDelete = async () => {
+    setIsDeleting(true);
+
+    try {
+      const response = await fetch(`/api/vms/${vm.vmId}`, {
+        method: "DELETE",
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || data.status !== "deletion_success") {
+        throw new Error(data.msg || "failed to delete vm");
+      }
+
+      toast.success("vm deleted", {
+        description: `${vm.name || vm.vmId} has been deleted`,
+      });
+
+      setShowDeleteDialog(false);
+    } catch (error) {
+      toast.error("deletion failed", {
+        description: error instanceof Error ? error.message : "unknown error",
+      });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   return (
-    <div className="bg-white border border-gray-200 p-6 hover:border-black transition-colors">
-      <div className="flex justify-between items-start mb-4">
-        <div>
-          <h3 className="text-base font-semibold text-black">
-            {vm.name || "unnamed vm"}
-          </h3>
-          <p className="text-xs text-gray-500 font-mono">{vm.vmId}</p>
-        </div>
-        <span
-          className={`px-2 py-1 text-xs font-medium border ${getStatusColor(vm.status)}`}
-        >
-          {vm.status}
-        </span>
-      </div>
-
-      <div className="grid grid-cols-2 gap-4 mb-4 text-xs">
-        <div>
-          <p className="text-gray-500">cpus</p>
-          <p className="font-medium text-black">{vm.cpus} vCPU</p>
-        </div>
-        <div>
-          <p className="text-gray-500">ram</p>
-          <p className="font-medium text-black">{vm.ram} GB</p>
-        </div>
-        <div>
-          <p className="text-gray-500">disk</p>
-          <p className="font-medium text-black">{vm.disk} GB</p>
-        </div>
-        <div>
-          <p className="text-gray-500">gpus</p>
-          <p className="font-medium text-black">
-            {vm.gpus > 0 ? `${vm.gpus}x ${vm.gpuType}` : "none"}
-          </p>
-        </div>
-      </div>
-
-      <div className="border-t border-gray-200 pt-4 space-y-2 text-xs">
-        <div className="flex justify-between">
-          <span className="text-gray-500">created:</span>
-          <span className="text-black">{formatDate(vm.createdAt)}</span>
-        </div>
-        {isActive && (
-          <div className="flex justify-between">
-            <span className="text-gray-500">expires:</span>
-            <span className="text-black font-medium">
-              {formatTimeRemaining(vm.expiresAt)}
+    <>
+      <div className="bg-white border border-gray-200 p-6 hover:border-black transition-colors relative">
+        <div className="flex justify-between items-start mb-4">
+          <div className="flex-1">
+            <h3 className="text-base font-semibold text-black">
+              {vm.name || "unnamed vm"}
+            </h3>
+            <p className="text-xs text-gray-500 font-mono">{vm.vmId}</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <span
+              className={`px-2 py-1 text-xs font-medium border ${getStatusColor(vm.status)}`}
+            >
+              {vm.status}
             </span>
+            {isActive && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    className="h-6 w-6 cursor-pointer"
+                  >
+                    <MoreVertical className="h-4 w-4" />
+                    <span className="sr-only">open menu</span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem
+                    variant="destructive"
+                    onClick={() => setShowDeleteDialog(true)}
+                    className="cursor-pointer"
+                  >
+                    delete vm
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
           </div>
-        )}
-        {!isActive && vm.deletedAt && (
+        </div>
+
+        <div className="grid grid-cols-2 gap-4 mb-4 text-xs">
+          <div>
+            <p className="text-gray-500">cpus</p>
+            <p className="font-medium text-black">{vm.cpus} vCPU</p>
+          </div>
+          <div>
+            <p className="text-gray-500">ram</p>
+            <p className="font-medium text-black">{vm.ram} GB</p>
+          </div>
+          <div>
+            <p className="text-gray-500">disk</p>
+            <p className="font-medium text-black">{vm.disk} GB</p>
+          </div>
+          <div>
+            <p className="text-gray-500">gpus</p>
+            <p className="font-medium text-black">
+              {vm.gpus > 0 ? `${vm.gpus}x ${vm.gpuType}` : "none"}
+            </p>
+          </div>
+        </div>
+
+        <div className="border-t border-gray-200 pt-4 space-y-2 text-xs">
           <div className="flex justify-between">
-            <span className="text-gray-500">deleted:</span>
-            <span className="text-black">{formatDate(vm.deletedAt)}</span>
+            <span className="text-gray-500">created:</span>
+            <span className="text-black">{formatDate(vm.createdAt)}</span>
           </div>
-        )}
+          {isActive && (
+            <div className="flex justify-between">
+              <span className="text-gray-500">expires:</span>
+              <span className="text-black font-medium">
+                {formatTimeRemaining(vm.expiresAt)}
+              </span>
+            </div>
+          )}
+          {!isActive && vm.deletedAt && (
+            <div className="flex justify-between">
+              <span className="text-gray-500">deleted:</span>
+              <span className="text-black">{formatDate(vm.deletedAt)}</span>
+            </div>
+          )}
+        </div>
       </div>
-    </div>
+
+      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>delete vm</DialogTitle>
+            <DialogDescription>
+              are you sure you want to delete {vm.name || vm.vmId}? this action
+              cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowDeleteDialog(false)}
+              disabled={isDeleting}
+            >
+              cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDelete}
+              disabled={isDeleting}
+            >
+              {isDeleting ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  deleting...
+                </>
+              ) : (
+                "delete"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
