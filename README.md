@@ -69,6 +69,7 @@ the main vm thingy. this should only really run on linux machines since it uses 
 - `sshd` (should prolly ahve this by default)
 - `autossh`
 - `incus`
+- `ssh2inucs`
 
 other things for setup/general notes:
 
@@ -91,7 +92,7 @@ So let's say i wanna add a feature that tests the entire stack (cli, ui, and the
 - merge the PR when ready, then go into GitHub actions, look at the "release" action for releasing a new version of the CLI, then release.
 - Install new version of cli
 - test the commands
-- debug via `ssh workstation` and the Vercel logs.
+- debug via `ssh workstation` and tailing logs for the service and the Vercel logs.
 
 _as you can tell we kinda do need a better dev setup here.
 _
