@@ -38,7 +38,7 @@ man uva
 
 - `--force`: if already logged in, forcefully re-logs in.
 
-`uva logout`: logs out (not yet implemented)
+`uva logout`: logs out from uvacompute
 
 ### Management
 
