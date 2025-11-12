@@ -61,8 +61,7 @@ async function deviceAuthorization(): Promise<TokenSuccessResponse> {
 
     console.log(authBox);
 
-    const urlToOpen =
-      verification_uri_complete || `${verification_uri}?user_code=${user_code}`;
+    const urlToOpen = `${verification_uri}/approve?user_code=${user_code}`;
 
     try {
       await open(urlToOpen);
