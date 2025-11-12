@@ -266,7 +266,11 @@ export default function ActiveVMs() {
         <>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 min-h-[280px]">
             {paginatedActiveVMs?.map((vm) => (
-              <VMCard key={vm._id} vm={vm} isActive={true} />
+              <VMCard
+                key={vm._id}
+                vm={vm}
+                isActive={vm.status === "running" || vm.status === "updating"}
+              />
             ))}
           </div>
           {totalPages > 1 && (
