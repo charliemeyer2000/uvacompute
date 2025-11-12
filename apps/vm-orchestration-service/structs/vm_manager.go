@@ -273,6 +273,14 @@ func (vm *VMManager) InitializeFromIncus() error {
 		syncedCount++
 		log.Printf("Synced VM %s from Incus (status: %s, cpus: %d, ram: %dGB)",
 			incusVM.Name, vmState.Status, vmState.Cpus, vmState.Ram)
+
+		if vm.callbackClient != nil {
+			go func(vmId string, status VMStatus) {
+				if err := vm.callbackClient.NotifyVMStatusUpdate(vmId, string(status)); err != nil {
+					log.Printf("ERROR: Failed to notify site about synced VM %s status: %v", vmId, err)
+				}
+			}(incusVM.Name, VM_STATUS_RUNNING)
+		}
 	}
 
 	log.Printf("Successfully synced %d running VMs from Incus (%d stopped/non-running VMs skipped)", syncedCount, skippedCount)
