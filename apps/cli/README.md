@@ -40,6 +40,12 @@ man uva
 
 `uva logout`: logs out (not yet implemented)
 
+### Management
+
+`uva uninstall`: uninstall the uvacompute CLI
+
+Removes the CLI binary and all configuration data. Prompts for confirmation (y/N) before proceeding.
+
 ### Virtual Machines
 
 #### Create VM
