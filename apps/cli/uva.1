@@ -96,6 +96,10 @@ Remove an SSH public key by its ID. Prevents future use of this key for VM acces
 .TP
 .B ssh-key set-primary \fIkeyId\fR
 Set specified SSH key as the primary key. Primary key is used by default for new VM deployments.
+.SS Management
+.TP
+.B uninstall
+Uninstall the uvacompute CLI. Removes the CLI binary from the system and deletes all configuration data including authentication tokens. Prompts for confirmation (y/N) before proceeding. If binary removal requires elevated permissions, displays instructions for manual removal.
 .SH OPTIONS
 .TP
 .B \-\-version
@@ -238,6 +242,14 @@ Set primary SSH key:
 .nf
 .RS
 $ uva ssh-key set-primary key_abc123
+.RE
+.fi
+.SS Uninstallation
+Uninstall the CLI and remove all configuration:
+.PP
+.nf
+.RS
+$ uva uninstall
 .RE
 .fi
 .SH DIAGNOSTICS
