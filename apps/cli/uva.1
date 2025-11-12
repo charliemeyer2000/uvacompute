@@ -53,15 +53,16 @@ Number of GPUs to allocate (default: 0). Maximum: 1.
 GPU type (default: 5090). Currently only supports NVIDIA RTX 5090.
 .TP
 .BR \-n ", " \-\-name " \fIname\fR"
-Optional friendly name for the VM. Used for identification and SSH connection.
+Optional friendly name for the VM. Used for identification and SSH connection. If a VM with this name already exists, the CLI prompts for confirmation before creating a duplicate.
 .RE
 .TP
-.B vm delete \fIvmId\fR
-Delete a virtual machine by its ID. Immediately terminates and removes the VM.
+.B vm delete \fInameOrVmId\fR
+Delete a virtual machine by its ID or name. Immediately terminates and removes the VM. If multiple VMs share the same name, presents an interactive selection menu with an option to delete all matching VMs.
 .TP
-.B vm rm \fIvmId\fR
+.B vm rm \fInameOrVmId\fR
 Alias for
 .BR "vm delete" .
+Accepts VM ID or name. Supports interactive selection for duplicate names.
 .TP
 .B vm status \fIvmId\fR
 Display current status and detailed information about a virtual machine including state, configuration, and any error messages.
@@ -80,7 +81,7 @@ Alias for
 Accepts same options.
 .TP
 .B vm ssh \fInameOrVmId\fR
-Connect to a virtual machine via SSH. Accepts either the VM ID or friendly name. VM must be in running state. Requires SSH key to be configured.
+Connect to a virtual machine via SSH. Accepts either the VM ID or friendly name. If multiple VMs share the same name, presents an interactive selection menu. VM must be in running state. Requires SSH key to be configured.
 .SS SSH Key Management
 .TP
 .B ssh-key add \fIpath\fR
@@ -102,7 +103,7 @@ Set specified SSH key as the primary key. Primary key is used by default for new
 .SS Management
 .TP
 .B uninstall
-Uninstall the uvacompute CLI. Removes the CLI binary from the system and deletes all configuration data including authentication tokens. Prompts for confirmation (y/N) before proceeding. If binary removal requires elevated permissions, displays instructions for manual removal.
+Uninstall the uvacompute CLI. Removes the CLI binary from the system and deletes all configuration data including authentication tokens. Presents an interactive confirmation prompt (default: No) before proceeding. If binary removal requires elevated permissions, displays instructions for manual removal.
 .SH OPTIONS
 .TP
 .B \-\-version
@@ -184,15 +185,23 @@ $ uva vm status abc-123-def
 .RE
 .fi
 .PP
-Delete a VM:
+Delete a VM by ID:
 .PP
 .nf
 .RS
 $ uva vm delete abc-123-def
 .RE
 .fi
+.PP
+Delete a VM by name (if multiple VMs share the name, interactive menu appears):
+.PP
+.nf
+.RS
+$ uva vm delete training-vm
+.RE
+.fi
 .SS SSH Access
-Connect to VM by name:
+Connect to VM by name (if unique):
 .PP
 .nf
 .RS
@@ -278,6 +287,14 @@ SSH connections require at least one SSH public key to be configured. Use
 .B ssh-key add
 to register your public key before attempting SSH access. ED25519 keys are recommended over RSA for better security and performance. Generate an ED25519 key with:
 .B ssh-keygen -t ed25519 -C "your_email@example.com"
+.PP
+When multiple VMs share the same name, commands that accept VM names (
+.BR ssh ,
+.BR delete ,
+.BR rm )
+present an interactive selection menu. Use arrow keys to navigate and Enter to select. For
+.B delete
+operations, an additional option to delete all matching VMs is provided.
 .PP
 Version checks occur automatically once per 24 hours. Update notifications display latest version and installation command.
 .SH BUGS
