@@ -44,7 +44,7 @@ man uva
 
 `uva uninstall`: uninstall the uvacompute CLI
 
-Removes the CLI binary and all configuration data. Prompts for confirmation (y/N) before proceeding.
+Removes the CLI binary and all configuration data. Presents an interactive confirmation prompt (default: No) before proceeding.
 
 ### Virtual Machines
 
@@ -63,7 +63,7 @@ Removes the CLI binary and all configuration data. Prompts for confirmation (y/N
 - `-d, --disk <disk>`: Disk size in GB (default: 64, must be power of 2, max: 1000)
 - `-g, --gpus <gpus>`: Number of GPUs (default: 0, max: 1)
 - `-t, --gpu-type <type>`: GPU type (default: 5090, currently only supports 5090)
-- `-n, --name <name>`: VM name (optional)
+- `-n, --name <name>`: VM name (optional, prompts for confirmation if name already exists)
 
 **Examples:**
 
@@ -80,15 +80,23 @@ uva vm create -h 2 -c 4 -r 16 -d 128 -n my-training-vm
 
 #### Delete VM
 
-`uva vm delete <vmId>`: delete a virtual machine
+`uva vm delete <nameOrVmId>`: delete a virtual machine by ID or name
 
-`uva vm rm <vmId>`: alias for delete
+`uva vm rm <nameOrVmId>`: alias for delete
 
-**Example:**
+If multiple VMs share the same name, presents an interactive selection menu with an option to delete all matching VMs.
+
+**Examples:**
 
 ```bash
+# Delete by ID
 uva vm delete abc-123-def
-uva vm rm abc-123-def
+
+# Delete by name (interactive menu if duplicates exist)
+uva vm delete my-training-vm
+
+# Alias works the same way
+uva vm rm my-training-vm
 ```
 
 #### Check VM Status
@@ -115,13 +123,15 @@ uva vm list
 
 `uva vm ssh <nameOrVmId>`: connect to a virtual machine via SSH
 
-**Example:**
+If multiple VMs share the same name, presents an interactive selection menu.
+
+**Examples:**
 
 ```bash
-# Connect using VM name
+# Connect using VM name (interactive menu if duplicates exist)
 uva vm ssh my-training-vm
 
-# Connect using VM ID
+# Connect using VM ID (always unique)
 uva vm ssh abc-123-def
 ```
 

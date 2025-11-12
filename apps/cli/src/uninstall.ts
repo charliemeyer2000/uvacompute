@@ -1,6 +1,7 @@
 import type { Command } from "commander";
 import ora from "ora";
 import { existsSync, rmSync } from "fs";
+import { confirm } from "@inquirer/prompts";
 import { CONFIG_DIR } from "./lib/constants";
 import { theme } from "./lib/theme";
 import chalk from "chalk";
@@ -8,13 +9,15 @@ import chalk from "chalk";
 async function uninstall(): Promise<void> {
   console.log(
     chalk.yellow(
-      "\nThis will remove the uvacompute CLI and all configuration data.\n",
+      "\nThis will remove the uvacompute CLI and all configuration data.",
     ),
   );
+  console.log();
 
-  const response = await promptConfirmation(
-    "Are you sure you want to uninstall? (y/N): ",
-  );
+  const response = await confirm({
+    message: "Are you sure you want to uninstall?",
+    default: false,
+  });
 
   if (!response) {
     console.log(chalk.gray("\nUninstall cancelled."));
@@ -118,61 +121,6 @@ async function findBinaryPath(): Promise<string | null> {
   }
 
   return null;
-}
-
-async function promptConfirmation(question: string): Promise<boolean> {
-  process.stdout.write(question);
-
-  const reader = process.stdin;
-  const isTTY = process.stdin.isTTY;
-
-  if (isTTY && typeof reader.setRawMode === "function") {
-    reader.setRawMode(true);
-  }
-
-  return new Promise((resolve) => {
-    let buffer = "";
-
-    const onData = (chunk: Buffer) => {
-      const input = chunk.toString();
-
-      if (isTTY && typeof reader.setRawMode === "function") {
-        const char = input.toLowerCase().trim();
-
-        if (char === "y") {
-          reader.setRawMode(false);
-          reader.off("data", onData);
-          console.log("y");
-          resolve(true);
-        } else if (
-          char === "n" ||
-          char === "\r" ||
-          char === "\n" ||
-          char === "\u0003"
-        ) {
-          reader.setRawMode(false);
-          reader.off("data", onData);
-          if (char === "\u0003") {
-            console.log("^C");
-          } else {
-            console.log(char || "n");
-          }
-          resolve(false);
-        }
-      } else {
-        buffer += input;
-
-        if (buffer.includes("\n")) {
-          reader.off("data", onData);
-          const answer = buffer.trim().toLowerCase();
-          console.log();
-          resolve(answer === "y" || answer === "yes");
-        }
-      }
-    };
-
-    reader.on("data", onData);
-  });
 }
 
 export function registerUninstallCommand(program: Command) {
