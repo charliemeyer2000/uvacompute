@@ -58,6 +58,11 @@ export const updateStatus = mutation({
       status: args.status,
     };
 
+    if (args.status === "running" && vm.status !== "running") {
+      const now = Date.now();
+      updates.expiresAt = now + vm.hours * 60 * 60 * 1000;
+    }
+
     if (args.status === "deleted" || args.status === "expired") {
       updates.deletedAt = Date.now();
     }
@@ -104,9 +109,17 @@ export const listActiveByUser = query({
       "updating",
     ];
 
-    return allVms.filter(
-      (vm) => activeStatuses.includes(vm.status) && vm.expiresAt > Date.now(),
-    );
+    const runningStatuses = ["running", "updating"];
+
+    return allVms.filter((vm) => {
+      if (!activeStatuses.includes(vm.status)) {
+        return false;
+      }
+      if (runningStatuses.includes(vm.status)) {
+        return vm.expiresAt > Date.now();
+      }
+      return true;
+    });
   },
 });
 
