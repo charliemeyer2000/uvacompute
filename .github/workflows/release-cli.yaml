@@ -77,8 +77,8 @@ jobs:
           mv package.json.tmp package.json
           cat package.json
 
-          # Update version in man page header
-          sed -i.bak 's/^\.TH UVA 1 "[^"]*" "uvacompute [^"]*"/.TH UVA 1 "November 2025" "uvacompute ${{ steps.version.outputs.new_version }}"/' uva.1
+          RELEASE_DATE=$(date '+%B %Y')
+          sed -i.bak "s/^\.TH UVA 1 \"[^\"]*\" \"uvacompute [^\"]*\"/.TH UVA 1 \"${RELEASE_DATE}\" \"uvacompute ${{ steps.version.outputs.new_version }}\"/" uva.1
           rm uva.1.bak
 
       - name: Commit version bump
