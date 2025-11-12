@@ -68,7 +68,7 @@ export async function checkForUpdate(): Promise<void> {
           theme.success(`Latest: ${latestVersion}`) +
           "\n\n" +
           "To update, run:\n" +
-          theme.accent("curl -fsSL https://uvacompute.com/install.sh | sh"),
+          theme.accent("curl -fsSL https://uvacompute.com/install.sh | bash"),
       );
 
       console.log(updateMessage);
