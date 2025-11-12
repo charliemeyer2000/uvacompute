@@ -104,7 +104,7 @@ async function listSSHKeys(): Promise<void> {
     if (data.keys.length === 0) {
       console.log(theme.warning("\nNo SSH keys found."));
       console.log(
-        theme.muted("Add a key with: uva ssh-key add ~/.ssh/id_rsa.pub\n"),
+        theme.muted("Add a key with: uva ssh-key add ~/.ssh/id_ed25519.pub\n"),
       );
       return;
     }
