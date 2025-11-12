@@ -154,3 +154,26 @@ export async function findBinaryPath(): Promise<string | null> {
 
   return null;
 }
+
+export function hasShownCompletionPrompt(): boolean {
+  try {
+    const config = loadConfig();
+    return config.completion_prompt_shown === true;
+  } catch {
+    return false;
+  }
+}
+
+export function markCompletionPromptShown(): void {
+  try {
+    if (!existsSync(CONFIG_DIR)) {
+      mkdirSync(CONFIG_DIR, { recursive: true });
+    }
+
+    const existingConfig = loadConfig();
+    const config = { ...existingConfig, completion_prompt_shown: true };
+    writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2));
+  } catch {
+    // no-op: best-effort write
+  }
+}
