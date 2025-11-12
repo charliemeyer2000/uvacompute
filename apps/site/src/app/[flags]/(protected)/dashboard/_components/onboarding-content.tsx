@@ -18,7 +18,7 @@ export default function OnboardingContent() {
         </p>
         <div className="ml-8 bg-gray-50 border border-gray-200 p-4">
           <code className="text-sm text-black">
-            curl -fsSL https://uvacompute.com/install.sh | sh
+            curl -fsSL https://uvacompute.com/install.sh | bash
           </code>
         </div>
       </div>

@@ -1,5 +1,21 @@
 # uvacompute CLI
 
+## Installation
+
+Install with a single command:
+
+```bash
+curl -fsSL https://uvacompute.com/install.sh | bash
+```
+
+Or download the script first to inspect it:
+
+```bash
+curl -fsSL https://uvacompute.com/install.sh -o install.sh
+chmod +x install.sh
+./install.sh
+```
+
 ## Documentation
 
 A comprehensive man page is available. To view it:
