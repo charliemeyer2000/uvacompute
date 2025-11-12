@@ -48,7 +48,7 @@ export default function OnboardingContent() {
         </p>
         <div className="ml-8 bg-gray-50 border border-gray-200 p-4">
           <code className="text-sm text-black">
-            uva ssh-key add ~/.ssh/id_rsa.pub
+            uva ssh-key add ~/.ssh/id_ed25519.pub
           </code>
         </div>
         <p className="text-xs text-gray-500 ml-8 mt-2">
