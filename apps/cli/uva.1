@@ -81,7 +81,7 @@ Connect to a virtual machine via SSH. Accepts either the VM ID or friendly name.
 .SS SSH Key Management
 .TP
 .B ssh-key add \fIpath\fR
-Add an SSH public key for VM access. Reads public key from specified file path.
+Add an SSH public key for VM access. Reads public key from specified file path. ED25519 keys are recommended for better security and performance.
 .RS
 .TP
 .BR \-n ", " \-\-name " \fIname\fR"
@@ -201,11 +201,19 @@ $ uva vm ssh abc-123-def
 .RE
 .fi
 .SS SSH Key Management
+Generate an ED25519 SSH key (recommended):
+.PP
+.nf
+.RS
+$ ssh-keygen -t ed25519 -C "your_email@example.com"
+.RE
+.fi
+.PP
 Add SSH public key:
 .PP
 .nf
 .RS
-$ uva ssh-key add ~/.ssh/id_rsa.pub --name "My Laptop"
+$ uva ssh-key add ~/.ssh/id_ed25519.pub --name "My Laptop"
 .RE
 .fi
 .PP
@@ -253,7 +261,8 @@ with error details.
 .PP
 SSH connections require at least one SSH public key to be configured. Use
 .B ssh-key add
-to register your public key before attempting SSH access.
+to register your public key before attempting SSH access. ED25519 keys are recommended over RSA for better security and performance. Generate an ED25519 key with:
+.B ssh-keygen -t ed25519 -C "your_email@example.com"
 .PP
 Version checks occur automatically once per 24 hours. Update notifications display latest version and installation command.
 .SH BUGS
