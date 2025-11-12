@@ -16,6 +16,7 @@ Hello contributor, text charlie. rough idea of what needs to be done can be foun
 - [ ] Run Docker container (via Kubernetes, probably)
 - [ ] Live tail logs in CLI/UI (modal-style)
 - [ ] Integrate vcluster (?)
+- [ ] o11y into how people r using it ++ some visualization of usage
 - [ ] When 2 GPUs are purchased, support 2 GPUs
 - [ ] modal notebooks implementation
 - [ ] support other computers joining uvacompute
