@@ -42,6 +42,10 @@ man uva
 
 ### Management
 
+`uva upgrade`: upgrade the uvacompute CLI to the latest version
+
+Checks for the latest version, presents an interactive confirmation prompt, and upgrades the CLI in place. This is more convenient than running the install script manually.
+
 `uva uninstall`: uninstall the uvacompute CLI
 
 Removes the CLI binary and all configuration data. Presents an interactive confirmation prompt (default: No) before proceeding.

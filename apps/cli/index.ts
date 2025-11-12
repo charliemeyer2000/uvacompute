@@ -5,6 +5,7 @@ import { registerVMCommands } from "./src/vm";
 import { registerSSHKeyCommands } from "./src/ssh-keys";
 import { registerUserCommands } from "./src/user";
 import { registerUninstallCommand } from "./src/uninstall";
+import { registerUpgradeCommand } from "./src/upgrade";
 import { checkForUpdate } from "./src/lib/version-check";
 
 async function main() {
@@ -22,6 +23,7 @@ async function main() {
   registerSSHKeyCommands(program);
   registerUserCommands(program);
   registerUninstallCommand(program);
+  registerUpgradeCommand(program);
   program.parse(process.argv);
 }
 

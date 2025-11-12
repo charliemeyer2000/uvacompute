@@ -4,6 +4,7 @@ import { existsSync, rmSync } from "fs";
 import { confirm } from "@inquirer/prompts";
 import { CONFIG_DIR } from "./lib/constants";
 import { theme } from "./lib/theme";
+import { findBinaryPath } from "./lib/utils";
 import chalk from "chalk";
 
 async function uninstall(): Promise<void> {
@@ -90,37 +91,6 @@ async function uninstall(): Promise<void> {
     spinner.fail(`Error during uninstall: ${error.message}`);
     process.exit(1);
   }
-}
-
-async function findBinaryPath(): Promise<string | null> {
-  try {
-    const proc = Bun.spawn(["which", "uva"], {
-      stdout: "pipe",
-      stderr: "pipe",
-    });
-
-    const text = await new Response(proc.stdout).text();
-    await proc.exited;
-
-    if (proc.exitCode === 0 && text.trim()) {
-      return text.trim();
-    }
-  } catch {}
-
-  const commonPaths = [
-    "/usr/local/bin/uva",
-    "/usr/bin/uva",
-    `${process.env.HOME}/.local/bin/uva`,
-    `${process.env.HOME}/bin/uva`,
-  ];
-
-  for (const path of commonPaths) {
-    if (existsSync(path)) {
-      return path;
-    }
-  }
-
-  return null;
 }
 
 export function registerUninstallCommand(program: Command) {
