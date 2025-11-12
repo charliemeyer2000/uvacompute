@@ -1,6 +1,6 @@
 .TH UVA 1 "November 2025" "uvacompute 0.0.13" "User Commands"
 .SH NAME
-uva \- command-line interface for managing UVACompute virtual machines
+uva \- command-line interface for managing uvacompute virtual machines
 .SH SYNOPSIS
 .B uva
 [\fB\-\-version\fR]
@@ -8,19 +8,22 @@ uva \- command-line interface for managing UVACompute virtual machines
 [\fIoptions\fR] [\fIarguments\fR]
 .SH DESCRIPTION
 .B uva
-is the command-line interface for UVACompute, a cloud computing platform for provisioning and managing virtual machines with flexible resource configurations including CPU, RAM, disk, and GPU resources.
+is the command-line interface for uvacompute, a cloud computing platform for provisioning and managing virtual machines with flexible resource configurations including CPU, RAM, disk, and GPU resources.
 .PP
-The CLI uses OAuth 2.0 device authorization flow for authentication and communicates with the UVACompute API to manage virtual machine lifecycles, SSH keys, and user sessions.
+The CLI uses OAuth 2.0 device authorization flow for authentication and communicates with the uvacompute API to manage virtual machine lifecycles, SSH keys, and user sessions.
 .SH COMMANDS
 .SS Authentication
 .TP
 .B login
-Authenticate with UVACompute using OAuth 2.0 device flow. Opens a browser window and prompts for authorization code entry.
+Authenticate with uvacompute using OAuth 2.0 device flow. Opens a browser window and prompts for authorization code entry.
 .RS
 .TP
 .B \-\-force
 Force re-authentication even if already logged in. Invalidates existing token and initiates new device authorization flow.
 .RE
+.TP
+.B logout
+Log out from uvacompute by removing the stored authentication token from local configuration.
 .SS User Information
 .TP
 .B whoami
@@ -117,7 +120,7 @@ Successful program execution.
 General error occurred. Check error message for details. Common causes include authentication failure, network errors, invalid parameters, or VM operation failures.
 .SH EXAMPLES
 .SS Authentication
-Login to UVACompute:
+Login to uvacompute:
 .PP
 .nf
 .RS
@@ -278,7 +281,7 @@ to register your public key before attempting SSH access. ED25519 keys are recom
 .PP
 Version checks occur automatically once per 24 hours. Update notifications display latest version and installation command.
 .SH BUGS
-Report bugs to the UVACompute team or open an issue on the project repository.
+Report bugs to the uvacompute team or open an issue on the project repository.
 .SH AUTHOR
 Written by Charlie Meyer.
 .SH SEE ALSO
