@@ -7,10 +7,13 @@ import { registerUserCommands } from "./src/user";
 import { registerUninstallCommand } from "./src/uninstall";
 import { registerUpgradeCommand } from "./src/upgrade";
 import { checkForUpdate } from "./src/lib/version-check";
+import {
+  handleCompletion,
+  registerCompletionCommands,
+  checkAndPromptCompletion,
+} from "./src/completion";
 
 async function main() {
-  await checkForUpdate().catch(() => {});
-
   const program = new Command();
 
   program
@@ -24,7 +27,15 @@ async function main() {
   registerUserCommands(program);
   registerUninstallCommand(program);
   registerUpgradeCommand(program);
+  registerCompletionCommands(program);
+
+  await handleCompletion();
+
+  await checkForUpdate().catch(() => {});
+
   program.parse(process.argv);
+
+  checkAndPromptCompletion();
 }
 
 main();
