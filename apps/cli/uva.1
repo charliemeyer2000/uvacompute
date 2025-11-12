@@ -102,6 +102,9 @@ Remove an SSH public key by its ID. Prevents future use of this key for VM acces
 Set specified SSH key as the primary key. Primary key is used by default for new VM deployments.
 .SS Management
 .TP
+.B upgrade
+Upgrade the uvacompute CLI to the latest version. Checks the API for available updates, displays version comparison, and presents an interactive confirmation prompt (default: Yes) before downloading and installing the update. Automatically handles the upgrade process by running the official installation script. If binary replacement requires elevated permissions, provides instructions for using sudo.
+.TP
 .B uninstall
 Uninstall the uvacompute CLI. Removes the CLI binary from the system and deletes all configuration data including authentication tokens. Presents an interactive confirmation prompt (default: No) before proceeding. If binary removal requires elevated permissions, displays instructions for manual removal.
 .SH OPTIONS
@@ -256,7 +259,15 @@ Set primary SSH key:
 $ uva ssh-key set-primary key_abc123
 .RE
 .fi
-.SS Uninstallation
+.SS Management
+Upgrade to the latest version:
+.PP
+.nf
+.RS
+$ uva upgrade
+.RE
+.fi
+.PP
 Uninstall the CLI and remove all configuration:
 .PP
 .nf
@@ -296,7 +307,8 @@ present an interactive selection menu. Use arrow keys to navigate and Enter to s
 .B delete
 operations, an additional option to delete all matching VMs is provided.
 .PP
-Version checks occur automatically once per 24 hours. Update notifications display latest version and installation command.
+Version checks occur automatically once per 24 hours. Update notifications display latest version and upgrade instructions. To upgrade at any time, run:
+.B uva upgrade
 .SH BUGS
 Report bugs to the uvacompute team or open an issue on the project repository.
 .SH AUTHOR
