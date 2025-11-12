@@ -8,7 +8,7 @@ import chalk from "chalk";
 async function uninstall(): Promise<void> {
   console.log(
     chalk.yellow(
-      "\n⚠️  This will remove the uvacompute CLI and all configuration data.\n",
+      "\nThis will remove the uvacompute CLI and all configuration data.\n",
     ),
   );
 
