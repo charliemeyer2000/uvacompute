@@ -79,7 +79,7 @@ main() {
     
     binary_file="$(detect_platform)"
     tmpdir="$(mktemp -d)" || die "Failed to create temporary directory"
-    trap 'rm -rf "$tmpdir"' EXIT
+    trap 'rm -rf "${tmpdir:-}"' EXIT
     
     target_file="${TARGET_DIR}/${BINARY_NAME}"
     
