@@ -70,16 +70,20 @@ jobs:
 
           echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
 
-      - name: Update package.json
+      - name: Update package.json and man page
         run: |
           cd apps/cli
           jq '.version = "${{ steps.version.outputs.new_version }}"' package.json > package.json.tmp
           mv package.json.tmp package.json
           cat package.json
 
+          RELEASE_DATE=$(date '+%B %Y')
+          sed -i.bak "s/^\.TH UVA 1 \"[^\"]*\" \"uvacompute [^\"]*\"/.TH UVA 1 \"${RELEASE_DATE}\" \"uvacompute ${{ steps.version.outputs.new_version }}\"/" uva.1
+          rm uva.1.bak
+
       - name: Commit version bump
         run: |
-          git add apps/cli/package.json
+          git add apps/cli/package.json apps/cli/uva.1
           git commit -m "chore(cli): bump version to ${{ steps.version.outputs.new_version }}"
           git tag "cli-v${{ steps.version.outputs.new_version }}"
           git push origin HEAD:${{ github.ref_name }}
@@ -123,8 +127,23 @@ jobs:
           path: ./apps/cli/dist/${{ matrix.artifact }}
           retention-days: 1
 
+  upload-man-page:
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: cli-v${{ needs.release.outputs.version }}
+
+      - name: Upload man page artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: uva.1
+          path: ./apps/cli/uva.1
+          retention-days: 1
+
   create-release:
-    needs: [release, build]
+    needs: [release, build, upload-man-page]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -145,4 +164,5 @@ jobs:
             ./dist/uvacompute-linux/uvacompute-linux
             ./dist/uvacompute-macos/uvacompute-macos
             ./dist/uvacompute-windows.exe/uvacompute-windows.exe
+            ./dist/uva.1/uva.1
           generate_release_notes: true
