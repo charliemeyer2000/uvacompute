@@ -102,6 +102,12 @@ Remove an SSH public key by its ID. Prevents future use of this key for VM acces
 Set specified SSH key as the primary key. Primary key is used by default for new VM deployments.
 .SS Management
 .TP
+.B completion install
+Install shell tab completion for the uva command. Supports Bash and Zsh shells. Automatically detects the current shell and configures completion scripts in the appropriate shell configuration file. After installation, restart your shell or source the configuration file to enable tab completion.
+.TP
+.B completion uninstall
+Remove shell tab completion for the uva command. Cleans up completion scripts from shell configuration files and the tabtab directory.
+.TP
 .B upgrade
 Upgrade the uvacompute CLI to the latest version. Checks the API for available updates, displays version comparison, and presents an interactive confirmation prompt (default: Yes) before downloading and installing the update. Automatically handles the upgrade process by running the official installation script. If binary replacement requires elevated permissions, provides instructions for using sudo.
 .TP
@@ -114,7 +120,12 @@ Display CLI version number and exit.
 .SH FILES
 .TP
 .I ~/.uvacompute/config
-Configuration file storing authentication tokens, version information, and last update check timestamp. JSON format. Created automatically on first login.
+Configuration file storing authentication tokens, version information, completion prompt status, and last update check timestamp. JSON format. Created automatically on first login.
+.TP
+.I ~/.config/tabtab/
+Directory containing shell completion scripts for Bash and Zsh. Created when running
+.BR "uva completion install" .
+Shell configuration files (~/.bashrc or ~/.zshrc) are automatically updated to source these scripts.
 .SH EXIT STATUS
 .TP
 .B 0
@@ -260,6 +271,22 @@ $ uva ssh-key set-primary key_abc123
 .RE
 .fi
 .SS Management
+Enable tab completion for Bash or Zsh:
+.PP
+.nf
+.RS
+$ uva completion install
+.RE
+.fi
+.PP
+Disable tab completion:
+.PP
+.nf
+.RS
+$ uva completion uninstall
+.RE
+.fi
+.PP
 Upgrade to the latest version:
 .PP
 .nf
@@ -277,6 +304,14 @@ $ uva uninstall
 .fi
 .SH DIAGNOSTICS
 The CLI uses OAuth 2.0 device authorization flow. During login, if browser does not open automatically, manually visit the displayed URL and enter the provided code.
+.PP
+Tab completion can be enabled by running
+.B uva completion install
+which supports Bash and Zsh shells. After installation, restart your shell or run
+.B source ~/.bashrc
+(or
+.BR ~/.zshrc )
+to activate completion. Tab completion provides command, subcommand, flag, and dynamic VM name suggestions. VM name completion requires authentication and fetches current VM list from the API with a 500ms timeout.
 .PP
 VM creation may take several minutes. The CLI polls status through the following stages:
 .B creating
