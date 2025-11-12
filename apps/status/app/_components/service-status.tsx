@@ -43,7 +43,7 @@ export function ServiceStatus({
 
   function getBarColor(day: DayAggregate): string {
     if (day.total === 0) return "bg-gray-200";
-    if (day.uptimePercentage === 100) return "bg-blue-500";
+    if (day.uptimePercentage >= 80) return "bg-blue-500";
     if (day.uptimePercentage > 0) return "bg-yellow-500";
     return "bg-red-500";
   }
