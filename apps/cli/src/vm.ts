@@ -1,6 +1,7 @@
 import type { Command } from "commander";
 import ora from "ora";
 import { spawn } from "child_process";
+import { select, confirm } from "@inquirer/prompts";
 import { getBaseUrl, loadToken } from "./lib/utils";
 import {
   theme,
@@ -45,6 +46,56 @@ function getStatusMessage(status: string): string {
     updating: "Updating VM...",
   };
   return messages[status] || `Status: ${status}`;
+}
+
+async function fetchAndFilterVMs(
+  nameOrVmId: string,
+  token: string,
+): Promise<Array<any>> {
+  const vmsResponse = await fetch(`${BASE_URL}/api/vms`, {
+    method: "GET",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  if (!vmsResponse.ok) {
+    throw new Error("Failed to fetch VMs");
+  }
+
+  const vmsData = VMListResponseSchema.parse(await vmsResponse.json());
+  return vmsData.vms.filter(
+    (v) => v.vmId === nameOrVmId || v.name === nameOrVmId,
+  );
+}
+
+async function selectVM(
+  matchingVMs: Array<any>,
+  nameOrVmId: string,
+): Promise<any> {
+  const choices = matchingVMs.map((v) => {
+    const statusColor =
+      statusColors[v.status as keyof typeof statusColors] || theme.muted;
+    const nameDisplay = v.name
+      ? theme.emphasis(v.name)
+      : theme.muted("(unnamed)");
+    return {
+      name: `${nameDisplay} - ${theme.muted(v.vmId)} ${statusColor(`[${v.status}]`)} - ${v.cpus}vCPU, ${v.ram}GB RAM`,
+      value: v.vmId,
+      description: `Created: ${new Date(v.createdAt).toLocaleString()}`,
+    };
+  });
+
+  console.log(
+    theme.warning(
+      `\nFound ${matchingVMs.length} VMs matching "${nameOrVmId}"\n`,
+    ),
+  );
+
+  const selectedVmId = await select({
+    message: "Select a VM:",
+    choices,
+  });
+
+  return matchingVMs.find((v) => v.vmId === selectedVmId);
 }
 
 async function pollVMStatus(
@@ -137,14 +188,62 @@ async function createVM(options: {
   gpuType?: string;
   name?: string;
 }): Promise<void> {
-  const spinner = ora("Creating VM...").start();
+  let spinner: any = null;
 
   try {
     const token = loadToken();
     if (!token) {
-      spinner.fail("Not authenticated. Please run 'uva login' first.");
+      console.log(
+        theme.warning("Not authenticated. Please run 'uva login' first."),
+      );
       process.exit(1);
     }
+
+    if (options.name) {
+      const vmsResponse = await fetch(`${BASE_URL}/api/vms`, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (vmsResponse.ok) {
+        const vmsData = VMListResponseSchema.parse(await vmsResponse.json());
+        const duplicateVMs = vmsData.vms.filter(
+          (vm) => vm.name === options.name,
+        );
+
+        if (duplicateVMs.length > 0) {
+          console.log(
+            theme.warning(
+              `\nWarning: Found ${duplicateVMs.length} existing VM(s) with the name "${options.name}":`,
+            ),
+          );
+          for (const vm of duplicateVMs) {
+            const statusColor =
+              statusColors[vm.status as keyof typeof statusColors] ||
+              theme.muted;
+            console.log(
+              `  • ${theme.muted(vm.vmId)} ${statusColor(`[${vm.status}]`)}`,
+            );
+          }
+          console.log();
+
+          const shouldContinue = await confirm({
+            message: "Do you want to continue creating a VM with this name?",
+            default: false,
+          });
+
+          if (!shouldContinue) {
+            console.log(theme.muted("VM creation cancelled."));
+            process.exit(0);
+          }
+          console.log();
+        }
+      }
+    }
+
+    spinner = ora("Creating VM...").start();
 
     // Parse and validate input
     const hours = parseInt(options.hours, 10);
@@ -277,13 +376,18 @@ async function createVM(options: {
       process.exit(1);
     }
   } catch (error: any) {
-    spinner.fail(`Error: ${error.message}`);
+    if (spinner) {
+      spinner.fail(`Error: ${error.message}`);
+    } else {
+      console.log(theme.warning(`Error: ${error.message}`));
+    }
     process.exit(1);
   }
 }
 
-async function deleteVM(vmId: string): Promise<void> {
-  const spinner = ora(`Deleting VM ${vmId}...`).start();
+async function deleteVM(nameOrVmId: string): Promise<void> {
+  let spinner = ora("Fetching VMs...").start();
+  let spinnerActive = true;
 
   try {
     const token = loadToken();
@@ -292,32 +396,89 @@ async function deleteVM(vmId: string): Promise<void> {
       process.exit(1);
     }
 
-    const response = await fetch(`${BASE_URL}/api/vms/${vmId}`, {
-      method: "DELETE",
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
+    const matchingVMs = await fetchAndFilterVMs(nameOrVmId, token);
 
-    const rawData = (await response.json()) as any;
-
-    if (!response.ok) {
-      spinner.fail(
-        `Failed to delete VM: ${rawData.msg || rawData.error || "Unknown error"}`,
-      );
+    if (matchingVMs.length === 0) {
+      spinner.fail(`VM not found: ${nameOrVmId}`);
       process.exit(1);
     }
 
-    const data = VMDeletionResponseSchema.parse(rawData);
+    let vmsToDelete: string[];
 
-    if (data.status === "deletion_success") {
-      spinner.succeed(theme.success(`VM ${vmId} deleted successfully!`));
+    if (matchingVMs.length > 1) {
+      spinner.stop();
+      spinnerActive = false;
+      const choices = [
+        ...matchingVMs.map((v) => {
+          const statusColor =
+            statusColors[v.status as keyof typeof statusColors] || theme.muted;
+          const nameDisplay = v.name
+            ? theme.emphasis(v.name)
+            : theme.muted("(unnamed)");
+          return {
+            name: `${nameDisplay} - ${theme.muted(v.vmId)} ${statusColor(`[${v.status}]`)}`,
+            value: v.vmId,
+          };
+        }),
+        {
+          name: theme.warning("Delete all matching VMs"),
+          value: "__DELETE_ALL__",
+        },
+      ];
+
+      console.log(
+        theme.warning(
+          `\nFound ${matchingVMs.length} VMs matching "${nameOrVmId}"\n`,
+        ),
+      );
+
+      const selection = await select({
+        message: "Select a VM to delete:",
+        choices,
+      });
+
+      vmsToDelete =
+        selection === "__DELETE_ALL__"
+          ? matchingVMs.map((v) => v.vmId)
+          : [selection];
+      console.log();
     } else {
-      spinner.fail(`VM deletion failed: ${data.msg}`);
-      process.exit(1);
+      vmsToDelete = [matchingVMs[0]!.vmId];
+    }
+
+    for (const vmId of vmsToDelete) {
+      const deleteSpinner = ora(`Deleting VM ${vmId}...`).start();
+
+      const response = await fetch(`${BASE_URL}/api/vms/${vmId}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      const rawData = (await response.json()) as any;
+
+      if (!response.ok) {
+        deleteSpinner.fail(
+          `Failed to delete VM ${vmId}: ${rawData.msg || rawData.error || "Unknown error"}`,
+        );
+        continue;
+      }
+
+      const data = VMDeletionResponseSchema.parse(rawData);
+
+      if (data.status === "deletion_success") {
+        deleteSpinner.succeed(
+          theme.success(`VM ${vmId} deleted successfully!`),
+        );
+      } else {
+        deleteSpinner.fail(`VM deletion failed: ${data.msg}`);
+      }
     }
   } catch (error: any) {
-    spinner.fail(`Error: ${error.message}`);
+    if (spinnerActive && spinner) {
+      spinner.fail(`Error: ${error.message}`);
+    } else {
+      console.log(theme.warning(`Error: ${error.message}`));
+    }
     process.exit(1);
   }
 }
@@ -445,7 +606,7 @@ async function listVMs(options: { all?: boolean }): Promise<void> {
 }
 
 async function sshToVM(nameOrVmId: string): Promise<void> {
-  const spinner = ora("Fetching VM connection info...").start();
+  let spinner = ora("Fetching VMs...").start();
 
   try {
     const token = loadToken();
@@ -454,27 +615,24 @@ async function sshToVM(nameOrVmId: string): Promise<void> {
       process.exit(1);
     }
 
-    const vmsResponse = await fetch(`${BASE_URL}/api/vms`, {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
+    const matchingVMs = await fetchAndFilterVMs(nameOrVmId, token);
 
-    if (!vmsResponse.ok) {
-      spinner.fail("Failed to fetch VMs");
-      process.exit(1);
-    }
-
-    const vmsData = VMListResponseSchema.parse(await vmsResponse.json());
-    const vm = vmsData.vms.find(
-      (v) => v.vmId === nameOrVmId || v.name === nameOrVmId,
-    );
-
-    if (!vm) {
+    if (matchingVMs.length === 0) {
       spinner.fail(`VM not found: ${nameOrVmId}`);
       console.log(theme.muted("\nRun 'uva vm list' to see all VMs\n"));
       process.exit(1);
+    }
+
+    let vm;
+
+    if (matchingVMs.length > 1) {
+      spinner.stop();
+      vm = await selectVM(matchingVMs, nameOrVmId);
+      console.log();
+      spinner = ora("Fetching VM connection info...").start();
+    } else {
+      vm = matchingVMs[0];
+      spinner.text = "Fetching VM connection info...";
     }
 
     if (vm.status !== "running") {
@@ -588,12 +746,12 @@ export function registerVMCommands(program: Command) {
 
   vm.command("delete")
     .description("Delete a VM")
-    .argument("<vmId>", "VM ID to delete")
+    .argument("<nameOrVmId>", "VM name or VM ID")
     .action(deleteVM);
 
   vm.command("rm")
     .description("Delete a VM (alias for delete)")
-    .argument("<vmId>", "VM ID to delete")
+    .argument("<nameOrVmId>", "VM name or VM ID")
     .action(deleteVM);
 
   vm.command("status")
