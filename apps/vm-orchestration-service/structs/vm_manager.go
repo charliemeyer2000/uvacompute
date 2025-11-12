@@ -81,9 +81,18 @@ func (vm *VMManager) CreateVM(req VMCreationRequest) (string, error) {
 }
 
 func (vm *VMManager) createVMAsync(vmId string, cpus, ram, disk, gpus int, sshPublicKeys []string, hours int) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("ERROR: Panic in createVMAsync for VM %s: %v", vmId, r)
+			vm.UpdateVMStatus(vmId, VM_STATUS_FAILED, fmt.Sprintf("Internal error: %v", r))
+		}
+	}()
+
 	statusCallback := func(status VMStatus) {
 		vm.UpdateVMStatus(vmId, status, "")
 	}
+
+	log.Printf("Starting async VM creation for %s (cpus: %d, ram: %d, disk: %d, gpus: %d)", vmId, cpus, ram, disk, gpus)
 
 	if !IsDevelopment() {
 		incusErr := vm.incusProvider.CreateVM(vmId, cpus, ram, disk, gpus, sshPublicKeys, statusCallback)
@@ -105,6 +114,7 @@ func (vm *VMManager) createVMAsync(vmId string, cpus, ram, disk, gpus int, sshPu
 	}
 
 	vm.UpdateVMStatus(vmId, VM_STATUS_RUNNING, "")
+	log.Printf("VM %s successfully created and is now running", vmId)
 
 	time.AfterFunc(time.Duration(hours*3600*int(time.Second)), func() {
 		log.Printf("VM %s expired, deleting from Incus", vmId)
@@ -236,6 +246,8 @@ func (vm *VMManager) InitializeFromIncus() error {
 
 	syncedCount := 0
 	skippedCount := 0
+	var syncedVMs []string
+
 	for _, incusVM := range vms {
 		if incusVM.Status != "Running" {
 			log.Printf("Skipping VM %s (status: %s) - only running VMs are synced", incusVM.Name, incusVM.Status)
@@ -270,12 +282,24 @@ func (vm *VMManager) InitializeFromIncus() error {
 		}
 
 		vm.vmMap[incusVM.Name] = vmState
+		syncedVMs = append(syncedVMs, incusVM.Name)
 		syncedCount++
 		log.Printf("Synced VM %s from Incus (status: %s, cpus: %d, ram: %dGB)",
 			incusVM.Name, vmState.Status, vmState.Cpus, vmState.Ram)
 	}
 
 	log.Printf("Successfully synced %d running VMs from Incus (%d stopped/non-running VMs skipped)", syncedCount, skippedCount)
+
+	if vm.callbackClient != nil {
+		for _, vmId := range syncedVMs {
+			go func(id string) {
+				if err := vm.callbackClient.NotifyVMStatusUpdate(id, string(VM_STATUS_RUNNING)); err != nil {
+					log.Printf("ERROR: Failed to notify site about synced VM %s status: %v", id, err)
+				}
+			}(vmId)
+		}
+	}
+
 	return nil
 }
 
