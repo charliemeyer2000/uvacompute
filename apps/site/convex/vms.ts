@@ -58,7 +58,15 @@ export const updateStatus = mutation({
       status: args.status,
     };
 
-    if (args.status === "running" && vm.status !== "running") {
+    const provisioningStatuses = [
+      "creating",
+      "initializing",
+      "starting",
+      "waiting_for_agent",
+      "configuring",
+    ];
+
+    if (args.status === "running" && provisioningStatuses.includes(vm.status)) {
       const now = Date.now();
       updates.expiresAt = now + vm.hours * 60 * 60 * 1000;
     }
