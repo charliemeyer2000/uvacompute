@@ -13,7 +13,12 @@ import {
   hasShownCompletionPrompt,
   markCompletionPromptShown,
 } from "./lib/utils";
-import { VMListResponseSchema, SSHKeyListResponseSchema } from "./lib/schemas";
+import {
+  VMListResponseSchema,
+  SSHKeyListResponseSchema,
+  VM_STATUS_GROUPS,
+  isVMStatusInGroup,
+} from "./lib/schemas";
 import { theme } from "./lib/theme";
 
 const BASE_URL = getBaseUrl();
@@ -214,6 +219,10 @@ function needsSSHKeyCompletion(
   return args.length > 0;
 }
 
+function truncateVmId(vmId: string): string {
+  return vmId.slice(0, 8);
+}
+
 async function fetchVMsForCompletion(
   subcommandName: string,
 ): Promise<string[]> {
@@ -235,23 +244,34 @@ async function fetchVMsForCompletion(
     if (!response.ok) return [];
 
     const data = VMListResponseSchema.parse(await response.json());
-    const completions: string[] = [];
 
-    for (const vm of data.vms) {
-      let include = false;
-
-      // Business logic: filter VMs based on what the subcommand can operate on
-      // subcommandName is extracted from Commander.js, not hardcoded
+    const filteredVMs = data.vms.filter((vm) => {
       if (subcommandName === "ssh") {
-        include = vm.status === "running";
+        return isVMStatusInGroup(vm.status, VM_STATUS_GROUPS.RUNNING);
       } else if (subcommandName === "delete" || subcommandName === "rm") {
-        include = vm.status !== "expired" && vm.status !== "deleted";
-      } else {
-        include = true;
+        return isVMStatusInGroup(vm.status, VM_STATUS_GROUPS.DELETABLE);
       }
+      return true;
+    });
 
-      if (include) {
-        completions.push(vm.name || vm.vmId);
+    const nameCounts = new Map<string, number>();
+    for (const vm of filteredVMs) {
+      if (vm.name) {
+        nameCounts.set(vm.name, (nameCounts.get(vm.name) || 0) + 1);
+      }
+    }
+
+    const completions: string[] = [];
+    for (const vm of filteredVMs) {
+      if (!vm.name) {
+        completions.push(truncateVmId(vm.vmId));
+      } else {
+        const count = nameCounts.get(vm.name) ?? 0;
+        if (count > 1) {
+          completions.push(`${vm.name} (${truncateVmId(vm.vmId)})`);
+        } else {
+          completions.push(vm.name);
+        }
       }
     }
 
