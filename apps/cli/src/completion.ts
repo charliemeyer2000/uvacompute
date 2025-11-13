@@ -251,10 +251,7 @@ async function fetchVMsForCompletion(
       }
 
       if (include) {
-        if (vm.name) {
-          completions.push(vm.name);
-        }
-        completions.push(vm.vmId);
+        completions.push(vm.name || vm.vmId);
       }
     }
 
