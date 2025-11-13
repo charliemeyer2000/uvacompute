@@ -18,6 +18,7 @@ import {
   VMListResponseSchema,
   VMConnectionInfoSchema,
   SSHKeyListResponseSchema,
+  VM_STATUS_GROUPS,
 } from "./lib/schemas";
 import {
   VMError,
@@ -48,9 +49,18 @@ function getStatusMessage(status: string): string {
   return messages[status] || `Status: ${status}`;
 }
 
+function parseVMInput(input: string): { name?: string; truncatedId?: string } {
+  const match = input.match(/^(.+?)\s+\(([0-9a-f]{8})\)$/);
+  if (match) {
+    return { name: match[1], truncatedId: match[2] };
+  }
+  return {};
+}
+
 async function fetchAndFilterVMs(
   nameOrVmId: string,
   token: string,
+  allowedStatuses?: readonly string[],
 ): Promise<Array<any>> {
   const vmsResponse = await fetch(`${BASE_URL}/api/vms`, {
     method: "GET",
@@ -62,9 +72,30 @@ async function fetchAndFilterVMs(
   }
 
   const vmsData = VMListResponseSchema.parse(await vmsResponse.json());
-  return vmsData.vms.filter(
-    (v) => v.vmId === nameOrVmId || v.name === nameOrVmId,
+
+  let filtered = vmsData.vms.filter(
+    (v) =>
+      v.vmId === nameOrVmId ||
+      v.name === nameOrVmId ||
+      v.vmId.startsWith(nameOrVmId),
   );
+
+  if (filtered.length === 0) {
+    const parsed = parseVMInput(nameOrVmId);
+    if (parsed.name && parsed.truncatedId) {
+      const parsedName = parsed.name;
+      const parsedTruncatedId = parsed.truncatedId;
+      filtered = vmsData.vms.filter(
+        (v) => v.name === parsedName && v.vmId.startsWith(parsedTruncatedId),
+      );
+    }
+  }
+
+  if (allowedStatuses && allowedStatuses.length > 0) {
+    filtered = filtered.filter((v) => allowedStatuses.includes(v.status));
+  }
+
+  return filtered;
 }
 
 async function selectVM(
@@ -396,10 +427,20 @@ async function deleteVM(nameOrVmId: string): Promise<void> {
       process.exit(1);
     }
 
-    const matchingVMs = await fetchAndFilterVMs(nameOrVmId, token);
+    const matchingVMs = await fetchAndFilterVMs(
+      nameOrVmId,
+      token,
+      VM_STATUS_GROUPS.DELETABLE,
+    );
 
     if (matchingVMs.length === 0) {
-      spinner.fail(`VM not found: ${nameOrVmId}`);
+      spinner.fail(`No deletable VM found with name or ID: ${nameOrVmId}`);
+      console.log(theme.muted("\nRun 'uva vm list --all' to see all VMs"));
+      console.log(
+        theme.muted(
+          "Note: Already deleted or expired VMs cannot be deleted again\n",
+        ),
+      );
       process.exit(1);
     }
 
@@ -615,11 +656,18 @@ async function sshToVM(nameOrVmId: string): Promise<void> {
       process.exit(1);
     }
 
-    const matchingVMs = await fetchAndFilterVMs(nameOrVmId, token);
+    const matchingVMs = await fetchAndFilterVMs(
+      nameOrVmId,
+      token,
+      VM_STATUS_GROUPS.RUNNING,
+    );
 
     if (matchingVMs.length === 0) {
-      spinner.fail(`VM not found: ${nameOrVmId}`);
-      console.log(theme.muted("\nRun 'uva vm list' to see all VMs\n"));
+      spinner.fail(`No running VM found with name or ID: ${nameOrVmId}`);
+      console.log(theme.muted("\nRun 'uva vm list --all' to see all VMs"));
+      console.log(
+        theme.muted("Note: Only running VMs can be accessed via SSH\n"),
+      );
       process.exit(1);
     }
 
