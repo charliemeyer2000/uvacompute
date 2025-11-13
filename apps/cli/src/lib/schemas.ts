@@ -100,6 +100,27 @@ export const VMStatusEnum = z.enum([
 ]);
 export type VMStatus = z.infer<typeof VMStatusEnum>;
 
+export const VM_STATUS_GROUPS = {
+  RUNNING: ["running"] as const,
+  DELETABLE: [
+    "creating",
+    "initializing",
+    "starting",
+    "waiting_for_agent",
+    "configuring",
+    "running",
+    "failed",
+    "updating",
+  ] as const,
+} as const;
+
+export function isVMStatusInGroup(
+  status: VMStatus,
+  group: readonly string[],
+): boolean {
+  return group.includes(status);
+}
+
 export const VMStatusResponseSchema = z.object({
   status: VMStatusEnum,
   msg: z.string(),
