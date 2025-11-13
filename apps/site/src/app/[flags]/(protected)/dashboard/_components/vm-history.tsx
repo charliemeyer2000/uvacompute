@@ -13,11 +13,11 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
-import { VM, formatDate, getStatusColor } from "@/lib/vm-utils";
+import { VM, formatDate, formatStatus, getStatusColor } from "@/lib/vm-utils";
 
 function VMCard({ vm }: { vm: VM }) {
   return (
-    <div className="bg-white border border-gray-200 p-6 hover:border-black transition-colors">
+    <div className="bg-white border border-gray-200 p-6">
       <div className="flex justify-between items-start mb-4">
         <div>
           <h3 className="text-base font-semibold text-black">
@@ -28,7 +28,7 @@ function VMCard({ vm }: { vm: VM }) {
         <span
           className={`px-2 py-1 text-xs font-medium border ${getStatusColor(vm.status)}`}
         >
-          {vm.status}
+          {formatStatus(vm.status)}
         </span>
       </div>
 
