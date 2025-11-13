@@ -8,7 +8,7 @@ Hello contributor, text charlie. rough idea of what needs to be done can be foun
 
 - [ ] speed is horrible.
 - [x] need a man page
-- [ ] auth flow gives you the code twice basically
+- [x] auth flow gives you the code twice basically
 - [x] terminate instance on web ui
 - [ ] upgrade/downgrade vCPUs, storage
 - [ ] Add UV to base images
