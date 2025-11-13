@@ -39,6 +39,10 @@ export function formatTimeRemaining(expiresAt: number): string {
   return `${minutes}m remaining`;
 }
 
+export function formatStatus(status: VMStatus): string {
+  return status.replace(/_/g, " ");
+}
+
 export function getStatusColor(status: VMStatus): string {
   switch (status) {
     case "running":

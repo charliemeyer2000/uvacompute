@@ -32,6 +32,7 @@ import {
   VM,
   formatDate,
   formatTimeRemaining,
+  formatStatus,
   getStatusColor,
 } from "@/lib/vm-utils";
 import { MoreVertical, Loader2, Copy, Check } from "lucide-react";
@@ -112,10 +113,10 @@ function VMCard({ vm, isActive }: { vm: VM; isActive: boolean }) {
             <span
               className={`px-2 py-1 text-xs font-medium border ${getStatusColor(vm.status)}`}
             >
-              {vm.status}
+              {formatStatus(vm.status)}
             </span>
             {isActive && (
-              <DropdownMenu>
+              <DropdownMenu modal={false}>
                 <DropdownMenuTrigger asChild>
                   <Button
                     variant="ghost"
