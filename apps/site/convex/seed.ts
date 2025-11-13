@@ -36,7 +36,7 @@ function randomInt(min: number, max: number): number {
 }
 
 function generateVmId(): string {
-  return `vm-${Math.random().toString(36).substring(2, 15)}`;
+  return crypto.randomUUID();
 }
 
 export const seedVMs = mutation({
