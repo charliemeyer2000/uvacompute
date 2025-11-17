@@ -57,6 +57,14 @@ export const VMCreationRequestSchema = z.object({
     .optional(),
   gpus: z.number().int().min(0).max(1).optional(),
   "gpu-type": z.enum(["5090"]).optional(),
+  startupScript: z
+    .string()
+    .max(1048576, "Startup script must be less than 1MB")
+    .optional(),
+  cloudInitConfig: z
+    .string()
+    .max(102400, "Cloud-init config must be less than 100KB")
+    .optional(),
 });
 
 const VMCreationStatusEnum = z.enum([

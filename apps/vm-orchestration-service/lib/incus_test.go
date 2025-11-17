@@ -35,7 +35,7 @@ func TestGenerateCloudInitUserData(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := generateCloudInitUserData(tt.sshKeys)
+			result := generateCloudInitUserData(tt.sshKeys, "", "")
 
 			if !strings.HasPrefix(result, "#cloud-config") {
 				t.Error("Cloud-init data should start with #cloud-config")
@@ -75,7 +75,7 @@ func TestGenerateCloudInitUserData(t *testing.T) {
 
 func TestGenerateCloudInitUserDataFormat(t *testing.T) {
 	sshKey := "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI... test@example.com"
-	result := generateCloudInitUserData([]string{sshKey})
+	result := generateCloudInitUserData([]string{sshKey}, "", "")
 
 	expectedSubstrings := []string{
 		"#cloud-config",
@@ -110,7 +110,7 @@ func TestGenerateCloudInitUserDataMultipleKeys(t *testing.T) {
 		"ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQD... user3@example.com",
 	}
 
-	result := generateCloudInitUserData(sshKeys)
+	result := generateCloudInitUserData(sshKeys, "", "")
 
 	for _, key := range sshKeys {
 		count := strings.Count(result, key)
@@ -134,7 +134,7 @@ func TestGenerateCloudInitUserDataMultipleKeys(t *testing.T) {
 }
 
 func TestGenerateCloudInitUserDataNoKeys(t *testing.T) {
-	result := generateCloudInitUserData([]string{})
+	result := generateCloudInitUserData([]string{}, "", "")
 
 	if !strings.HasPrefix(result, "#cloud-config") {
 		t.Error("Cloud-init data should start with #cloud-config even with no keys")
@@ -142,5 +142,113 @@ func TestGenerateCloudInitUserDataNoKeys(t *testing.T) {
 
 	if !strings.Contains(result, "users:") {
 		t.Error("Cloud-init data should contain users section even if empty")
+	}
+}
+
+func TestGenerateCloudInitWithScript(t *testing.T) {
+	sshKey := "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI... test@example.com"
+	script := "#!/bin/bash\napt-get update\napt-get install -y vim"
+
+	result := generateCloudInitUserData([]string{sshKey}, script, "")
+
+	if !strings.Contains(result, "Content-Type: multipart/mixed") {
+		t.Error("Cloud-init should use MIME multipart format when script is provided")
+	}
+
+	if !strings.Contains(result, "text/x-shellscript") {
+		t.Error("Cloud-init should contain shellscript content type for startup script")
+	}
+
+	if !strings.Contains(result, sshKey) {
+		t.Error("Cloud-init should contain SSH key in base config")
+	}
+
+	if !strings.Contains(result, "apt-get update") {
+		t.Error("Cloud-init should contain startup script content")
+	}
+}
+
+func TestGenerateCloudInitWithCustomConfig(t *testing.T) {
+	sshKey := "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI... test@example.com"
+	customConfig := `#cloud-config
+packages:
+  - vim
+  - git
+runcmd:
+  - echo "custom setup"
+`
+
+	result := generateCloudInitUserData([]string{sshKey}, "", customConfig)
+
+	if !strings.Contains(result, "Content-Type: multipart/mixed") {
+		t.Error("Cloud-init should use MIME multipart format when custom config is provided")
+	}
+
+	if !strings.Contains(result, "Merge-Type: list(append)+dict(no_replace,recurse_list)") {
+		t.Error("Cloud-init should include merge type for proper merging")
+	}
+
+	if !strings.Contains(result, sshKey) {
+		t.Error("Cloud-init should contain SSH key in base config")
+	}
+
+	if !strings.Contains(result, "packages:") {
+		t.Error("Cloud-init should preserve custom config sections")
+	}
+
+	if !strings.Contains(result, "vim") {
+		t.Error("Cloud-init should preserve custom config values")
+	}
+}
+
+func TestGenerateMIMEMultipartStructure(t *testing.T) {
+	sshKey := "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI... test@example.com"
+	script := "#!/bin/bash\necho hello"
+	customConfig := "#cloud-config\npackages:\n  - vim"
+
+	result := generateCloudInitUserData([]string{sshKey}, script, customConfig)
+
+	if !strings.Contains(result, "==CLOUDCONFIG_BOUNDARY==") {
+		t.Error("MIME multipart should use boundary marker")
+	}
+
+	boundaryCount := strings.Count(result, "--==CLOUDCONFIG_BOUNDARY==")
+	if boundaryCount < 4 {
+		t.Errorf("Expected at least 4 boundary markers (start + 2 parts + end), got %d", boundaryCount)
+	}
+
+	if !strings.Contains(result, "base-config.cfg") {
+		t.Error("Should contain SSH keys config part")
+	}
+
+	if !strings.Contains(result, "startup-script.sh") {
+		t.Error("Should contain startup script part")
+	}
+
+	if !strings.Contains(result, "user-config.cfg") {
+		t.Error("Should contain user config part")
+	}
+}
+
+func TestGenerateSSHKeysConfig(t *testing.T) {
+	sshKeys := []string{
+		"ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC... user1@example.com",
+		"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI... user2@example.com",
+	}
+
+	result := generateSSHKeysConfig(sshKeys)
+
+	if !strings.HasPrefix(result, "#cloud-config") {
+		t.Error("SSH keys config should start with #cloud-config")
+	}
+
+	for _, key := range sshKeys {
+		if !strings.Contains(result, key) {
+			t.Errorf("SSH keys config should contain key: %s", key)
+		}
+	}
+
+	if !strings.Contains(result, "disable_root: false") {
+		t.Error("SSH keys config should allow root login")
 	}
 }
