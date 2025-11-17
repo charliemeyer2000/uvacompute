@@ -20,7 +20,7 @@ type VMResourceLimits struct {
 type StatusCallback func(status VMStatus)
 
 type IncusProvider interface {
-	CreateVM(vmId string, cpus, ram, disk, gpus int, sshPublicKeys []string, statusCallback StatusCallback) error
+	CreateVM(vmId string, cpus, ram, disk, gpus int, sshPublicKeys []string, statusCallback StatusCallback, startupScript, cloudInitConfig string) error
 	DestroyVM(vmId string) error
 	GetVMStatus(vmId string) (string, error)
 	GetVMInfo(vmId string) (*IncusVMInfo, error)
@@ -61,6 +61,8 @@ func (vm *VMManager) CreateVM(req VMCreationRequest) (string, error) {
 	gpus := IntOrDefault(req.Gpus, DefaultGpus)
 	gpuType := GpuTypeOrDefault(req.GpuType, DefaultGpuType)
 	name := StringOrDefault(req.Name, "")
+	startupScript := StringOrDefault(req.StartupScript, "")
+	cloudInitConfig := StringOrDefault(req.CloudInitConfig, "")
 
 	vm.vmMap[vmId] = VMState{
 		Id:           vmId,
@@ -75,12 +77,12 @@ func (vm *VMManager) CreateVM(req VMCreationRequest) (string, error) {
 		Status:       VM_STATUS_CREATING,
 	}
 
-	go vm.createVMAsync(vmId, cpus, ram, disk, gpus, req.SSHPublicKeys, req.Hours)
+	go vm.createVMAsync(vmId, cpus, ram, disk, gpus, req.SSHPublicKeys, req.Hours, startupScript, cloudInitConfig)
 
 	return vmId, nil
 }
 
-func (vm *VMManager) createVMAsync(vmId string, cpus, ram, disk, gpus int, sshPublicKeys []string, hours int) {
+func (vm *VMManager) createVMAsync(vmId string, cpus, ram, disk, gpus int, sshPublicKeys []string, hours int, startupScript, cloudInitConfig string) {
 	defer func() {
 		if r := recover(); r != nil {
 			log.Printf("ERROR: Panic in createVMAsync for VM %s: %v", vmId, r)
@@ -95,7 +97,7 @@ func (vm *VMManager) createVMAsync(vmId string, cpus, ram, disk, gpus int, sshPu
 	log.Printf("Starting async VM creation for %s (cpus: %d, ram: %d, disk: %d, gpus: %d)", vmId, cpus, ram, disk, gpus)
 
 	if !IsDevelopment() {
-		incusErr := vm.incusProvider.CreateVM(vmId, cpus, ram, disk, gpus, sshPublicKeys, statusCallback)
+		incusErr := vm.incusProvider.CreateVM(vmId, cpus, ram, disk, gpus, sshPublicKeys, statusCallback, startupScript, cloudInitConfig)
 		if incusErr != nil {
 			log.Printf("ERROR: Failed to create VM %s: %v", vmId, incusErr)
 			vm.UpdateVMStatus(vmId, VM_STATUS_FAILED, incusErr.Error())

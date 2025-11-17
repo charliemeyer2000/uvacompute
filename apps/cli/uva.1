@@ -54,6 +54,14 @@ GPU type (default: 5090). Currently only supports NVIDIA RTX 5090.
 .TP
 .BR \-n ", " \-\-name " \fIname\fR"
 Optional friendly name for the VM. Used for identification and SSH connection. If a VM with this name already exists, the CLI prompts for confirmation before creating a duplicate.
+.TP
+.BR \-s ", " \-\-startup-script " \fIpath\fR"
+Path to a bash script to run on first boot via cloud-init. Script executes as root during VM initialization. Maximum file size: 1MB. Mutually exclusive with
+.BR \-\-cloud-init .
+.TP
+.BR \-\-cloud-init " \fIpath\fR"
+Path to a custom cloud-init configuration file in YAML format. File must begin with '#cloud-config' header. SSH keys are automatically merged into the configuration. Maximum file size: 100KB. Mutually exclusive with
+.BR \-\-startup-script .
 .RE
 .TP
 .B vm delete \fInameOrVmId\fR
