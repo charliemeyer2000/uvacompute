@@ -79,20 +79,6 @@ func generateMIMEMultipart(sshConfig, startupScript, cloudInitConfig string) str
 	}
 
 	if startupScript != "" {
-		wrappedScript := fmt.Sprintf(`#!/bin/bash
-# Set up proper environment for user script
-export HOME=/root
-export USER=root
-export LOGNAME=root
-cd /root
-
-# Source profile for normal bash environment
-[ -f /etc/profile ] && . /etc/profile
-[ -f ~/.bashrc ] && . ~/.bashrc
-
-# Run user's script
-%s`, startupScript)
-
 		parts = append(parts,
 			"--"+boundary,
 			"Content-Type: text/x-shellscript; charset=\"us-ascii\"",
@@ -100,7 +86,7 @@ cd /root
 			"Content-Transfer-Encoding: 7bit",
 			"Content-Disposition: attachment; filename=\"startup-script.sh\"",
 			"",
-			wrappedScript,
+			startupScript,
 		)
 	}
 
