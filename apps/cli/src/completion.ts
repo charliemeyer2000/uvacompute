@@ -233,49 +233,54 @@ async function fetchVMsForCompletion(
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 500);
 
-    const response = await fetch(`${BASE_URL}/api/vms`, {
-      method: "GET",
-      headers: { Authorization: `Bearer ${token}` },
-      signal: controller.signal,
-    });
+    try {
+      const response = await fetch(`${BASE_URL}/api/vms`, {
+        method: "GET",
+        headers: { Authorization: `Bearer ${token}` },
+        signal: controller.signal,
+      });
 
-    clearTimeout(timeoutId);
+      clearTimeout(timeoutId);
 
-    if (!response.ok) return [];
+      if (!response.ok) return [];
 
-    const data = VMListResponseSchema.parse(await response.json());
+      const data = VMListResponseSchema.parse(await response.json());
 
-    const filteredVMs = data.vms.filter((vm) => {
-      if (subcommandName === "ssh") {
-        return isVMStatusInGroup(vm.status, VM_STATUS_GROUPS.RUNNING);
-      } else if (subcommandName === "delete" || subcommandName === "rm") {
-        return isVMStatusInGroup(vm.status, VM_STATUS_GROUPS.DELETABLE);
-      }
-      return true;
-    });
+      const filteredVMs = data.vms.filter((vm) => {
+        if (subcommandName === "ssh") {
+          return isVMStatusInGroup(vm.status, VM_STATUS_GROUPS.RUNNING);
+        } else if (subcommandName === "delete" || subcommandName === "rm") {
+          return isVMStatusInGroup(vm.status, VM_STATUS_GROUPS.DELETABLE);
+        }
+        return true;
+      });
 
-    const nameCounts = new Map<string, number>();
-    for (const vm of filteredVMs) {
-      if (vm.name) {
-        nameCounts.set(vm.name, (nameCounts.get(vm.name) || 0) + 1);
-      }
-    }
-
-    const completions: string[] = [];
-    for (const vm of filteredVMs) {
-      if (!vm.name) {
-        completions.push(truncateVmId(vm.vmId));
-      } else {
-        const count = nameCounts.get(vm.name) ?? 0;
-        if (count > 1) {
-          completions.push(`${vm.name} (${truncateVmId(vm.vmId)})`);
-        } else {
-          completions.push(vm.name);
+      const nameCounts = new Map<string, number>();
+      for (const vm of filteredVMs) {
+        if (vm.name) {
+          nameCounts.set(vm.name, (nameCounts.get(vm.name) || 0) + 1);
         }
       }
-    }
 
-    return completions;
+      const completions: string[] = [];
+      for (const vm of filteredVMs) {
+        if (!vm.name) {
+          completions.push(truncateVmId(vm.vmId));
+        } else {
+          const count = nameCounts.get(vm.name) ?? 0;
+          if (count > 1) {
+            completions.push(`${vm.name} (${truncateVmId(vm.vmId)})`);
+          } else {
+            completions.push(vm.name);
+          }
+        }
+      }
+
+      return completions;
+    } catch (fetchError) {
+      clearTimeout(timeoutId);
+      return [];
+    }
   } catch (error) {
     return [];
   }
@@ -289,18 +294,23 @@ async function fetchSSHKeysForCompletion(): Promise<string[]> {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 500);
 
-    const response = await fetch(`${BASE_URL}/api/ssh-keys`, {
-      method: "GET",
-      headers: { Authorization: `Bearer ${token}` },
-      signal: controller.signal,
-    });
+    try {
+      const response = await fetch(`${BASE_URL}/api/ssh-keys`, {
+        method: "GET",
+        headers: { Authorization: `Bearer ${token}` },
+        signal: controller.signal,
+      });
 
-    clearTimeout(timeoutId);
+      clearTimeout(timeoutId);
 
-    if (!response.ok) return [];
+      if (!response.ok) return [];
 
-    const data = SSHKeyListResponseSchema.parse(await response.json());
-    return data.keys.map((key) => key._id);
+      const data = SSHKeyListResponseSchema.parse(await response.json());
+      return data.keys.map((key) => key._id);
+    } catch (fetchError) {
+      clearTimeout(timeoutId);
+      return [];
+    }
   } catch (error) {
     return [];
   }
