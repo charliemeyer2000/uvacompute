@@ -593,8 +593,6 @@ async function deleteVM(nameOrVmId: string): Promise<void> {
           : [selection];
       console.log();
     } else {
-      spinner.stop();
-      spinnerActive = false;
       vmsToDelete = [matchingVMs[0]!.vmId];
     }
 
