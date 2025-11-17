@@ -22,7 +22,7 @@ Hello contributor, text charlie. rough idea of what needs to be done can be foun
 - [ ] support other computers joining uvacompute
   - add some switch off/on supoprt easily
 - [ ] can this be rearchitected without incus and only using k8s?
-- [ ] make some market out of this (?)
+- [ ] make some market out of this (?)cl
 
 ## Setup
 
