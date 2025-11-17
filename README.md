@@ -1,18 +1,18 @@
-# UVACompute
+# uvacompute
 
-## Contributuon
+## Contribution
 
 Hello contributor, text charlie. rough idea of what needs to be done can be found below:
 
 ## Todo list
 
-- [ ] speed is horrible.
+- [x] speed is horrible.
 - [x] need a man page
 - [x] auth flow gives you the code twice basically
 - [x] terminate instance on web ui
 - [ ] upgrade/downgrade vCPUs, storage
 - [ ] Add UV to base images
-- [ ] allow BYO startup scripts
+- [x] allow BYO startup scripts
 - [ ] Run Docker container (via Kubernetes, probably)
 - [ ] Live tail logs in CLI/UI (modal-style)
 - [ ] Integrate vcluster (?)

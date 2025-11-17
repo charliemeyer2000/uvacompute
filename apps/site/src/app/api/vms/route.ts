@@ -72,6 +72,8 @@ export async function POST(request: NextRequest) {
       ...body,
       userId: session.user.id,
       sshPublicKeys,
+      ...(body.startupScript && { startupScript: body.startupScript }),
+      ...(body.cloudInitConfig && { cloudInitConfig: body.cloudInitConfig }),
     };
 
     const requestBody = JSON.stringify(vmCreationRequest);
