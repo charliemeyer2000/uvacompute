@@ -34,6 +34,9 @@ importers:
       commander:
         specifier: ^14.0.0
         version: 14.0.0
+      js-yaml:
+        specifier: ^4.1.1
+        version: 4.1.1
       open:
         specifier: ^10.1.0
         version: 10.2.0
@@ -56,6 +59,9 @@ importers:
       "@types/commander":
         specifier: ^2.12.5
         version: 2.12.5
+      "@types/js-yaml":
+        specifier: ^4.0.9
+        version: 4.0.9
       "@types/tabtab":
         specifier: ^3.0.4
         version: 3.0.4
@@ -2804,6 +2810,12 @@ packages:
         integrity: sha512-dWHzHa2WqEXI/O1E9OjrocMTKJl2mSrEolh1Iomrv6U+JuNwaHXsXx9bLu5gG7BUWFIN0skIQJQ/L1rIex4X6w==,
       }
 
+  "@types/js-yaml@4.0.9":
+    resolution:
+      {
+        integrity: sha512-k4MGaQl5TGo/iipqb2UDG2UwjXziSWkh0uysQelTlJpX1qGlpUZYm8PnO4DxG1qBomtJUdYJ6qR6xdIah10JLg==,
+      }
+
   "@types/json-schema@7.0.15":
     resolution:
       {
@@ -5360,10 +5372,10 @@ packages:
         integrity: sha512-RdJUflcE3cUzKiMqQgsCu06FPu9UdIJO0beYbPhHN4k6apgJtifcoCtT9bcxOpYBtpD2kCM6Sbzg4CausW/PKQ==,
       }
 
-  js-yaml@4.1.0:
+  js-yaml@4.1.1:
     resolution:
       {
-        integrity: sha512-wpxZs9NoxZaJESJGIZTyDEaYpl0FKSA+FB9aJiyemKhMwkxQg63h4T1KJgUGHpTqPDNRcmmYLugrRjJlBtWvRA==,
+        integrity: sha512-qQKT4zQxXl8lLwBtHMWwaTcGfFOZviOJet3Oy/xmGk2gZH677CJM9EvtfdSkgWcATZhj/55JZ0rmy3myCT5lsA==,
       }
     hasBin: true
 
@@ -7737,7 +7749,7 @@ snapshots:
       globals: 14.0.0
       ignore: 5.3.2
       import-fresh: 3.3.1
-      js-yaml: 4.1.0
+      js-yaml: 4.1.1
       minimatch: 3.1.2
       strip-json-comments: 3.1.1
     transitivePeerDependencies:
@@ -8720,6 +8732,8 @@ snapshots:
       commander: 14.0.0
 
   "@types/estree@1.0.8": {}
+
+  "@types/js-yaml@4.0.9": {}
 
   "@types/json-schema@7.0.15": {}
 
@@ -10354,7 +10368,7 @@ snapshots:
 
   js-tokens@4.0.0: {}
 
-  js-yaml@4.1.0:
+  js-yaml@4.1.1:
     dependencies:
       argparse: 2.0.1
 
