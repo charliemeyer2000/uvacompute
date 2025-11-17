@@ -56,6 +56,31 @@ export class VMNetworkError extends VMError {
   }
 }
 
+export class ServiceUnavailableError extends VMError {
+  constructor(serviceStatus: "operational" | "degraded" | "down" | null) {
+    const message = ServiceUnavailableError.getMessageForStatus(serviceStatus);
+    super(message, "SERVICE_UNAVAILABLE");
+  }
+
+  private static getMessageForStatus(
+    status: "operational" | "degraded" | "down" | null,
+  ): string {
+    if (status === "down") {
+      return "uvacompute workstation is currently offline. Check status at status.uvacompute.com";
+    }
+
+    if (status === "degraded") {
+      return "uvacompute service is experiencing issues. Check status at status.uvacompute.com";
+    }
+
+    if (status === "operational") {
+      return "Connection to uvacompute API failed (service status: operational). This may be a transient issue, please try again";
+    }
+
+    return "Network error. Check your internet connection or visit status.uvacompute.com";
+  }
+}
+
 export function shouldStopRetrying(error: unknown): boolean {
   if (error instanceof VMAuthError) return true;
   if (error instanceof VMOperationError) return true;
