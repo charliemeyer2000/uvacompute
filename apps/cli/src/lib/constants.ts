@@ -3,6 +3,7 @@ import { join } from "path";
 
 export const DEV_SITE_URL = "http://localhost:3000" as const;
 export const PROD_SITE_URL = "https://uvacompute.com" as const;
+export const STATUS_URL = "https://status.uvacompute.com" as const;
 
 export const CONFIG_DIR = join(homedir(), ".uvacompute");
 export const CONFIG_FILE = join(CONFIG_DIR, "config");

@@ -213,3 +213,18 @@ export const SSHKeySetPrimaryResponseSchema = z.object({
 export const VersionResponseSchema = z.object({
   version: z.string(),
 });
+
+export const ServiceStatusSchema = z.enum(["operational", "degraded", "down"]);
+
+export const StatusCheckSchema = z.object({
+  status: ServiceStatusSchema,
+  responseTime: z.number(),
+  timestamp: z.number(),
+  error: z.string().optional(),
+});
+
+export const StatusApiResponseSchema = z.object({
+  current: StatusCheckSchema,
+  history: z.array(StatusCheckSchema),
+  uptime: z.number(),
+});
