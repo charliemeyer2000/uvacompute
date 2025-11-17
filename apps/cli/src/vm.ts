@@ -1,6 +1,7 @@
 import type { Command } from "commander";
-import ora from "ora";
+import ora, { type Ora } from "ora";
 import { spawn } from "child_process";
+import { readFileSync, existsSync, statSync } from "fs";
 import { select, confirm } from "@inquirer/prompts";
 import { getBaseUrl, loadToken, checkServiceStatus } from "./lib/utils";
 import {
@@ -133,7 +134,7 @@ async function selectVM(
 async function pollVMStatus(
   vmId: string,
   token: string,
-  spinner: any,
+  spinner: Ora,
 ): Promise<void> {
   const maxAttempts = 180;
   let attempts = 0;
@@ -219,14 +220,25 @@ async function createVM(options: {
   gpus?: string;
   gpuType?: string;
   name?: string;
+  startupScript?: string;
+  cloudInit?: string;
 }): Promise<void> {
-  let spinner: any = null;
+  let spinner: Ora | null = null;
 
   try {
     const token = loadToken();
     if (!token) {
       console.log(
         theme.warning("Not authenticated. Please run 'uva login' first."),
+      );
+      process.exit(1);
+    }
+
+    if (options.startupScript && options.cloudInit) {
+      console.log(
+        theme.error(
+          "Cannot use both --startup-script and --cloud-init flags together",
+        ),
       );
       process.exit(1);
     }
@@ -328,6 +340,64 @@ async function createVM(options: {
 
     if (options.gpuType) requestBody["gpu-type"] = options.gpuType as "5090";
 
+    if (options.startupScript) {
+      if (!existsSync(options.startupScript)) {
+        spinner.fail(`Startup script file not found: ${options.startupScript}`);
+        process.exit(1);
+      }
+
+      const stats = statSync(options.startupScript);
+      const maxSize = 1048576;
+      if (stats.size > maxSize) {
+        spinner.fail(
+          `Startup script file is too large: ${stats.size} bytes (max: ${maxSize} bytes / 1MB)`,
+        );
+        process.exit(1);
+      }
+
+      try {
+        const scriptContent = readFileSync(options.startupScript, "utf-8");
+        requestBody.startupScript = scriptContent;
+      } catch (error: unknown) {
+        const message =
+          error instanceof Error ? error.message : "Unknown error";
+        spinner.fail(`Failed to read startup script: ${message}`);
+        process.exit(1);
+      }
+    }
+
+    if (options.cloudInit) {
+      if (!existsSync(options.cloudInit)) {
+        spinner.fail(`Cloud-init config file not found: ${options.cloudInit}`);
+        process.exit(1);
+      }
+
+      const stats = statSync(options.cloudInit);
+      const maxSize = 102400;
+      if (stats.size > maxSize) {
+        spinner.fail(
+          `Cloud-init config file is too large: ${stats.size} bytes (max: ${maxSize} bytes / 100KB)`,
+        );
+        process.exit(1);
+      }
+
+      try {
+        const configContent = readFileSync(options.cloudInit, "utf-8");
+        if (!configContent.trim().startsWith("#cloud-config")) {
+          spinner.fail(
+            "Cloud-init config must start with '#cloud-config' header",
+          );
+          process.exit(1);
+        }
+        requestBody.cloudInitConfig = configContent;
+      } catch (error: unknown) {
+        const message =
+          error instanceof Error ? error.message : "Unknown error";
+        spinner.fail(`Failed to read cloud-init config: ${message}`);
+        process.exit(1);
+      }
+    }
+
     let response: Response;
     try {
       response = await fetch(`${BASE_URL}/api/vms`, {
@@ -416,11 +486,12 @@ async function createVM(options: {
       spinner.fail(`VM creation failed: ${data.msg}`);
       process.exit(1);
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Unknown error";
     if (spinner) {
-      spinner.fail(`Error: ${error.message}`);
+      spinner.fail(`Error: ${message}`);
     } else {
-      console.log(theme.warning(`Error: ${error.message}`));
+      console.log(theme.warning(`Error: ${message}`));
     }
     process.exit(1);
   }
@@ -534,11 +605,12 @@ async function deleteVM(nameOrVmId: string): Promise<void> {
         deleteSpinner.fail(`VM deletion failed: ${data.msg}`);
       }
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Unknown error";
     if (spinnerActive && spinner) {
-      spinner.fail(`Error: ${error.message}`);
+      spinner.fail(`Error: ${message}`);
     } else {
-      console.log(theme.warning(`Error: ${error.message}`));
+      console.log(theme.warning(`Error: ${message}`));
     }
     process.exit(1);
   }
@@ -590,8 +662,9 @@ async function getVMStatus(vmId: string): Promise<void> {
       console.log(formatDetail("Info", JSON.stringify(data.info, null, 2)));
     }
     console.log();
-  } catch (error: any) {
-    spinner.fail(`Error: ${error.message}`);
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    spinner.fail(`Error: ${message}`);
     process.exit(1);
   }
 }
@@ -680,8 +753,9 @@ async function listVMs(options: { all?: boolean }): Promise<void> {
       );
       console.log();
     }
-  } catch (error: any) {
-    spinner.fail(`Error: ${error.message}`);
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    spinner.fail(`Error: ${message}`);
     process.exit(1);
   }
 }
@@ -822,8 +896,9 @@ async function sshToVM(nameOrVmId: string): Promise<void> {
         console.log(theme.warning(`\nSSH process exited with code ${code}`));
       }
     });
-  } catch (error: any) {
-    spinner.fail(`Error: ${error.message}`);
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    spinner.fail(`Error: ${message}`);
     process.exit(1);
   }
 }
@@ -840,6 +915,14 @@ export function registerVMCommands(program: Command) {
     .option("-g, --gpus <gpus>", "Number of GPUs (default: 0)")
     .option("-t, --gpu-type <type>", "GPU type (default: 5090)")
     .option("-n, --name <name>", "VM name (optional)")
+    .option(
+      "-s, --startup-script <path>",
+      "Path to startup script (runs on first boot)",
+    )
+    .option(
+      "--cloud-init <path>",
+      "Path to cloud-init config file (mutually exclusive with --startup-script)",
+    )
     .action(createVM);
 
   vm.command("delete")
