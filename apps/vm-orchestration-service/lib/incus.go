@@ -79,6 +79,15 @@ func generateMIMEMultipart(sshConfig, startupScript, cloudInitConfig string) str
 	}
 
 	if startupScript != "" {
+		wrappedScript := `#!/bin/bash
+export HOME=/root
+export USER=root
+export LOGNAME=root
+cd /root
+
+# Run user's script
+` + startupScript
+
 		parts = append(parts,
 			"--"+boundary,
 			"Content-Type: text/x-shellscript; charset=\"us-ascii\"",
@@ -86,7 +95,7 @@ func generateMIMEMultipart(sshConfig, startupScript, cloudInitConfig string) str
 			"Content-Transfer-Encoding: 7bit",
 			"Content-Disposition: attachment; filename=\"startup-script.sh\"",
 			"",
-			startupScript,
+			wrappedScript,
 		)
 	}
 
@@ -189,14 +198,14 @@ func waitForCloudInit(vmId string) error {
 	if err != nil {
 		logsCmd := []string{"incus", "exec", vmId, "--", "bash", "-c", "cloud-init status --long 2>&1 | grep -A 20 'errors:' || cloud-init status --long"}
 		logsOutput, logsErr := exec.Command(logsCmd[0], logsCmd[1:]...).Output()
-		
+
 		errMsg := "cloud-init failed"
 		if logsErr == nil && len(logsOutput) > 0 {
 			errMsg = fmt.Sprintf("cloud-init failed:\n%s", string(logsOutput))
 		} else if len(output) > 0 {
 			errMsg = fmt.Sprintf("cloud-init failed: %s", string(output))
 		}
-		
+
 		return errors.New(errMsg)
 	}
 
