@@ -187,12 +187,12 @@ func waitForCloudInit(vmId string) error {
 	cmd := []string{"incus", "exec", vmId, "--", "cloud-init", "status", "--wait"}
 	output, err := exec.Command(cmd[0], cmd[1:]...).CombinedOutput()
 	if err != nil {
-		statusCmd := []string{"incus", "exec", vmId, "--", "cloud-init", "status", "--long"}
-		statusOutput, statusErr := exec.Command(statusCmd[0], statusCmd[1:]...).Output()
+		logsCmd := []string{"incus", "exec", vmId, "--", "bash", "-c", "cloud-init status --long 2>&1 | grep -A 20 'errors:' || cloud-init status --long"}
+		logsOutput, logsErr := exec.Command(logsCmd[0], logsCmd[1:]...).Output()
 		
-		errMsg := fmt.Sprintf("cloud-init exited with error status")
-		if statusErr == nil && len(statusOutput) > 0 {
-			errMsg = fmt.Sprintf("cloud-init failed: %s", string(statusOutput))
+		errMsg := "cloud-init failed"
+		if logsErr == nil && len(logsOutput) > 0 {
+			errMsg = fmt.Sprintf("cloud-init failed:\n%s", string(logsOutput))
 		} else if len(output) > 0 {
 			errMsg = fmt.Sprintf("cloud-init failed: %s", string(output))
 		}
