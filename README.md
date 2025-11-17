@@ -11,11 +11,10 @@ Hello contributor, text charlie. rough idea of what needs to be done can be foun
 - [x] auth flow gives you the code twice basically
 - [x] terminate instance on web ui
 - [ ] upgrade/downgrade vCPUs, storage
-- [ ] Add UV to base images
 - [x] allow BYO startup scripts
 - [ ] Run Docker container (via Kubernetes, probably)
-- [ ] Live tail logs in CLI/UI (modal-style)
-- [ ] Integrate vcluster (?)
+  - Live tail logs in CLI/UI (modal-style) in the CLI (and potentialyl UI)?
+  - need to add into the ui view vms/jobs
 - [ ] o11y into how people r using it ++ some visualization of usage
 - [ ] When 2 GPUs are purchased, support 2 GPUs
 - [ ] modal notebooks implementation
