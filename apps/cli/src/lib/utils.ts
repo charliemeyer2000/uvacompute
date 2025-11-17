@@ -4,7 +4,12 @@ import {
   CONFIG_FILE,
   DEV_SITE_URL,
   PROD_SITE_URL,
+  STATUS_URL,
 } from "./constants";
+import { StatusApiResponseSchema } from "./schemas";
+import type { z } from "zod";
+
+export type ServiceStatus = z.infer<typeof StatusApiResponseSchema>;
 
 export function getBaseUrl(): string {
   if (process.env.SITE_URL) {
@@ -175,5 +180,29 @@ export function markCompletionPromptShown(): void {
     writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2));
   } catch {
     // no-op: best-effort write
+  }
+}
+
+export async function checkServiceStatus(): Promise<ServiceStatus | null> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 3000);
+
+  try {
+    const response = await fetch(`${STATUS_URL}/api/status`, {
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      clearTimeout(timeoutId);
+      return null;
+    }
+
+    const data = await response.json();
+    const parsed = StatusApiResponseSchema.parse(data);
+    clearTimeout(timeoutId);
+    return parsed;
+  } catch {
+    clearTimeout(timeoutId);
+    return null;
   }
 }
