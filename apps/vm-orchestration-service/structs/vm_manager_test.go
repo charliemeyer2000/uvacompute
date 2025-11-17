@@ -11,7 +11,7 @@ type MockIncusProvider struct {
 	LastSSHKeys []string
 }
 
-func (m *MockIncusProvider) CreateVM(vmId string, cpus, ram, disk, gpus int, sshPublicKeys []string, statusCallback StatusCallback) error {
+func (m *MockIncusProvider) CreateVM(vmId string, cpus, ram, disk, gpus int, sshPublicKeys []string, statusCallback StatusCallback, startupScript, cloudInitConfig string) error {
 	m.mu.Lock()
 	m.LastSSHKeys = sshPublicKeys
 	m.mu.Unlock()
