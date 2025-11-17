@@ -95,6 +95,10 @@ Friendly name for the SSH key (default: "Unnamed Key"). Used for identification 
 .B ssh-key list
 Display all SSH public keys associated with the authenticated user. Shows key ID, name, fingerprint, creation date, and primary status.
 .TP
+.B ssh-key ls
+Alias for
+.BR "ssh-key list" .
+.TP
 .B ssh-key remove \fIkeyId\fR
 Remove an SSH public key by its ID. Prevents future use of this key for VM access.
 .TP
@@ -252,6 +256,14 @@ List all SSH keys:
 .nf
 .RS
 $ uva ssh-key list
+.RE
+.fi
+.PP
+Or using the shorthand:
+.PP
+.nf
+.RS
+$ uva ssh-key ls
 .RE
 .fi
 .PP
