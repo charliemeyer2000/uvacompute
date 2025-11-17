@@ -18,8 +18,8 @@ func NewIncusAdapter() *IncusAdapter {
 	return &IncusAdapter{}
 }
 
-func (i *IncusAdapter) CreateVM(vmId string, cpus, ram, disk, gpus int, sshPublicKeys []string, statusCallback structs.StatusCallback) error {
-	return createIncusVM(vmId, cpus, ram, disk, gpus, sshPublicKeys, statusCallback)
+func (i *IncusAdapter) CreateVM(vmId string, cpus, ram, disk, gpus int, sshPublicKeys []string, statusCallback structs.StatusCallback, startupScript, cloudInitConfig string) error {
+	return createIncusVM(vmId, cpus, ram, disk, gpus, sshPublicKeys, statusCallback, startupScript, cloudInitConfig)
 }
 
 func (i *IncusAdapter) DestroyVM(vmId string) error {
@@ -38,24 +38,77 @@ func (i *IncusAdapter) ListVMs() ([]structs.IncusListVM, error) {
 	return listIncusVMs()
 }
 
-func generateCloudInitUserData(sshPublicKeys []string) string {
+func generateCloudInitUserData(sshPublicKeys []string, startupScript, cloudInitConfig string) string {
+	sshConfig := generateSSHKeysConfig(sshPublicKeys)
+
+	if startupScript == "" && cloudInitConfig == "" {
+		return sshConfig
+	}
+
+	return generateMIMEMultipart(sshConfig, startupScript, cloudInitConfig)
+}
+
+func generateSSHKeysConfig(sshPublicKeys []string) string {
 	var userLevelKeys []string
 	for _, key := range sshPublicKeys {
 		userLevelKeys = append(userLevelKeys, fmt.Sprintf("      - %s", key))
 	}
 
-	cloudInit := fmt.Sprintf(`#cloud-config
+	return fmt.Sprintf(`#cloud-config
 users:
   - name: root
     ssh_authorized_keys:
 %s
 ssh_pwauth: false
 disable_root: false`, strings.Join(userLevelKeys, "\n"))
-
-	return cloudInit
 }
 
-func createIncusVM(vmId string, cpus int, ram int, disk int, gpus int, sshPublicKeys []string, statusCallback structs.StatusCallback) error {
+func generateMIMEMultipart(sshConfig, startupScript, cloudInitConfig string) string {
+	boundary := "==CLOUDCONFIG_BOUNDARY=="
+	parts := []string{
+		"Content-Type: multipart/mixed; boundary=\"" + boundary + "\"",
+		"MIME-Version: 1.0",
+		"",
+		"--" + boundary,
+		"Content-Type: text/cloud-config; charset=\"us-ascii\"",
+		"MIME-Version: 1.0",
+		"Content-Transfer-Encoding: 7bit",
+		"Content-Disposition: attachment; filename=\"base-config.cfg\"",
+		"",
+		sshConfig,
+	}
+
+	if startupScript != "" {
+		parts = append(parts,
+			"--"+boundary,
+			"Content-Type: text/x-shellscript; charset=\"us-ascii\"",
+			"MIME-Version: 1.0",
+			"Content-Transfer-Encoding: 7bit",
+			"Content-Disposition: attachment; filename=\"startup-script.sh\"",
+			"",
+			startupScript,
+		)
+	}
+
+	if cloudInitConfig != "" {
+		parts = append(parts,
+			"--"+boundary,
+			"Content-Type: text/cloud-config; charset=\"us-ascii\"",
+			"MIME-Version: 1.0",
+			"Content-Transfer-Encoding: 7bit",
+			"Content-Disposition: attachment; filename=\"user-config.cfg\"",
+			"Merge-Type: list(append)+dict(no_replace,recurse_list)+str()",
+			"",
+			cloudInitConfig,
+		)
+	}
+
+	parts = append(parts, "--"+boundary+"--", "")
+
+	return strings.Join(parts, "\n")
+}
+
+func createIncusVM(vmId string, cpus int, ram int, disk int, gpus int, sshPublicKeys []string, statusCallback structs.StatusCallback, startupScript, cloudInitConfig string) error {
 	statusCallback(structs.VM_STATUS_INITIALIZING)
 
 	var vmImage string
@@ -66,8 +119,8 @@ func createIncusVM(vmId string, cpus int, ram int, disk int, gpus int, sshPublic
 	}
 	cmd := []string{"incus", "init", vmImage, vmId, "--vm", "-c", "limits.cpu=" + strconv.Itoa(cpus), "-c", "limits.memory=" + strconv.Itoa(ram) + "GiB", "-d", "root,size=" + strconv.Itoa(disk) + "GiB", "-d", "root,io.bus=nvme", "-c", "security.secureboot=false"}
 
-	if len(sshPublicKeys) > 0 {
-		cloudInitUserData := generateCloudInitUserData(sshPublicKeys)
+	if len(sshPublicKeys) > 0 || startupScript != "" || cloudInitConfig != "" {
+		cloudInitUserData := generateCloudInitUserData(sshPublicKeys, startupScript, cloudInitConfig)
 		cmd = append(cmd, "-c", "user.user-data="+cloudInitUserData)
 	}
 
