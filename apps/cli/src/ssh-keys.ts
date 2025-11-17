@@ -210,7 +210,11 @@ export function registerSSHKeyCommands(program: Command) {
     .option("-n, --name <name>", "Friendly name for the key")
     .action(addSSHKey);
 
-  sshKey.command("list").description("List all SSH keys").action(listSSHKeys);
+  sshKey
+    .command("list")
+    .alias("ls")
+    .description("List all SSH keys")
+    .action(listSSHKeys);
 
   sshKey
     .command("remove")
