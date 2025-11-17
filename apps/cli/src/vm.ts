@@ -2,7 +2,7 @@ import type { Command } from "commander";
 import ora from "ora";
 import { spawn } from "child_process";
 import { select, confirm } from "@inquirer/prompts";
-import { getBaseUrl, loadToken } from "./lib/utils";
+import { getBaseUrl, loadToken, checkServiceStatus } from "./lib/utils";
 import {
   theme,
   statusColors,
@@ -25,6 +25,7 @@ import {
   VMOperationError,
   VMValidationError,
   VMNetworkError,
+  ServiceUnavailableError,
   shouldStopRetrying,
   isTransientError,
   parseErrorResponse,
@@ -327,15 +328,24 @@ async function createVM(options: {
 
     if (options.gpuType) requestBody["gpu-type"] = options.gpuType as "5090";
 
-    // Make API request to Next.js backend
-    const response = await fetch(`${BASE_URL}/api/vms`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify(requestBody),
-    });
+    let response: Response;
+    try {
+      response = await fetch(`${BASE_URL}/api/vms`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(requestBody),
+      });
+    } catch (error: unknown) {
+      const statusData = await checkServiceStatus();
+      const serviceError = new ServiceUnavailableError(
+        statusData?.current.status ?? null,
+      );
+      spinner.fail(serviceError.message);
+      process.exit(1);
+    }
 
     const rawData = (await response.json()) as any;
 
@@ -490,10 +500,20 @@ async function deleteVM(nameOrVmId: string): Promise<void> {
     for (const vmId of vmsToDelete) {
       const deleteSpinner = ora(`Deleting VM ${vmId}...`).start();
 
-      const response = await fetch(`${BASE_URL}/api/vms/${vmId}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      let response: Response;
+      try {
+        response = await fetch(`${BASE_URL}/api/vms/${vmId}`, {
+          method: "DELETE",
+          headers: { Authorization: `Bearer ${token}` },
+        });
+      } catch (error: unknown) {
+        const statusData = await checkServiceStatus();
+        const serviceError = new ServiceUnavailableError(
+          statusData?.current.status ?? null,
+        );
+        deleteSpinner.fail(serviceError.message);
+        continue;
+      }
 
       const rawData = (await response.json()) as any;
 
@@ -534,12 +554,22 @@ async function getVMStatus(vmId: string): Promise<void> {
       process.exit(1);
     }
 
-    const response = await fetch(`${BASE_URL}/api/vms/${vmId}/status`, {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
+    let response: Response;
+    try {
+      response = await fetch(`${BASE_URL}/api/vms/${vmId}/status`, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+    } catch (error: unknown) {
+      const statusData = await checkServiceStatus();
+      const serviceError = new ServiceUnavailableError(
+        statusData?.current.status ?? null,
+      );
+      spinner.fail(serviceError.message);
+      process.exit(1);
+    }
 
     const rawData = (await response.json()) as any;
 
@@ -576,12 +606,22 @@ async function listVMs(options: { all?: boolean }): Promise<void> {
       process.exit(1);
     }
 
-    const response = await fetch(`${BASE_URL}/api/vms`, {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
+    let response: Response;
+    try {
+      response = await fetch(`${BASE_URL}/api/vms`, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+    } catch (error: unknown) {
+      const statusData = await checkServiceStatus();
+      const serviceError = new ServiceUnavailableError(
+        statusData?.current.status ?? null,
+      );
+      spinner.fail(serviceError.message);
+      process.exit(1);
+    }
 
     const rawData = (await response.json()) as any;
 
@@ -688,15 +728,25 @@ async function sshToVM(nameOrVmId: string): Promise<void> {
       process.exit(1);
     }
 
-    const connectionResponse = await fetch(
-      `${BASE_URL}/api/vms/${vm.vmId}/connection`,
-      {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
+    let connectionResponse: Response;
+    try {
+      connectionResponse = await fetch(
+        `${BASE_URL}/api/vms/${vm.vmId}/connection`,
+        {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
         },
-      },
-    );
+      );
+    } catch (error: unknown) {
+      const statusData = await checkServiceStatus();
+      const serviceError = new ServiceUnavailableError(
+        statusData?.current.status ?? null,
+      );
+      spinner.fail(serviceError.message);
+      process.exit(1);
+    }
 
     if (!connectionResponse.ok) {
       const errorData = (await connectionResponse.json()) as {
