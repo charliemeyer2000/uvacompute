@@ -31,6 +31,7 @@ import {
   isTransientError,
   parseErrorResponse,
 } from "./lib/errors";
+import yaml from "js-yaml";
 const BASE_URL = getBaseUrl();
 
 function getStatusMessage(status: string): string {
@@ -389,6 +390,33 @@ async function createVM(options: {
           );
           process.exit(1);
         }
+
+        try {
+          const parsed = yaml.load(configContent) as Record<string, unknown>;
+          const hasPackages =
+            !!parsed.packages &&
+            Array.isArray(parsed.packages) &&
+            parsed.packages.length > 0;
+          const hasPackageUpdate = parsed.package_update === true;
+          const hasPackageUpgrade = parsed.package_upgrade === true;
+
+          if (hasPackages && !hasPackageUpdate && !hasPackageUpgrade) {
+            spinner.warn(
+              theme.warning(
+                "Warning: Your cloud-init config includes 'packages' but not 'package_update: true' or 'package_upgrade: true'.\n" +
+                  "This may cause package installation to fail if apt cache is not updated.\n" +
+                  "Consider adding 'package_update: true' to your config.",
+              ),
+            );
+            console.log();
+          }
+        } catch (yamlError: unknown) {
+          const yamlMessage =
+            yamlError instanceof Error ? yamlError.message : "Invalid YAML";
+          spinner.fail(`Failed to parse cloud-init config: ${yamlMessage}`);
+          process.exit(1);
+        }
+
         requestBody.cloudInitConfig = configContent;
       } catch (error: unknown) {
         const message =
