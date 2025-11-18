@@ -117,7 +117,6 @@ export const VM_STATUS_GROUPS = {
     "waiting_for_agent",
     "configuring",
     "running",
-    "failed",
     "updating",
   ] as const,
 } as const;
