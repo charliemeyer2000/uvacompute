@@ -8,11 +8,10 @@ Type=simple
 WorkingDirectory=/opt/vm-orchestration-service
 Environment="ENV=production"
 ExecStart=/usr/local/bin/vm-orchestration
-ExecStartPost=-/usr/bin/tailscale funnel --bg --https=443 8080
-ExecStartPost=-/usr/bin/tailscale funnel --bg --tcp=8443 tcp://localhost:2222
+ExecStartPost=-/usr/bin/tailscale serve --bg --https 443 8080
+ExecStartPost=-/usr/bin/tailscale funnel --bg --https 443 8080
 ExecStartPost=-/usr/bin/autossh -M 0 -f -N -o "ServerAliveInterval 30" -o "ServerAliveCountMax 3" -o "ExitOnForwardFailure yes" -R 2222:localhost:2222 -R 8080:localhost:8080 root@24.199.85.26
 ExecStopPost=-/usr/bin/tailscale funnel --https=443 off
-ExecStopPost=-/usr/bin/tailscale funnel --tcp=8443 off
 ExecStopPost=-/usr/bin/pkill -f "autossh.*24.199.85.26"
 Restart=always
 RestartSec=10s
