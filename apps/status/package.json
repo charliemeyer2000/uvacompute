@@ -15,7 +15,7 @@
     "date-fns": "^4.1.0",
     "ioredis": "^5.8.2",
     "lucide-react": "^0.546.0",
-    "next": "16.0.7",
+    "next": "16.0.10",
     "react": "19.2.1",
     "react-dom": "19.2.1",
     "tailwind-merge": "^3.3.1",
