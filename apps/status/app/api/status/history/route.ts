@@ -6,11 +6,11 @@ export async function GET(request: NextRequest) {
   const daysParam = searchParams.get("days");
   const days = parseInt(daysParam || "7", 10);
 
-  if (isNaN(days) || days < 1 || days > 90) {
+  if (isNaN(days) || days < 1 || days > 30) {
     return NextResponse.json(
       {
         error: "Invalid 'days' parameter",
-        details: "Must be a number between 1 and 90",
+        details: "Must be a number between 1 and 30",
       },
       { status: 400 },
     );
