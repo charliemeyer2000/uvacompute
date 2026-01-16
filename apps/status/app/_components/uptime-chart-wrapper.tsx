@@ -8,7 +8,7 @@ interface UptimeChartWrapperProps {
 }
 
 export async function UptimeChartWrapper({
-  days = 90,
+  days = 30,
 }: UptimeChartWrapperProps) {
   try {
     const result = await getStatusHistory(days);

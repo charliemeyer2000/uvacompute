@@ -100,7 +100,7 @@ export function ServiceStatus({
           )}
         </div>
         <div className="flex justify-between text-xs text-gray-500">
-          <span>90 days ago</span>
+          <span>30 days ago</span>
           <span>Today</span>
         </div>
       </div>

@@ -45,7 +45,7 @@ export async function getStatus(): Promise<StatusData> {
 export async function getStatusHistory(
   days: number = 7,
 ): Promise<HistoricalData> {
-  const maxDays = Math.min(Math.max(days, 1), 90);
+  const maxDays = Math.min(Math.max(days, 1), 30);
   const checks = await getHistoricalData(maxDays);
 
   const dayMap = new Map<string, StatusCheck[]>();
