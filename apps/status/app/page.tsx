@@ -30,7 +30,7 @@ export default async function StatusPage() {
   }
 
   try {
-    const days = 90;
+    const days = 30;
     const result = await getStatusHistory(days);
     const today = new Date();
     const dataMap = new Map<string, DayAggregate>(
@@ -81,7 +81,7 @@ export default async function StatusPage() {
             </p>
             <p>
               Monitoring checks run every minute. Historical data is retained
-              for 90 days.
+              for 30 days.
             </p>
           </div>
         </div>
