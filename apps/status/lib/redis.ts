@@ -18,7 +18,7 @@ function getRedisClient(): Redis {
   return redis;
 }
 
-const NINETY_DAYS_SECONDS = 90 * 24 * 60 * 60;
+const THIRTY_DAYS_SECONDS = 30 * 24 * 60 * 60;
 
 export async function recordStatusCheck(
   status: ServiceStatus,
@@ -35,12 +35,12 @@ export async function recordStatusCheck(
   };
 
   const key = `status:check:${timestamp}`;
-  await client.setex(key, NINETY_DAYS_SECONDS, JSON.stringify(check));
+  await client.setex(key, THIRTY_DAYS_SECONDS, JSON.stringify(check));
   await client.zadd("status:checks:timeline", timestamp, key);
   await client.zremrangebyscore(
     "status:checks:timeline",
     0,
-    Date.now() - NINETY_DAYS_SECONDS * 1000,
+    Date.now() - THIRTY_DAYS_SECONDS * 1000,
   );
 }
 
@@ -78,6 +78,6 @@ export async function getCurrentStatus(): Promise<StatusCheck | null> {
 export async function getHistoricalData(
   days: number = 7,
 ): Promise<StatusCheck[]> {
-  const maxDays = Math.min(days, 90);
+  const maxDays = Math.min(days, 30);
   return getRecentChecks(maxDays * 24);
 }
