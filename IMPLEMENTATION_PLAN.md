@@ -111,13 +111,55 @@ If you need AWS resources (S3 buckets, etc.):
 - The orchestration service has `IsDevelopment()` check that skips actual KubeVirt operations when `ENV=development`. Use `ENV=test` or `ENV=production` for real testing.
 - The API requires HMAC-SHA256 signatures with `X-Timestamp` (milliseconds) and `X-Signature` headers. Payload format: `METHOD:PATH:TIMESTAMP:BODY`
 - First VM creation is slow (~5 min) due to container image pulling (fedora-cloud-container-disk-demo is ~700MB)
-- NVIDIA driver issues on workstation - need to debug separately for GPU passthrough testing
+
+**GPU-specific gotchas:**
+
+- **Single GPU tradeoff**: With one GPU, must choose between container mode (nvidia driver) or VM passthrough mode (vfio-pci). Can't do both simultaneously.
+- **VFIO binding at boot**: If GRUB has `vfio-pci.ids=XXXX:YYYY`, the GPU binds to VFIO at boot, making `nvidia-smi` fail. Need to unbind and rebind to nvidia driver.
+- **GPU state after VFIO use**: After a VM releases the GPU, it may be in a bad state. Need PCIe FLR reset (`echo 1 > /sys/bus/pci/devices/XXXX/reset`) before nvidia driver can use it.
+- **k3s runc location**: nvidia-container-runtime needs `runc` but k3s bundles it at `/var/lib/rancher/k3s/data/current/bin/runc`. Symlink to `/usr/local/bin/runc`.
+- **Device plugin needs nvidia runtime**: The nvidia-device-plugin pod must use `runtimeClassName: nvidia` to detect GPUs.
+- **CDI config required**: Run `nvidia-ctk cdi generate --output=/etc/cdi/nvidia.yaml` for device plugin auto-detection.
 
 ### Useful Patterns
 
 - Use Python for generating HMAC signatures (easier than bash/openssl)
 - k3s installs quickly and creates /etc/rancher/k3s/k3s.yaml for KUBECONFIG
 - KubeVirt operator + CR installation: apply operator, wait for deployment, apply CR, wait for kubevirt resource
+
+**GPU detection patterns (for Plan 3):**
+
+```bash
+# Detect NVIDIA GPUs
+lspci | grep -i nvidia
+
+# Get PCI addresses dynamically
+GPU_PCI=$(lspci -D | grep -i 'vga.*nvidia' | awk '{print $1}')
+
+# Get device IDs (vendor:device)
+lspci -nn | grep -i nvidia | grep -oP '\[10de:\w+\]'
+
+# Check current driver
+lspci -nnk -s $GPU_PCI | grep "driver in use"
+```
+
+**GPU mode switching (conceptual - needs auto-detection for Plan 3):**
+
+```bash
+# Switch to nvidia mode (for containers)
+echo $GPU_PCI > /sys/bus/pci/drivers/vfio-pci/unbind
+echo "nvidia" > /sys/bus/pci/devices/$GPU_PCI/driver_override
+echo 1 > /sys/bus/pci/devices/$GPU_PCI/reset  # PCIe FLR
+modprobe nvidia
+echo $GPU_PCI > /sys/bus/pci/drivers_probe
+
+# Switch to vfio mode (for VM passthrough)
+rmmod nvidia_uvm nvidia_drm nvidia_modeset nvidia
+echo $GPU_PCI > /sys/bus/pci/drivers/nvidia/unbind
+echo "vfio-pci" > /sys/bus/pci/devices/$GPU_PCI/driver_override
+modprobe vfio-pci
+echo $GPU_PCI > /sys/bus/pci/drivers_probe
+```
 
 ### Workstation Setup (for reference)
 
@@ -138,24 +180,95 @@ sudo kubectl create namespace uvacompute
 ENV=test KUBECONFIG=/etc/rancher/k3s/k3s.yaml ./vm-orchestration
 ```
 
+### GPU Container Setup (for reference)
+
+```bash
+# 1. Install nvidia-container-toolkit
+curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | \
+  sudo gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
+curl -s -L https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list | \
+  sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' | \
+  sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list
+sudo apt-get update && sudo apt-get install -y nvidia-container-toolkit
+
+# 2. Symlink runc for k3s
+sudo ln -sf /var/lib/rancher/k3s/data/current/bin/runc /usr/local/bin/runc
+
+# 3. Generate CDI config
+sudo nvidia-ctk cdi generate --output=/etc/cdi/nvidia.yaml
+
+# 4. Create RuntimeClass
+kubectl apply -f - <<EOF
+apiVersion: node.k8s.io/v1
+kind: RuntimeClass
+metadata:
+  name: nvidia
+handler: nvidia
+EOF
+
+# 5. Deploy device plugin with nvidia runtime
+kubectl apply -f - <<EOF
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: nvidia-device-plugin-daemonset
+  namespace: kube-system
+spec:
+  selector:
+    matchLabels:
+      name: nvidia-device-plugin-ds
+  template:
+    metadata:
+      labels:
+        name: nvidia-device-plugin-ds
+    spec:
+      runtimeClassName: nvidia
+      tolerations:
+      - key: nvidia.com/gpu
+        operator: Exists
+        effect: NoSchedule
+      priorityClassName: system-node-critical
+      containers:
+      - image: nvcr.io/nvidia/k8s-device-plugin:v0.17.0
+        name: nvidia-device-plugin-ctr
+        env:
+        - name: FAIL_ON_INIT_ERROR
+          value: "false"
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop: ["ALL"]
+        volumeMounts:
+        - name: device-plugin
+          mountPath: /var/lib/kubelet/device-plugins
+      volumes:
+      - name: device-plugin
+        hostPath:
+          path: /var/lib/kubelet/device-plugins
+EOF
+
+# 6. Verify GPU is available
+kubectl describe node | grep nvidia.com/gpu
+```
+
 ---
 
 ## Progress Tracker
 
-| Plan                               | Status         | Branch | Notes                                         |
-| ---------------------------------- | -------------- | ------ | --------------------------------------------- |
-| 1. Remove Incus, finalize KubeVirt | ✅ Complete    |        | Removed all Incus code, KubeVirt-only backend |
-| 2. Test KubeVirt on workstation    | ✅ Complete    |        | k3s v1.34.3 + KubeVirt v1.3.0 working         |
-| 3. k3s/KubeVirt install script     | ⬜ Not Started |        |                                               |
-| 4. Jobs schema + site API          | ⬜ Not Started |        |                                               |
-| 5. Jobs in orchestration service   | ⬜ Not Started |        |                                               |
-| 6. Jobs CLI commands               | ⬜ Not Started |        |                                               |
-| 7. Jobs website UI                 | ⬜ Not Started |        |                                               |
-| 8. Log storage + streaming         | ⬜ Not Started |        |                                               |
-| 9. Node management CLI             | ⬜ Not Started |        |                                               |
-| 10. Node config + partial sharing  | ⬜ Not Started |        |                                               |
-| 11. Multi-node SSH routing         | ⬜ Not Started |        |                                               |
-| 12. Admin commands                 | ⬜ Not Started |        |                                               |
+| Plan                               | Status         | Branch | Notes                                               |
+| ---------------------------------- | -------------- | ------ | --------------------------------------------------- |
+| 1. Remove Incus, finalize KubeVirt | ✅ Complete    |        | Removed all Incus code, KubeVirt-only backend       |
+| 2. Test KubeVirt on workstation    | ✅ Complete    |        | k3s v1.34.3 + KubeVirt v1.3.0 working               |
+| 3. k3s/KubeVirt install script     | ✅ Complete    |        | uva node install/uninstall/status + GPU auto-detect |
+| 4. Jobs schema + site API          | ⬜ Not Started |        |                                                     |
+| 5. Jobs in orchestration service   | ⬜ Not Started |        |                                                     |
+| 6. Jobs CLI commands               | ⬜ Not Started |        |                                                     |
+| 7. Jobs website UI                 | ⬜ Not Started |        |                                                     |
+| 8. Log storage + streaming         | ⬜ Not Started |        |                                                     |
+| 9. Node management CLI             | ⬜ Not Started |        |                                                     |
+| 10. Node config + partial sharing  | ⬜ Not Started |        |                                                     |
+| 11. Multi-node SSH routing         | ⬜ Not Started |        |                                                     |
+| 12. Admin commands                 | ⬜ Not Started |        |                                                     |
 
 Status key: ⬜ Not Started | 🔄 In Progress | ✅ Complete | ❌ Blocked
 
@@ -229,7 +342,7 @@ We need to install k3s + KubeVirt and test VM creation.
 - [x] Deploy orchestration service locally on workstation
 - [x] Test VM creation via orchestration service API
 - [x] Test VM deletion
-- [ ] Test with GPU (skipped - NVIDIA driver not working on workstation)
+- [x] Test with GPU (container mode working, mode-switching validated)
 - [x] Document any issues in Learnings section
 
 ### Manual Test Script
@@ -273,32 +386,124 @@ Users should be able to run one command to join the network. The script should:
 - Configure resource sharing
 - Save state for clean uninstall
 
+### Learnings from Plan 2 Testing
+
+**What worked well:**
+
+- k3s installs cleanly with `curl -sfL https://get.k3s.io | sh -s - --disable=traefik`
+- KubeVirt v1.3.0 operator + CR pattern is reliable
+- nvidia-container-toolkit from NVIDIA's apt repo works
+
+**What needs auto-detection:**
+
+- GPU presence: `lspci | grep -i nvidia`
+- GPU PCI addresses: `lspci -D | grep -i 'vga.*nvidia' | awk '{print $1}'`
+- GPU device IDs: `lspci -nn | grep -i nvidia | grep -oP '\[10de:\w+\]'`
+- Current driver binding: `lspci -nnk -s $PCI | grep "driver in use"`
+
+**GPU setup requirements (discovered during testing):**
+
+1. Install nvidia-container-toolkit from NVIDIA apt repo
+2. Symlink k3s runc: `ln -sf /var/lib/rancher/k3s/data/current/bin/runc /usr/local/bin/runc`
+3. Generate CDI config: `nvidia-ctk cdi generate --output=/etc/cdi/nvidia.yaml`
+4. Create `nvidia` RuntimeClass in Kubernetes
+5. Deploy nvidia-device-plugin with `runtimeClassName: nvidia`
+6. If GPU bound to vfio-pci, need to unbind and bind to nvidia driver
+
+**GPU mode switching (single GPU limitation):**
+
+- Container mode: nvidia driver bound, containers can use GPU, no VM passthrough
+- VM passthrough mode: vfio-pci bound, KubeVirt can passthrough GPU, no container access
+- Script should generate machine-specific mode-switching scripts based on detected PCI addresses
+
 ### Todos
 
-- [ ] Create `apps/cli/src/node.ts` with node subcommands
-- [ ] Implement `uva node install` command structure
-- [ ] Create install script at `apps/site/public/install.sh` (already exists, update it)
-- [ ] Add k3s installation logic
-- [ ] Add KubeVirt installation logic
-- [ ] Add NVIDIA container toolkit installation (detect GPU first)
-- [ ] Create `~/.uvacompute/node/config.yaml` structure
-- [ ] Create `~/.uvacompute/node/install-state.yaml` for tracking changes
-- [ ] Test on workstation via `ssh workstation`
+**CLI Structure:**
+
+- [x] Create `apps/cli/src/node.ts` with node subcommands
+- [x] Implement `uva node install` command structure
+- [x] Implement `uva node uninstall` command
+- [x] Implement `uva node status` command
+
+**Install Script Core:**
+
+- [x] Create install script at `apps/site/public/install-node.sh`
+- [x] Detect OS (Ubuntu/Debian required initially)
+- [x] Check prerequisites (curl, systemd, sudo)
+- [x] Add k3s installation logic (server mode for now)
+- [x] Add KubeVirt installation logic (operator + CR + wait)
+- [x] Create namespace `uvacompute`
+
+**GPU Support (auto-detected):**
+
+- [x] Detect NVIDIA GPU via `lspci`
+- [x] Get PCI addresses dynamically (not hardcoded!)
+- [x] Get device IDs dynamically (not hardcoded!)
+- [x] Install nvidia-container-toolkit if GPU present
+- [x] Symlink k3s runc to /usr/local/bin
+- [x] Generate CDI config
+- [x] Create nvidia RuntimeClass
+- [x] Deploy nvidia-device-plugin DaemonSet
+- [x] Generate machine-specific gpu-mode-nvidia script
+- [x] Generate machine-specific gpu-mode-vfio script
+- [x] Generate machine-specific gpu-mode-status script
+
+**State Management:**
+
+- [x] Create `~/.uvacompute/node/config.yaml` structure
+- [x] Create `~/.uvacompute/node/install-state.yaml` for tracking changes
+- [x] Store detected GPU info in state for uninstall
+
+**Testing:**
+
+- [x] Test on workstation via `ssh workstation` (clean install)
+- [ ] Test uninstall and reinstall (skipped - requires clean machine)
+- [x] Test GPU detection and mode switching
 
 ### Files to Create/Modify
 
-- `apps/cli/src/node.ts` → NEW
+- `apps/cli/src/node.ts` → NEW (node subcommands)
 - `apps/cli/index.ts` → Register node commands
-- `apps/site/public/install.sh` → UPDATE
+- `apps/site/public/install-node.sh` → NEW (main install script)
 - `apps/cli/src/lib/node-config.ts` → NEW (config types/helpers)
+
+### GPU Detection Script (reference)
+
+```bash
+#!/bin/bash
+# Auto-detect NVIDIA GPU and generate mode-switching scripts
+
+# Detect GPU
+if ! lspci | grep -qi nvidia; then
+  echo "No NVIDIA GPU detected"
+  exit 0
+fi
+
+# Get PCI addresses (may be multiple for GPU + audio)
+GPU_PCI=$(lspci -D | grep -i 'vga.*nvidia' | awk '{print $1}')
+AUDIO_PCI=$(lspci -D | grep -i 'audio.*nvidia' | awk '{print $1}')
+
+# Get device IDs
+GPU_DEVID=$(lspci -nn -s $GPU_PCI | grep -oP '10de:\w+' | head -1)
+AUDIO_DEVID=$(lspci -nn -s $AUDIO_PCI | grep -oP '10de:\w+' | head -1)
+
+echo "Detected GPU: $GPU_PCI ($GPU_DEVID)"
+echo "Detected Audio: $AUDIO_PCI ($AUDIO_DEVID)"
+
+# Generate scripts with detected values
+# (actual implementation in install-node.sh)
+```
 
 ### Completion Criteria
 
-- [ ] `bun run build` succeeds
-- [ ] `uva node install` runs (even if just scaffolding)
-- [ ] Install script tested on workstation
-- [ ] Config files created in `~/.uvacompute/node/`
-- [ ] Branch created: `gt create --all --message "feat: uva node install command"`
+- [x] `bun run build` succeeds
+- [x] `uva node install` runs end-to-end
+- [x] GPU auto-detection works (tested on workstation)
+- [x] Generated mode-switching scripts work
+- [x] Install script tested on workstation
+- [x] Config files created in `~/.uvacompute/node/`
+- [ ] Uninstall cleans up properly (requires clean test machine)
+- [x] Branch created: `gt create --all --message "feat: uva node install command"`
 
 ---
 

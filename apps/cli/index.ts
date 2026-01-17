@@ -6,6 +6,7 @@ import { registerSSHKeyCommands } from "./src/ssh-keys";
 import { registerUserCommands } from "./src/user";
 import { registerUninstallCommand } from "./src/uninstall";
 import { registerUpgradeCommand } from "./src/upgrade";
+import { registerNodeCommands } from "./src/node";
 import { checkForUpdate } from "./src/lib/version-check";
 import {
   handleCompletion,
@@ -27,6 +28,7 @@ async function main() {
   registerUserCommands(program);
   registerUninstallCommand(program);
   registerUpgradeCommand(program);
+  registerNodeCommands(program);
   registerCompletionCommands(program);
 
   await handleCompletion();

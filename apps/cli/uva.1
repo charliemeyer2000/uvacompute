@@ -125,6 +125,42 @@ Upgrade the uvacompute CLI to the latest version. Checks the API for available u
 .TP
 .B uninstall
 Uninstall the uvacompute CLI. Removes the CLI binary from the system and deletes all configuration data including authentication tokens. Presents an interactive confirmation prompt (default: No) before proceeding. If binary removal requires elevated permissions, displays instructions for manual removal.
+.SS Node Management
+.TP
+.B node install
+Install k3s, KubeVirt, and configure the machine as a uvacompute contributor node. Downloads and executes the installation script which handles:
+.RS
+.IP \(bu 2
+k3s (Kubernetes) installation
+.IP \(bu 2
+KubeVirt operator and CR deployment
+.IP \(bu 2
+NVIDIA container toolkit (if GPU detected)
+.IP \(bu 2
+GPU mode switching scripts generation
+.IP \(bu 2
+Node configuration state storage
+.RE
+.IP
+Requires root privileges (sudo). Only Ubuntu and Debian are currently supported.
+.TP
+.B node uninstall
+Remove all node components installed by
+.BR "uva node install" .
+This includes k3s, KubeVirt resources, GPU scripts, and configuration files. The nvidia-container-toolkit package is not removed automatically.
+.TP
+.B node status
+Display current node status including:
+.RS
+.IP \(bu 2
+Installation state and date
+.IP \(bu 2
+k3s status and version
+.IP \(bu 2
+KubeVirt deployment phase
+.IP \(bu 2
+GPU detection and current driver mode
+.RE
 .SH OPTIONS
 .TP
 .B \-\-version
@@ -133,6 +169,28 @@ Display CLI version number and exit.
 .TP
 .I ~/.uvacompute/config
 Configuration file storing authentication tokens, version information, completion prompt status, and last update check timestamp. JSON format. Created automatically on first login.
+.TP
+.I ~/.uvacompute/node/config.yaml
+Node configuration file storing node ID, installation date, k3s version, and KubeVirt version. Created by
+.BR "uva node install" .
+.TP
+.I ~/.uvacompute/node/install-state.yaml
+Node installation state tracking file. Records installed components and GPU information for clean uninstallation.
+.TP
+.I /usr/local/bin/gpu-mode-nvidia
+Script to switch GPU to nvidia driver mode for container workloads. Created by
+.BR "uva node install"
+when an NVIDIA GPU is detected. Requires root privileges.
+.TP
+.I /usr/local/bin/gpu-mode-vfio
+Script to switch GPU to vfio-pci driver mode for VM passthrough. Created by
+.BR "uva node install"
+when an NVIDIA GPU is detected. Requires root privileges.
+.TP
+.I /usr/local/bin/gpu-mode-status
+Script to display current GPU driver mode. Created by
+.BR "uva node install"
+when an NVIDIA GPU is detected.
 .TP
 .I ~/.config/tabtab/
 Directory containing shell completion scripts for Bash and Zsh. Created when running
@@ -320,6 +378,54 @@ Uninstall the CLI and remove all configuration:
 .nf
 .RS
 $ uva uninstall
+.RE
+.fi
+.SS Node Management
+Install as a contributor node:
+.PP
+.nf
+.RS
+$ uva node install
+.RE
+.fi
+.PP
+Check node status:
+.PP
+.nf
+.RS
+$ uva node status
+.RE
+.fi
+.PP
+Check GPU mode (after node install):
+.PP
+.nf
+.RS
+$ sudo gpu-mode-status
+.RE
+.fi
+.PP
+Switch GPU to container mode:
+.PP
+.nf
+.RS
+$ sudo gpu-mode-nvidia
+.RE
+.fi
+.PP
+Switch GPU to VM passthrough mode:
+.PP
+.nf
+.RS
+$ sudo gpu-mode-vfio
+.RE
+.fi
+.PP
+Uninstall node components:
+.PP
+.nf
+.RS
+$ uva node uninstall
 .RE
 .fi
 .SH DIAGNOSTICS
