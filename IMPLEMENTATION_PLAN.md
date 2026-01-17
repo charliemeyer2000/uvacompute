@@ -108,11 +108,35 @@ If you need AWS resources (S3 buckets, etc.):
 
 ### Gotchas
 
-- (Add gotchas as you discover them)
+- The orchestration service has `IsDevelopment()` check that skips actual KubeVirt operations when `ENV=development`. Use `ENV=test` or `ENV=production` for real testing.
+- The API requires HMAC-SHA256 signatures with `X-Timestamp` (milliseconds) and `X-Signature` headers. Payload format: `METHOD:PATH:TIMESTAMP:BODY`
+- First VM creation is slow (~5 min) due to container image pulling (fedora-cloud-container-disk-demo is ~700MB)
+- NVIDIA driver issues on workstation - need to debug separately for GPU passthrough testing
 
 ### Useful Patterns
 
-- (Add patterns as you discover them)
+- Use Python for generating HMAC signatures (easier than bash/openssl)
+- k3s installs quickly and creates /etc/rancher/k3s/k3s.yaml for KUBECONFIG
+- KubeVirt operator + CR installation: apply operator, wait for deployment, apply CR, wait for kubevirt resource
+
+### Workstation Setup (for reference)
+
+```bash
+# Install k3s
+curl -sfL https://get.k3s.io | sudo sh -s - --disable=traefik
+
+# Install KubeVirt
+sudo kubectl apply -f https://github.com/kubevirt/kubevirt/releases/download/v1.3.0/kubevirt-operator.yaml
+sudo kubectl wait --for=condition=available --timeout=300s deployment/virt-operator -n kubevirt
+sudo kubectl apply -f https://github.com/kubevirt/kubevirt/releases/download/v1.3.0/kubevirt-cr.yaml
+sudo kubectl wait --for=condition=Available --timeout=600s kubevirt/kubevirt -n kubevirt
+
+# Create namespace
+sudo kubectl create namespace uvacompute
+
+# Run orchestration service
+ENV=test KUBECONFIG=/etc/rancher/k3s/k3s.yaml ./vm-orchestration
+```
 
 ---
 
@@ -121,7 +145,7 @@ If you need AWS resources (S3 buckets, etc.):
 | Plan                               | Status         | Branch | Notes                                         |
 | ---------------------------------- | -------------- | ------ | --------------------------------------------- |
 | 1. Remove Incus, finalize KubeVirt | ✅ Complete    |        | Removed all Incus code, KubeVirt-only backend |
-| 2. Test KubeVirt on workstation    | ⬜ Not Started |        |                                               |
+| 2. Test KubeVirt on workstation    | ✅ Complete    |        | k3s v1.34.3 + KubeVirt v1.3.0 working         |
 | 3. k3s/KubeVirt install script     | ⬜ Not Started |        |                                               |
 | 4. Jobs schema + site API          | ⬜ Not Started |        |                                               |
 | 5. Jobs in orchestration service   | ⬜ Not Started |        |                                               |
@@ -198,15 +222,15 @@ We need to install k3s + KubeVirt and test VM creation.
 
 ### Todos
 
-- [ ] SSH to workstation: `ssh workstation`
-- [ ] Install k3s: `curl -sfL https://get.k3s.io | sh -`
-- [ ] Install KubeVirt (follow install script in `scripts/`)
-- [ ] Create test namespace: `kubectl create namespace uvacompute`
-- [ ] Deploy orchestration service locally on workstation
-- [ ] Test VM creation via orchestration service API
-- [ ] Test VM deletion
-- [ ] Test with GPU (if NVIDIA operator is set up)
-- [ ] Document any issues in Learnings section
+- [x] SSH to workstation: `ssh workstation`
+- [x] Install k3s: `curl -sfL https://get.k3s.io | sh -` (v1.34.3+k3s1)
+- [x] Install KubeVirt (v1.3.0 operator + CR)
+- [x] Create test namespace: `kubectl create namespace uvacompute`
+- [x] Deploy orchestration service locally on workstation
+- [x] Test VM creation via orchestration service API
+- [x] Test VM deletion
+- [ ] Test with GPU (skipped - NVIDIA driver not working on workstation)
+- [x] Document any issues in Learnings section
 
 ### Manual Test Script
 
@@ -226,12 +250,12 @@ curl -X POST http://localhost:8080/vms \
 
 ### Completion Criteria
 
-- [ ] k3s installed and running on workstation
-- [ ] KubeVirt installed and healthy
-- [ ] Can create VM via API
-- [ ] Can delete VM via API
-- [ ] Documented setup steps
-- [ ] Branch created: `gt create --all --message "test: validate kubevirt on workstation"`
+- [x] k3s installed and running on workstation
+- [x] KubeVirt installed and healthy
+- [x] Can create VM via API
+- [x] Can delete VM via API
+- [x] Documented setup steps
+- [x] Branch created: `gt create --all --message "test: validate kubevirt on workstation"`
 
 ---
 
