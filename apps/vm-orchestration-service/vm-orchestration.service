@@ -1,12 +1,19 @@
 [Unit]
 Description=VM Orchestration Service
-After=network-online.target tailscaled.service
+After=network-online.target tailscaled.service k3s.service
 Wants=network-online.target
+# Optional dependency on k3s for KubeVirt backend
+After=k3s.service
 
 [Service]
 Type=simple
 WorkingDirectory=/opt/vm-orchestration-service
 Environment="ENV=production"
+# KubeVirt Configuration
+Environment="KUBECONFIG=/etc/rancher/k3s/k3s.yaml"
+Environment="KUBEVIRT_NAMESPACE=uvacompute"
+Environment="VM_IMAGE_CPU=docker.io/kubevirt/fedora-cloud-container-disk-demo:latest"
+Environment="VM_IMAGE_GPU=docker.io/kubevirt/fedora-cloud-container-disk-demo:latest"
 ExecStart=/usr/local/bin/vm-orchestration
 ExecStartPost=-/usr/bin/tailscale serve --bg --https 443 8080
 ExecStartPost=-/usr/bin/tailscale funnel --bg --https 443 8080

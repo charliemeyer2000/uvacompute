@@ -4,12 +4,14 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	"github.com/goccy/go-yaml"
 )
 
 type VMStatusResponse struct {
-	Status VMStatus     `json:"status"`
-	Msg    string       `json:"msg"`
-	Info   *IncusVMInfo `json:"info,omitempty"`
+	Status VMStatus `json:"status"`
+	Msg    string   `json:"msg"`
+	Info   *VMInfo  `json:"info,omitempty"`
 }
 
 type VMCreationStatus string
@@ -29,7 +31,7 @@ type VMStatus string
 const (
 	VM_STATUS_NOT_FOUND         VMStatus = "not_found"         // vm not found
 	VM_STATUS_CREATING          VMStatus = "creating"          // creating vm (initial state)
-	VM_STATUS_INITIALIZING      VMStatus = "initializing"      // initializing incus instance
+	VM_STATUS_INITIALIZING      VMStatus = "initializing"      // initializing VM instance
 	VM_STATUS_STARTING          VMStatus = "starting"          // starting the vm
 	VM_STATUS_WAITING_FOR_AGENT VMStatus = "waiting_for_agent" // waiting for vm agent to be ready
 	VM_STATUS_CONFIGURING       VMStatus = "configuring"       // waiting for cloud-init
@@ -124,10 +126,79 @@ type VMState struct {
 	ErrorMessage string   `json:"errorMessage,omitempty"`
 }
 
-type IncusListVM struct {
+type ListVM struct {
 	Name      string            `json:"name"`
 	Status    string            `json:"status"`
 	Type      string            `json:"type"`
 	Config    map[string]string `json:"config"`
 	CreatedAt string            `json:"created_at"`
+}
+
+type VMInfo struct {
+	Name         string `yaml:"Name"`
+	Description  string `yaml:"Description"`
+	Status       string `yaml:"Status"`
+	Type         string `yaml:"Type"`
+	Architecture string `yaml:"Architecture"`
+	Created      string `yaml:"Created"`
+	LastUsed     string `yaml:"Last Used"`
+
+	Location        string       `yaml:"Location,omitempty"`
+	PID             int          `yaml:"PID,omitempty"`
+	Started         string       `yaml:"Started,omitempty"`
+	OperatingSystem *OSInfo      `yaml:"Operating System,omitempty"`
+	Resources       *VMResources `yaml:"Resources,omitempty"`
+}
+
+type OSInfo struct {
+	OS            string `yaml:"OS"`
+	OSVersion     string `yaml:"OS Version"`
+	KernelVersion string `yaml:"Kernel Version"`
+	Hostname      string `yaml:"Hostname"`
+	FQDN          string `yaml:"FQDN"`
+}
+
+type VMResources struct {
+	Processes    int                         `yaml:"Processes,omitempty"`
+	DiskUsage    map[string]string           `yaml:"Disk usage,omitempty"`
+	CPUUsage     *CPUUsage                   `yaml:"CPU usage,omitempty"`
+	MemoryUsage  *MemoryUsage                `yaml:"Memory usage,omitempty"`
+	NetworkUsage map[string]*NetworkDevice   `yaml:"Network usage,omitempty"`
+}
+
+type CPUUsage struct {
+	CPUUsageSeconds int `yaml:"CPU usage (in seconds)"`
+}
+
+type MemoryUsage struct {
+	MemoryCurrent string `yaml:"Memory (current),omitempty"`
+	MemoryPeak    string `yaml:"Memory (peak),omitempty"`
+	SwapCurrent   string `yaml:"Swap (current),omitempty"`
+	SwapPeak      string `yaml:"Swap (peak),omitempty"`
+}
+
+type NetworkDevice struct {
+	Type                   string        `yaml:"Type"`
+	State                  string        `yaml:"State"`
+	HostInterface          string        `yaml:"Host interface,omitempty"`
+	MACAddress             string        `yaml:"MAC address,omitempty"`
+	MTU                    int           `yaml:"MTU,omitempty"`
+	BytesReceived          string        `yaml:"Bytes received,omitempty"`
+	BytesSent              string        `yaml:"Bytes sent,omitempty"`
+	PacketsReceived        int           `yaml:"Packets received,omitempty"`
+	PacketsSent            int           `yaml:"Packets sent,omitempty"`
+	ErrorsReceived         int           `yaml:"Errors received,omitempty"`
+	ErrorsSent             int           `yaml:"Errors sent,omitempty"`
+	PacketsDroppedInbound  int           `yaml:"Packets dropped inbound,omitempty"`
+	PacketsDroppedOutbound int           `yaml:"Packets dropped outbound,omitempty"`
+	IPAddresses            yaml.MapSlice `yaml:"IP addresses,omitempty"`
+}
+
+func ParseVMInfo(yamlData []byte) (*VMInfo, error) {
+	var info VMInfo
+	err := yaml.UnmarshalWithOptions(yamlData, &info, yaml.AllowDuplicateMapKey())
+	if err != nil {
+		return nil, err
+	}
+	return &info, nil
 }

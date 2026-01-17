@@ -19,28 +19,28 @@ type VMResourceLimits struct {
 
 type StatusCallback func(status VMStatus)
 
-type IncusProvider interface {
+type VMProvider interface {
 	CreateVM(vmId string, cpus, ram, disk, gpus int, sshPublicKeys []string, statusCallback StatusCallback, startupScript, cloudInitConfig string) error
 	DestroyVM(vmId string) error
 	GetVMStatus(vmId string) (string, error)
-	GetVMInfo(vmId string) (*IncusVMInfo, error)
-	ListVMs() ([]IncusListVM, error)
+	GetVMInfo(vmId string) (*VMInfo, error)
+	ListVMs() ([]ListVM, error)
 }
 
 type VMManager struct {
 	mu             sync.Mutex
 	vmMap          map[string]VMState
 	limits         VMResourceLimits
-	incusProvider  IncusProvider
+	vmProvider     VMProvider
 	callbackClient CallbackClient
 }
 
-func NewVMManager(limits VMResourceLimits, incusProvider IncusProvider, callbackClient CallbackClient) *VMManager {
+func NewVMManager(limits VMResourceLimits, vmProvider VMProvider, callbackClient CallbackClient) *VMManager {
 	return &VMManager{
 		mu:             sync.Mutex{},
 		vmMap:          make(map[string]VMState),
 		limits:         limits,
-		incusProvider:  incusProvider,
+		vmProvider:     vmProvider,
 		callbackClient: callbackClient,
 	}
 }
@@ -97,14 +97,14 @@ func (vm *VMManager) createVMAsync(vmId string, cpus, ram, disk, gpus int, sshPu
 	log.Printf("Starting async VM creation for %s (cpus: %d, ram: %d, disk: %d, gpus: %d)", vmId, cpus, ram, disk, gpus)
 
 	if !IsDevelopment() {
-		incusErr := vm.incusProvider.CreateVM(vmId, cpus, ram, disk, gpus, sshPublicKeys, statusCallback, startupScript, cloudInitConfig)
-		if incusErr != nil {
-			log.Printf("ERROR: Failed to create VM %s: %v", vmId, incusErr)
-			vm.UpdateVMStatus(vmId, VM_STATUS_FAILED, incusErr.Error())
+		err := vm.vmProvider.CreateVM(vmId, cpus, ram, disk, gpus, sshPublicKeys, statusCallback, startupScript, cloudInitConfig)
+		if err != nil {
+			log.Printf("ERROR: Failed to create VM %s: %v", vmId, err)
+			vm.UpdateVMStatus(vmId, VM_STATUS_FAILED, err.Error())
 			return
 		}
 	} else {
-		log.Printf("[DEV MODE] Skipping Incus VM creation for VM %s", vmId)
+		log.Printf("[DEV MODE] Skipping VM creation for VM %s", vmId)
 		statusCallback(VM_STATUS_INITIALIZING)
 		time.Sleep(1 * time.Second)
 		statusCallback(VM_STATUS_STARTING)
@@ -119,12 +119,12 @@ func (vm *VMManager) createVMAsync(vmId string, cpus, ram, disk, gpus int, sshPu
 	log.Printf("VM %s successfully created and is now running", vmId)
 
 	time.AfterFunc(time.Duration(hours*3600*int(time.Second)), func() {
-		log.Printf("VM %s expired, deleting from Incus", vmId)
+		log.Printf("VM %s expired, deleting", vmId)
 
 		if !IsDevelopment() {
-			vm.incusProvider.DestroyVM(vmId)
+			vm.vmProvider.DestroyVM(vmId)
 		} else {
-			log.Printf("[DEV MODE] Skipping Incus VM deletion for VM %s", vmId)
+			log.Printf("[DEV MODE] Skipping VM deletion for VM %s", vmId)
 		}
 
 		vm.mu.Lock()
@@ -194,9 +194,9 @@ func (vm *VMManager) DeleteVM(vmId string) error {
 
 	if !exists {
 		if !IsDevelopment() {
-			_, statusErr := vm.incusProvider.GetVMStatus(vmId)
+			_, statusErr := vm.vmProvider.GetVMStatus(vmId)
 			if statusErr == nil {
-				log.Printf("VM %s found in Incus but not in memory, proceeding with deletion", vmId)
+				log.Printf("VM %s found in backend but not in memory, proceeding with deletion", vmId)
 			} else {
 				return fmt.Errorf("VM %s not found", vmId)
 			}
@@ -212,12 +212,12 @@ func (vm *VMManager) DeleteVM(vmId string) error {
 	}
 
 	if !IsDevelopment() {
-		incusErr := vm.incusProvider.DestroyVM(vmId)
-		if incusErr != nil {
-			return fmt.Errorf("failed to destroy VM in Incus: %w", incusErr)
+		err := vm.vmProvider.DestroyVM(vmId)
+		if err != nil {
+			return fmt.Errorf("failed to destroy VM: %w", err)
 		}
 	} else {
-		log.Printf("[DEV MODE] Skipping Incus VM deletion for VM %s", vmId)
+		log.Printf("[DEV MODE] Skipping VM deletion for VM %s", vmId)
 	}
 
 	if exists {
@@ -230,17 +230,17 @@ func (vm *VMManager) DeleteVM(vmId string) error {
 	return nil
 }
 
-func (vm *VMManager) InitializeFromIncus() error {
+func (vm *VMManager) InitializeFromBackend() error {
 	if IsDevelopment() {
-		log.Printf("[DEV MODE] Skipping Incus state synchronization")
+		log.Printf("[DEV MODE] Skipping backend state synchronization")
 		return nil
 	}
 
-	log.Printf("Syncing VM state from Incus...")
+	log.Printf("Syncing VM state from backend...")
 
-	vms, err := vm.incusProvider.ListVMs()
+	vms, err := vm.vmProvider.ListVMs()
 	if err != nil {
-		return fmt.Errorf("failed to list VMs from Incus: %w", err)
+		return fmt.Errorf("failed to list VMs from backend: %w", err)
 	}
 
 	vm.mu.Lock()
@@ -250,15 +250,15 @@ func (vm *VMManager) InitializeFromIncus() error {
 	skippedCount := 0
 	var syncedVMs []string
 
-	for _, incusVM := range vms {
-		if incusVM.Status != "Running" {
-			log.Printf("Skipping VM %s (status: %s) - only running VMs are synced", incusVM.Name, incusVM.Status)
+	for _, backendVM := range vms {
+		if backendVM.Status != "Running" {
+			log.Printf("Skipping VM %s (status: %s) - only running VMs are synced", backendVM.Name, backendVM.Status)
 			skippedCount++
 			continue
 		}
 
 		vmState := VMState{
-			Id:           incusVM.Name,
+			Id:           backendVM.Name,
 			Name:         "",
 			UserId:       "",
 			CreationTime: time.Now(),
@@ -270,27 +270,27 @@ func (vm *VMManager) InitializeFromIncus() error {
 			Status:       VM_STATUS_RUNNING,
 		}
 
-		if cpuStr, ok := incusVM.Config["limits.cpu"]; ok {
+		if cpuStr, ok := backendVM.Config["limits.cpu"]; ok {
 			if cpuVal, err := strconv.Atoi(cpuStr); err == nil {
 				vmState.Cpus = cpuVal
 			}
 		}
 
-		if ramStr, ok := incusVM.Config["limits.memory"]; ok {
+		if ramStr, ok := backendVM.Config["limits.memory"]; ok {
 			ramStr = strings.TrimSuffix(ramStr, "GiB")
 			if ramVal, err := strconv.Atoi(ramStr); err == nil {
 				vmState.Ram = ramVal
 			}
 		}
 
-		vm.vmMap[incusVM.Name] = vmState
-		syncedVMs = append(syncedVMs, incusVM.Name)
+		vm.vmMap[backendVM.Name] = vmState
+		syncedVMs = append(syncedVMs, backendVM.Name)
 		syncedCount++
-		log.Printf("Synced VM %s from Incus (status: %s, cpus: %d, ram: %dGB)",
-			incusVM.Name, vmState.Status, vmState.Cpus, vmState.Ram)
+		log.Printf("Synced VM %s from backend (status: %s, cpus: %d, ram: %dGB)",
+			backendVM.Name, vmState.Status, vmState.Cpus, vmState.Ram)
 	}
 
-	log.Printf("Successfully synced %d running VMs from Incus (%d stopped/non-running VMs skipped)", syncedCount, skippedCount)
+	log.Printf("Successfully synced %d running VMs from backend (%d stopped/non-running VMs skipped)", syncedCount, skippedCount)
 
 	if vm.callbackClient != nil {
 		for _, vmId := range syncedVMs {

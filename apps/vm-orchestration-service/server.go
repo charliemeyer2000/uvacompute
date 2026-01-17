@@ -33,7 +33,7 @@ func main() {
 	fmt.Println("Starting server...")
 
 	if structs.IsDevelopment() {
-		fmt.Println("Running in development (no incus calls)")
+		fmt.Println("Running in development mode")
 	} else {
 		fmt.Println("Running in production.")
 	}
@@ -55,11 +55,29 @@ func main() {
 	fmt.Printf("Callback client configured for: %s\n", siteBaseUrl)
 
 	callbackClient := lib.NewCallbackClient(siteBaseUrl, sharedSecret)
-	incusAdapter := lib.NewIncusAdapter()
-	app := structs.NewApp(incusAdapter, callbackClient)
 
-	if err := app.VMManager.InitializeFromIncus(); err != nil {
-		fmt.Printf("Warning: Failed to sync state from Incus: %v\n", err)
+	fmt.Println("Using KubeVirt backend")
+	config := lib.DefaultKubeVirtConfig()
+
+	adapter, err := lib.NewKubeVirtAdapter(config)
+	if err != nil {
+		panic(fmt.Sprintf("Failed to create KubeVirt adapter: %v", err))
+	}
+
+	if err := adapter.EnsureNamespace(); err != nil {
+		fmt.Printf("Warning: Failed to ensure namespace: %v\n", err)
+	}
+
+	if err := adapter.Ping(); err != nil {
+		panic(fmt.Sprintf("Failed to connect to Kubernetes: %v", err))
+	}
+
+	fmt.Printf("Connected to Kubernetes, using namespace: %s\n", config.Namespace)
+
+	app := structs.NewApp(adapter, callbackClient)
+
+	if err := app.VMManager.InitializeFromBackend(); err != nil {
+		fmt.Printf("Warning: Failed to sync state from backend: %v\n", err)
 	}
 
 	app.Router.Use(middleware.Logger)
@@ -71,7 +89,7 @@ func main() {
 	app.SetupRoutes(handlers.RootHandler, handlers.CreateVMHandler, handlers.GetVMStatusHandler, handlers.DeleteVMHandler, handlers.AuthMiddleware)
 
 	fmt.Println("Routes configured, starting server on :8080")
-	err := http.ListenAndServe(":8080", app.Router)
+	err = http.ListenAndServe(":8080", app.Router)
 	if err != nil {
 		fmt.Printf("Server failed to start: %v\n", err)
 		panic(err)

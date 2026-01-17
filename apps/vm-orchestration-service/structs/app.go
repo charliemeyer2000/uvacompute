@@ -15,7 +15,7 @@ type CallbackClient interface {
 	NotifyVMStatusUpdate(vmId string, status string) error
 }
 
-func NewApp(incusProvider IncusProvider, callbackClient CallbackClient) *App {
+func NewApp(vmProvider VMProvider, callbackClient CallbackClient) *App {
 	limits := VMResourceLimits{
 		MaxCpus: 16, // in vCPUs
 		MaxRam:  64, // in GiB
@@ -23,7 +23,7 @@ func NewApp(incusProvider IncusProvider, callbackClient CallbackClient) *App {
 	}
 
 	return &App{
-		VMManager: NewVMManager(limits, incusProvider, callbackClient),
+		VMManager: NewVMManager(limits, vmProvider, callbackClient),
 		Router:    chi.NewRouter(),
 	}
 }
