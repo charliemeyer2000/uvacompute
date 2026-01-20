@@ -14,7 +14,7 @@ type App struct {
 
 type CallbackClient interface {
 	NotifyVMStatusUpdate(vmId string, status string, nodeId string) error
-	NotifyJobStatusUpdate(jobId string, status string, exitCode *int, errorMsg string) error
+	NotifyJobStatusUpdate(jobId string, status string, exitCode *int, errorMsg string, nodeId string) error
 	UploadJobLogs(jobId string, logs string) error
 }
 
