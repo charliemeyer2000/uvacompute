@@ -112,6 +112,52 @@ Remove an SSH public key by its ID. Prevents future use of this key for VM acces
 .TP
 .B ssh-key set-primary \fIkeyId\fR
 Set specified SSH key as the primary key. Primary key is used by default for new VM deployments.
+.SS Container Job Management
+.TP
+.B run \fIimage\fR [\fIcommand...\fR]
+Run a container job with the specified image. The optional command arguments are passed to the container.
+.RS
+.TP
+.BR \-g ", " \-\-gpu
+Request a GPU for the job. Allocates 1 GPU to the container.
+.TP
+.BR \-c ", " \-\-cpu " \fIcpus\fR"
+Number of CPUs to allocate (default: 1). Maximum: 16.
+.TP
+.BR \-r ", " \-\-ram " \fIram\fR"
+RAM allocation in gigabytes (default: 4). Maximum: 64.
+.TP
+.BR \-e ", " \-\-env " \fIKEY=VALUE\fR"
+Set an environment variable in the container. Can be specified multiple times for multiple variables.
+.TP
+.BR \-n ", " \-\-name " \fIname\fR"
+Optional friendly name for the job. Used for identification in job listings.
+.RE
+.TP
+.B jobs
+List active container jobs (pending, scheduled, pulling, or running).
+.RS
+.TP
+.BR \-a ", " \-\-all
+Show all jobs regardless of status, including completed, failed, and cancelled jobs.
+.TP
+.BR \-s ", " \-\-status " \fIstatus\fR"
+Filter jobs by status. Valid values: pending, scheduled, pulling, running, completed, failed, cancelled.
+.RE
+.TP
+.B logs \fIjobId\fR
+Display logs from a container job.
+.RS
+.TP
+.BR \-t ", " \-\-tail " \fIlines\fR"
+Show only the last N lines of log output.
+.TP
+.BR \-\-no-follow
+Don't follow log output (this is currently the default behavior; streaming will be added in a future release).
+.RE
+.TP
+.B cancel \fIjobId\fR
+Cancel a running or pending job. Jobs in terminal states (completed, failed, cancelled) cannot be cancelled.
 .SS Management
 .TP
 .B completion install
@@ -125,6 +171,93 @@ Upgrade the uvacompute CLI to the latest version. Checks the API for available u
 .TP
 .B uninstall
 Uninstall the uvacompute CLI. Removes the CLI binary from the system and deletes all configuration data including authentication tokens. Presents an interactive confirmation prompt (default: No) before proceeding. If binary removal requires elevated permissions, displays instructions for manual removal.
+.SS Node Management
+.TP
+.B node prepare [\-\-check] [\-\-skip\-iommu]
+Prepare the system for node installation by installing NVIDIA drivers and checking IOMMU.
+.RS
+.IP \(bu 2
+Detects operating system (Ubuntu, Debian, Arch, Fedora, Gentoo)
+.IP \(bu 2
+Checks for NVIDIA GPU and installs appropriate driver
+.IP \(bu 2
+Verifies IOMMU is enabled for GPU passthrough
+.IP \(bu 2
+Saves preparation state for verification
+.RE
+.IP
+Options:
+.RS
+.TP
+.B \-\-check
+Show what would be done without making changes (dry-run mode).
+.TP
+.B \-\-skip\-iommu
+Skip IOMMU verification checks.
+.RE
+.IP
+Requires root privileges (sudo) for driver installation. A system reboot is typically required after driver installation before proceeding with
+.BR "node install" .
+.TP
+.B node install
+Install k3s, KubeVirt, and configure the machine as a uvacompute contributor node. Requires that
+.BR "node prepare"
+has been run and the system rebooted if drivers were installed. Downloads and executes the installation script which handles:
+.RS
+.IP \(bu 2
+k3s (Kubernetes) installation
+.IP \(bu 2
+KubeVirt operator and CR deployment
+.IP \(bu 2
+NVIDIA container toolkit (if GPU detected)
+.IP \(bu 2
+GPU mode switching scripts generation
+.IP \(bu 2
+Node configuration state storage
+.RE
+.IP
+Requires root privileges (sudo). Only Ubuntu and Debian are currently supported.
+.TP
+.B node uninstall
+Remove all node components installed by
+.BR "uva node install" .
+This includes k3s, KubeVirt resources, GPU scripts, and configuration files. The nvidia-container-toolkit package is not removed automatically.
+.TP
+.B node status
+Display current node status including:
+.RS
+.IP \(bu 2
+Installation state and date
+.IP \(bu 2
+k3s status and version
+.IP \(bu 2
+KubeVirt deployment phase
+.IP \(bu 2
+GPU detection and current driver mode
+.IP \(bu 2
+Node scheduling status (active/paused)
+.IP \(bu 2
+Running workloads (VMs and Jobs)
+.RE
+.TP
+.B node pause
+Stop accepting new workloads on this node. Existing workloads continue running. Uses kubectl cordon under the hood.
+.TP
+.B node resume
+Resume accepting new workloads on this node after being paused. Uses kubectl uncordon under the hood.
+.TP
+.B node config
+Interactively configure resource sharing settings. Prompts for:
+.RS
+.IP \(bu 2
+Number of CPUs to share
+.IP \(bu 2
+RAM allocation in GB
+.IP \(bu 2
+GPU sharing mode (container or none)
+.RE
+.IP
+Configuration is saved to ~/.uvacompute/node/config.yaml.
 .SH OPTIONS
 .TP
 .B \-\-version
@@ -133,6 +266,32 @@ Display CLI version number and exit.
 .TP
 .I ~/.uvacompute/config
 Configuration file storing authentication tokens, version information, completion prompt status, and last update check timestamp. JSON format. Created automatically on first login.
+.TP
+.I ~/.uvacompute/node/config.yaml
+Node configuration file storing node ID, installation date, k3s version, and KubeVirt version. Created by
+.BR "uva node install" .
+.TP
+.I ~/.uvacompute/node/install-state.yaml
+Node installation state tracking file. Records installed components and GPU information for clean uninstallation.
+.TP
+.I ~/.uvacompute/node/prepare-state.yaml
+System preparation state tracking file. Records OS information, GPU detection status, driver installation status, and IOMMU configuration. Created by
+.BR "uva node prepare" .
+.TP
+.I /usr/local/bin/gpu-mode-nvidia
+Script to switch GPU to nvidia driver mode for container workloads. Created by
+.BR "uva node install"
+when an NVIDIA GPU is detected. Requires root privileges.
+.TP
+.I /usr/local/bin/gpu-mode-vfio
+Script to switch GPU to vfio-pci driver mode for VM passthrough. Created by
+.BR "uva node install"
+when an NVIDIA GPU is detected. Requires root privileges.
+.TP
+.I /usr/local/bin/gpu-mode-status
+Script to display current GPU driver mode. Created by
+.BR "uva node install"
+when an NVIDIA GPU is detected.
 .TP
 .I ~/.config/tabtab/
 Directory containing shell completion scripts for Bash and Zsh. Created when running
@@ -290,6 +449,78 @@ Set primary SSH key:
 $ uva ssh-key set-primary key_abc123
 .RE
 .fi
+.SS Container Jobs
+Run a simple container job:
+.PP
+.nf
+.RS
+$ uva run alpine echo "Hello, World!"
+.RE
+.fi
+.PP
+Run a Python script with environment variables:
+.PP
+.nf
+.RS
+$ uva run python:3.11 python -c "import os; print(os.environ['MY_VAR'])" -e MY_VAR=hello
+.RE
+.fi
+.PP
+Run a GPU-accelerated job with custom resources:
+.PP
+.nf
+.RS
+$ uva run --gpu --cpu 4 --ram 16 --name ml-training pytorch/pytorch python train.py
+.RE
+.fi
+.PP
+List active jobs:
+.PP
+.nf
+.RS
+$ uva jobs
+.RE
+.fi
+.PP
+List all jobs including completed:
+.PP
+.nf
+.RS
+$ uva jobs --all
+.RE
+.fi
+.PP
+Filter jobs by status:
+.PP
+.nf
+.RS
+$ uva jobs --status running
+.RE
+.fi
+.PP
+View job logs:
+.PP
+.nf
+.RS
+$ uva logs abc-123-def
+.RE
+.fi
+.PP
+View only the last 50 lines of logs:
+.PP
+.nf
+.RS
+$ uva logs abc-123-def --tail 50
+.RE
+.fi
+.PP
+Cancel a running job:
+.PP
+.nf
+.RS
+$ uva cancel abc-123-def
+.RE
+.fi
 .SS Management
 Enable tab completion for Bash or Zsh:
 .PP
@@ -320,6 +551,102 @@ Uninstall the CLI and remove all configuration:
 .nf
 .RS
 $ uva uninstall
+.RE
+.fi
+.SS Node Management
+Prepare system for node installation:
+.PP
+.nf
+.RS
+$ uva node prepare
+.RE
+.fi
+.PP
+Check what prepare would do (dry-run):
+.PP
+.nf
+.RS
+$ uva node prepare --check
+.RE
+.fi
+.PP
+Prepare without IOMMU checks:
+.PP
+.nf
+.RS
+$ uva node prepare --skip-iommu
+.RE
+.fi
+.PP
+Install as a contributor node (after prepare and reboot):
+.PP
+.nf
+.RS
+$ uva node install
+.RE
+.fi
+.PP
+Check node status:
+.PP
+.nf
+.RS
+$ uva node status
+.RE
+.fi
+.PP
+Check GPU mode (after node install):
+.PP
+.nf
+.RS
+$ sudo gpu-mode-status
+.RE
+.fi
+.PP
+Switch GPU to container mode:
+.PP
+.nf
+.RS
+$ sudo gpu-mode-nvidia
+.RE
+.fi
+.PP
+Switch GPU to VM passthrough mode:
+.PP
+.nf
+.RS
+$ sudo gpu-mode-vfio
+.RE
+.fi
+.PP
+Uninstall node components:
+.PP
+.nf
+.RS
+$ uva node uninstall
+.RE
+.fi
+.PP
+Pause node (stop accepting new workloads):
+.PP
+.nf
+.RS
+$ uva node pause
+.RE
+.fi
+.PP
+Resume node (accept workloads again):
+.PP
+.nf
+.RS
+$ uva node resume
+.RE
+.fi
+.PP
+Configure resource sharing interactively:
+.PP
+.nf
+.RS
+$ uva node config
 .RE
 .fi
 .SH DIAGNOSTICS

@@ -11,7 +11,7 @@ export default function LandingHeader() {
     <div className="flex justify-between items-center mb-8">
       <h1 className="text-4xl font-normal leading-tight">uvacompute</h1>
       {isSignedIn ? (
-        <Link href="/dashboard" className="text-orange-accent underline">
+        <Link href="/vms" className="text-orange-accent underline">
           dashboard
         </Link>
       ) : (

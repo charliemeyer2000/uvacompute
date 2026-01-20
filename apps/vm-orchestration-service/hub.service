@@ -1,0 +1,29 @@
+[Unit]
+Description=VM Orchestration Service (Hub)
+Documentation=https://github.com/uvacompute/uvacompute
+After=network-online.target k3s.service
+Wants=network-online.target
+Requires=k3s.service
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/vm-orchestration-service
+EnvironmentFile=/opt/vm-orchestration-service/.env.production
+Environment="ENV=production"
+Environment="KUBECONFIG=/etc/rancher/k3s/k3s.yaml"
+Environment="KUBEVIRT_NAMESPACE=uvacompute"
+ExecStart=/usr/local/bin/vm-orchestration
+Restart=always
+RestartSec=10s
+StandardOutput=journal
+StandardError=journal
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/vm-orchestration-service
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

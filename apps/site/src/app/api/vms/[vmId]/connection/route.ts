@@ -3,9 +3,6 @@ import { authClient } from "@/lib/auth-client";
 import { fetchQuery } from "convex/nextjs";
 import { api } from "../../../../../../convex/_generated/api";
 
-const SSH2INCUS_HOST = process.env.SSH2INCUS_HOST || "localhost";
-const SSH2INCUS_PORT = parseInt(process.env.SSH2INCUS_PORT || "2222", 10);
-
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ vmId: string }> },
@@ -49,14 +46,29 @@ export async function GET(
       );
     }
 
+    let nodeInfo = null;
+    if (vm.nodeId) {
+      const node = await fetchQuery(api.nodes.getByNodeId, {
+        nodeId: vm.nodeId,
+      });
+      if (node) {
+        nodeInfo = {
+          nodeId: node.nodeId,
+          tunnelHost: node.tunnelHost,
+          tunnelPort: node.tunnelPort,
+          tunnelUser: node.tunnelUser || "root",
+          kubeconfigPath: node.kubeconfigPath || "/etc/rancher/k3s/k3s.yaml",
+        };
+      }
+    }
+
     return NextResponse.json(
       {
         vmId: vm.vmId,
         name: vm.name || null,
-        sshHost: SSH2INCUS_HOST,
-        sshPort: SSH2INCUS_PORT,
-        user: "root",
         status: vm.status,
+        nodeId: vm.nodeId || null,
+        node: nodeInfo,
       },
       { status: 200 },
     );
