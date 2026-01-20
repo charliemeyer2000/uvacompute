@@ -17,7 +17,6 @@ import {
   VMDeletionResponseSchema,
   VMStatusResponseSchema,
   VMListResponseSchema,
-  VMConnectionInfoSchema,
   SSHKeyListResponseSchema,
   VM_STATUS_GROUPS,
 } from "./lib/schemas";
@@ -241,6 +240,37 @@ async function createVM(options: {
           "Cannot use both --startup-script and --cloud-init flags together",
         ),
       );
+      process.exit(1);
+    }
+
+    const keysResponse = await fetch(`${BASE_URL}/api/ssh-keys`, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (keysResponse.ok) {
+      const keysData = SSHKeyListResponseSchema.parse(
+        await keysResponse.json(),
+      );
+      if (keysData.keys.length === 0) {
+        console.log(
+          theme.error(
+            "No SSH keys configured. You must add an SSH key before creating a VM.",
+          ),
+        );
+        console.log(theme.muted("\nAdd an SSH key with:"));
+        console.log(
+          formatCommand(
+            "uva ssh-key add ~/.ssh/id_ed25519.pub --name 'My Key'",
+          ),
+        );
+        console.log();
+        process.exit(1);
+      }
+    } else {
+      console.log(theme.error("Failed to check SSH keys. Please try again."));
       process.exit(1);
     }
 
@@ -790,8 +820,22 @@ async function listVMs(options: { all?: boolean }): Promise<void> {
   }
 }
 
+interface ConnectionInfo {
+  vmId: string;
+  name: string | null;
+  status: string;
+  nodeId: string | null;
+  node: {
+    nodeId: string;
+    tunnelHost: string;
+    tunnelPort: number;
+    tunnelUser: string;
+    kubeconfigPath: string;
+  } | null;
+}
+
 async function sshToVM(nameOrVmId: string): Promise<void> {
-  let spinner = ora("Fetching VMs...").start();
+  let spinner = ora("Checking prerequisites...").start();
 
   try {
     const token = loadToken();
@@ -799,6 +843,8 @@ async function sshToVM(nameOrVmId: string): Promise<void> {
       spinner.fail("Not authenticated. Please run 'uva login' first.");
       process.exit(1);
     }
+
+    spinner.text = "Fetching VMs...";
 
     const matchingVMs = await fetchAndFilterVMs(
       nameOrVmId,
@@ -821,61 +867,16 @@ async function sshToVM(nameOrVmId: string): Promise<void> {
       spinner.stop();
       vm = await selectVM(matchingVMs, nameOrVmId);
       console.log();
-      spinner = ora("Fetching VM connection info...").start();
+      spinner = ora("Checking SSH keys...").start();
     } else {
       vm = matchingVMs[0];
-      spinner.text = "Fetching VM connection info...";
+      spinner.text = "Checking SSH keys...";
     }
 
     if (vm.status !== "running") {
       spinner.fail(`VM is not running (current status: ${vm.status})`);
       process.exit(1);
     }
-
-    let connectionResponse: Response;
-    try {
-      connectionResponse = await fetch(
-        `${BASE_URL}/api/vms/${vm.vmId}/connection`,
-        {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        },
-      );
-    } catch (error: unknown) {
-      const statusData = await checkServiceStatus();
-      const serviceError = new ServiceUnavailableError(
-        statusData?.current.status ?? null,
-      );
-      spinner.fail(serviceError.message);
-      process.exit(1);
-    }
-
-    if (!connectionResponse.ok) {
-      const errorData = (await connectionResponse.json()) as {
-        error?: string;
-        message?: string;
-        status?: string;
-      };
-      if (connectionResponse.status === 409 && errorData.status) {
-        spinner.fail(`VM is not running (current status: ${errorData.status})`);
-        if (errorData.message) {
-          console.log(theme.warning(errorData.message));
-        }
-      } else {
-        spinner.fail(
-          errorData.error ||
-            errorData.message ||
-            "Failed to fetch connection info",
-        );
-      }
-      process.exit(1);
-    }
-
-    const connectionInfo = VMConnectionInfoSchema.parse(
-      await connectionResponse.json(),
-    );
 
     const keysResponse = await fetch(`${BASE_URL}/api/ssh-keys`, {
       method: "GET",
@@ -902,19 +903,55 @@ async function sshToVM(nameOrVmId: string): Promise<void> {
       }
     }
 
-    spinner.succeed(theme.success("VM connection info retrieved!"));
+    spinner.text = "Getting connection info...";
 
-    console.log(formatSectionHeader("Connecting to VM"));
+    const connectionResponse = await fetch(
+      `${BASE_URL}/api/vms/${vm.vmId}/connection`,
+      {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      },
+    );
+
+    if (!connectionResponse.ok) {
+      const errorData = (await connectionResponse.json().catch(() => ({}))) as {
+        message?: string;
+        error?: string;
+      };
+      spinner.fail(
+        `Failed to get connection info: ${errorData.message || errorData.error || "Unknown error"}`,
+      );
+      process.exit(1);
+    }
+
+    const connectionInfo = (await connectionResponse.json()) as ConnectionInfo;
+
+    if (!connectionInfo.node) {
+      spinner.fail("VM is not assigned to a node yet. Please try again.");
+      process.exit(1);
+    }
+
+    spinner.succeed(theme.success("Connecting to VM..."));
+
+    console.log(formatSectionHeader("SSH Session"));
     console.log();
 
+    const { tunnelHost, tunnelPort, tunnelUser, kubeconfigPath } =
+      connectionInfo.node;
+    // SSH to the node through DO VPS reverse tunnel, then run virtctl to connect to VM
+    // KUBECONFIG is needed for virtctl to access the k8s API
+    const proxyCommand = `ssh -p ${tunnelPort} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${tunnelUser}@${tunnelHost} 'KUBECONFIG=${kubeconfigPath} virtctl port-forward --stdio=true --namespace=uvacompute vmi/${vm.vmId} 22'`;
+
     const sshArgs = [
-      "-p",
-      connectionInfo.sshPort.toString(),
+      "-o",
+      `ProxyCommand=${proxyCommand}`,
       "-o",
       "StrictHostKeyChecking=no",
       "-o",
       "UserKnownHostsFile=/dev/null",
-      `${connectionInfo.user}@${vm.vmId}@${connectionInfo.sshHost}`,
+      `root@${vm.vmId}`,
     ];
 
     const sshProcess = spawn("ssh", sshArgs, {

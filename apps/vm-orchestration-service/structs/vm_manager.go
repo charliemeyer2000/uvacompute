@@ -19,28 +19,28 @@ type VMResourceLimits struct {
 
 type StatusCallback func(status VMStatus)
 
-type IncusProvider interface {
+type VMProvider interface {
 	CreateVM(vmId string, cpus, ram, disk, gpus int, sshPublicKeys []string, statusCallback StatusCallback, startupScript, cloudInitConfig string) error
 	DestroyVM(vmId string) error
 	GetVMStatus(vmId string) (string, error)
-	GetVMInfo(vmId string) (*IncusVMInfo, error)
-	ListVMs() ([]IncusListVM, error)
+	GetVMInfo(vmId string) (*VMInfo, error)
+	ListVMs() ([]ListVM, error)
 }
 
 type VMManager struct {
 	mu             sync.Mutex
 	vmMap          map[string]VMState
 	limits         VMResourceLimits
-	incusProvider  IncusProvider
+	vmProvider     VMProvider
 	callbackClient CallbackClient
 }
 
-func NewVMManager(limits VMResourceLimits, incusProvider IncusProvider, callbackClient CallbackClient) *VMManager {
+func NewVMManager(limits VMResourceLimits, vmProvider VMProvider, callbackClient CallbackClient) *VMManager {
 	return &VMManager{
 		mu:             sync.Mutex{},
 		vmMap:          make(map[string]VMState),
 		limits:         limits,
-		incusProvider:  incusProvider,
+		vmProvider:     vmProvider,
 		callbackClient: callbackClient,
 	}
 }
@@ -96,36 +96,20 @@ func (vm *VMManager) createVMAsync(vmId string, cpus, ram, disk, gpus int, sshPu
 
 	log.Printf("Starting async VM creation for %s (cpus: %d, ram: %d, disk: %d, gpus: %d)", vmId, cpus, ram, disk, gpus)
 
-	if !IsDevelopment() {
-		incusErr := vm.incusProvider.CreateVM(vmId, cpus, ram, disk, gpus, sshPublicKeys, statusCallback, startupScript, cloudInitConfig)
-		if incusErr != nil {
-			log.Printf("ERROR: Failed to create VM %s: %v", vmId, incusErr)
-			vm.UpdateVMStatus(vmId, VM_STATUS_FAILED, incusErr.Error())
-			return
-		}
-	} else {
-		log.Printf("[DEV MODE] Skipping Incus VM creation for VM %s", vmId)
-		statusCallback(VM_STATUS_INITIALIZING)
-		time.Sleep(1 * time.Second)
-		statusCallback(VM_STATUS_STARTING)
-		time.Sleep(1 * time.Second)
-		statusCallback(VM_STATUS_WAITING_FOR_AGENT)
-		time.Sleep(1 * time.Second)
-		statusCallback(VM_STATUS_CONFIGURING)
-		time.Sleep(1 * time.Second)
+	err := vm.vmProvider.CreateVM(vmId, cpus, ram, disk, gpus, sshPublicKeys, statusCallback, startupScript, cloudInitConfig)
+	if err != nil {
+		log.Printf("ERROR: Failed to create VM %s: %v", vmId, err)
+		vm.UpdateVMStatus(vmId, VM_STATUS_FAILED, err.Error())
+		return
 	}
 
 	vm.UpdateVMStatus(vmId, VM_STATUS_RUNNING, "")
 	log.Printf("VM %s successfully created and is now running", vmId)
 
 	time.AfterFunc(time.Duration(hours*3600*int(time.Second)), func() {
-		log.Printf("VM %s expired, deleting from Incus", vmId)
+		log.Printf("VM %s expired, deleting", vmId)
 
-		if !IsDevelopment() {
-			vm.incusProvider.DestroyVM(vmId)
-		} else {
-			log.Printf("[DEV MODE] Skipping Incus VM deletion for VM %s", vmId)
-		}
+		vm.vmProvider.DestroyVM(vmId)
 
 		vm.mu.Lock()
 		vmState := vm.vmMap[vmId]
@@ -135,7 +119,7 @@ func (vm *VMManager) createVMAsync(vmId string, cpus, ram, disk, gpus int, sshPu
 
 		if vm.callbackClient != nil {
 			go func() {
-				if err := vm.callbackClient.NotifyVMStatusUpdate(vmId, string(VM_STATUS_EXPIRED)); err != nil {
+				if err := vm.callbackClient.NotifyVMStatusUpdate(vmId, string(VM_STATUS_EXPIRED), ""); err != nil {
 					log.Printf("ERROR: Failed to notify site about VM %s expiration: %v", vmId, err)
 				}
 			}()
@@ -170,16 +154,30 @@ func (vm *VMManager) WaitForStatus(vmId string, targetStatus VMStatus) VMState {
 
 func (vm *VMManager) UpdateVMStatus(vmId string, status VMStatus, errorMessage string) {
 	vm.mu.Lock()
+	var nodeId string
 	if vmState, exists := vm.vmMap[vmId]; exists {
 		vmState.Status = status
 		vmState.ErrorMessage = errorMessage
+		nodeId = vmState.NodeId
 		vm.vmMap[vmId] = vmState
 	}
 	vm.mu.Unlock()
 
+	if status == VM_STATUS_RUNNING {
+		if info, err := vm.vmProvider.GetVMInfo(vmId); err == nil && info.Location != "" {
+			nodeId = info.Location
+			vm.mu.Lock()
+			if vmState, exists := vm.vmMap[vmId]; exists {
+				vmState.NodeId = nodeId
+				vm.vmMap[vmId] = vmState
+			}
+			vm.mu.Unlock()
+		}
+	}
+
 	if vm.callbackClient != nil {
 		go func() {
-			if err := vm.callbackClient.NotifyVMStatusUpdate(vmId, string(status)); err != nil {
+			if err := vm.callbackClient.NotifyVMStatusUpdate(vmId, string(status), nodeId); err != nil {
 				log.Printf("ERROR: Failed to notify site about VM %s status update: %v", vmId, err)
 			}
 		}()
@@ -193,13 +191,9 @@ func (vm *VMManager) DeleteVM(vmId string) error {
 	_, exists := vm.vmMap[vmId]
 
 	if !exists {
-		if !IsDevelopment() {
-			_, statusErr := vm.incusProvider.GetVMStatus(vmId)
-			if statusErr == nil {
-				log.Printf("VM %s found in Incus but not in memory, proceeding with deletion", vmId)
-			} else {
-				return fmt.Errorf("VM %s not found", vmId)
-			}
+		_, statusErr := vm.vmProvider.GetVMStatus(vmId)
+		if statusErr == nil {
+			log.Printf("VM %s found in backend but not in memory, proceeding with deletion", vmId)
 		} else {
 			return fmt.Errorf("VM %s not found", vmId)
 		}
@@ -211,13 +205,9 @@ func (vm *VMManager) DeleteVM(vmId string) error {
 		vm.vmMap[vmId] = vmState
 	}
 
-	if !IsDevelopment() {
-		incusErr := vm.incusProvider.DestroyVM(vmId)
-		if incusErr != nil {
-			return fmt.Errorf("failed to destroy VM in Incus: %w", incusErr)
-		}
-	} else {
-		log.Printf("[DEV MODE] Skipping Incus VM deletion for VM %s", vmId)
+	err := vm.vmProvider.DestroyVM(vmId)
+	if err != nil {
+		return fmt.Errorf("failed to destroy VM: %w", err)
 	}
 
 	if exists {
@@ -230,17 +220,12 @@ func (vm *VMManager) DeleteVM(vmId string) error {
 	return nil
 }
 
-func (vm *VMManager) InitializeFromIncus() error {
-	if IsDevelopment() {
-		log.Printf("[DEV MODE] Skipping Incus state synchronization")
-		return nil
-	}
+func (vm *VMManager) InitializeFromBackend() error {
+	log.Printf("Syncing VM state from backend...")
 
-	log.Printf("Syncing VM state from Incus...")
-
-	vms, err := vm.incusProvider.ListVMs()
+	vms, err := vm.vmProvider.ListVMs()
 	if err != nil {
-		return fmt.Errorf("failed to list VMs from Incus: %w", err)
+		return fmt.Errorf("failed to list VMs from backend: %w", err)
 	}
 
 	vm.mu.Lock()
@@ -250,15 +235,15 @@ func (vm *VMManager) InitializeFromIncus() error {
 	skippedCount := 0
 	var syncedVMs []string
 
-	for _, incusVM := range vms {
-		if incusVM.Status != "Running" {
-			log.Printf("Skipping VM %s (status: %s) - only running VMs are synced", incusVM.Name, incusVM.Status)
+	for _, backendVM := range vms {
+		if backendVM.Status != "Running" {
+			log.Printf("Skipping VM %s (status: %s) - only running VMs are synced", backendVM.Name, backendVM.Status)
 			skippedCount++
 			continue
 		}
 
 		vmState := VMState{
-			Id:           incusVM.Name,
+			Id:           backendVM.Name,
 			Name:         "",
 			UserId:       "",
 			CreationTime: time.Now(),
@@ -270,32 +255,36 @@ func (vm *VMManager) InitializeFromIncus() error {
 			Status:       VM_STATUS_RUNNING,
 		}
 
-		if cpuStr, ok := incusVM.Config["limits.cpu"]; ok {
+		if cpuStr, ok := backendVM.Config["limits.cpu"]; ok {
 			if cpuVal, err := strconv.Atoi(cpuStr); err == nil {
 				vmState.Cpus = cpuVal
 			}
 		}
 
-		if ramStr, ok := incusVM.Config["limits.memory"]; ok {
+		if ramStr, ok := backendVM.Config["limits.memory"]; ok {
 			ramStr = strings.TrimSuffix(ramStr, "GiB")
 			if ramVal, err := strconv.Atoi(ramStr); err == nil {
 				vmState.Ram = ramVal
 			}
 		}
 
-		vm.vmMap[incusVM.Name] = vmState
-		syncedVMs = append(syncedVMs, incusVM.Name)
+		vm.vmMap[backendVM.Name] = vmState
+		syncedVMs = append(syncedVMs, backendVM.Name)
 		syncedCount++
-		log.Printf("Synced VM %s from Incus (status: %s, cpus: %d, ram: %dGB)",
-			incusVM.Name, vmState.Status, vmState.Cpus, vmState.Ram)
+		log.Printf("Synced VM %s from backend (status: %s, cpus: %d, ram: %dGB)",
+			backendVM.Name, vmState.Status, vmState.Cpus, vmState.Ram)
 	}
 
-	log.Printf("Successfully synced %d running VMs from Incus (%d stopped/non-running VMs skipped)", syncedCount, skippedCount)
+	log.Printf("Successfully synced %d running VMs from backend (%d stopped/non-running VMs skipped)", syncedCount, skippedCount)
 
 	if vm.callbackClient != nil {
 		for _, vmId := range syncedVMs {
 			go func(id string) {
-				if err := vm.callbackClient.NotifyVMStatusUpdate(id, string(VM_STATUS_RUNNING)); err != nil {
+				nodeId := ""
+				if info, err := vm.vmProvider.GetVMInfo(id); err == nil && info.Location != "" {
+					nodeId = info.Location
+				}
+				if err := vm.callbackClient.NotifyVMStatusUpdate(id, string(VM_STATUS_RUNNING), nodeId); err != nil {
 					log.Printf("ERROR: Failed to notify site about synced VM %s status: %v", id, err)
 				}
 			}(vmId)
