@@ -28,12 +28,12 @@ export function isValidRedirect(redirect: string | null): boolean {
  * Gets a safe redirect URL from a query parameter.
  *
  * @param redirect - The redirect parameter from searchParams
- * @param fallback - The fallback URL to use if redirect is invalid (default: "/dashboard")
+ * @param fallback - The fallback URL to use if redirect is invalid (default: "/vms")
  * @returns A safe redirect URL
  */
 export function getSafeRedirect(
   redirect: string | null,
-  fallback: string = "/dashboard",
+  fallback: string = "/vms",
 ): string {
   if (!redirect || !isValidRedirect(redirect)) {
     return fallback;

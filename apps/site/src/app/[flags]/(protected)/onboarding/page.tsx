@@ -35,7 +35,7 @@ export default function OnboardingPage() {
       <div className="flex gap-4">
         {hasEarlyAccess ? (
           <Button asChild>
-            <Link href="/dashboard">go to dashboard</Link>
+            <Link href="/vms">go to vms</Link>
           </Button>
         ) : (
           <Button asChild>

@@ -7,6 +7,7 @@ import { VMStatusEnum } from "@/lib/vm-schemas";
 
 const UpdateStatusRequestSchema = z.object({
   status: VMStatusEnum,
+  nodeId: z.string().optional(),
 });
 
 export async function POST(
@@ -22,9 +23,9 @@ export async function POST(
 
   try {
     const requestData = JSON.parse(body);
-    const { status } = UpdateStatusRequestSchema.parse(requestData);
+    const { status, nodeId } = UpdateStatusRequestSchema.parse(requestData);
 
-    await fetchMutation(api.vms.updateStatus, { vmId, status });
+    await fetchMutation(api.vms.updateStatus, { vmId, status, nodeId });
     return NextResponse.json({ success: true }, { status: 200 });
   } catch (error) {
     if (error instanceof Error) {

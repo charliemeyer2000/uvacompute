@@ -43,6 +43,7 @@ export const updateStatus = mutation({
   args: {
     vmId: v.string(),
     status: v.union(...VM_STATUSES.map((s) => v.literal(s))),
+    nodeId: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const vm = await ctx.db
@@ -57,6 +58,10 @@ export const updateStatus = mutation({
     const updates: any = {
       status: args.status,
     };
+
+    if (args.nodeId) {
+      updates.nodeId = args.nodeId;
+    }
 
     const provisioningStatuses = [
       "creating",
