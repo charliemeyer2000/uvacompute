@@ -10,6 +10,7 @@ export const register = mutation({
     tunnelUser: v.optional(v.string()),
     kubeconfigPath: v.optional(v.string()),
     sshPublicKey: v.optional(v.string()),
+    ownerId: v.optional(v.string()),
     cpus: v.optional(v.number()),
     ram: v.optional(v.number()),
     gpus: v.optional(v.number()),
@@ -34,6 +35,7 @@ export const register = mutation({
         cpus: args.cpus,
         ram: args.ram,
         gpus: args.gpus,
+        ...(args.ownerId && !existing.ownerId ? { ownerId: args.ownerId } : {}),
       });
       return existing._id;
     }
@@ -46,6 +48,7 @@ export const register = mutation({
       tunnelUser: args.tunnelUser,
       kubeconfigPath: args.kubeconfigPath,
       sshPublicKey: args.sshPublicKey,
+      ownerId: args.ownerId,
       status: "online",
       lastHeartbeat: now,
       registeredAt: now,
@@ -164,5 +167,72 @@ export const getPublicKeys = query({
         nodeId: node.nodeId,
         sshPublicKey: node.sshPublicKey,
       }));
+  },
+});
+
+export const listByOwner = query({
+  args: {
+    ownerId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("nodes")
+      .withIndex("by_ownerId", (q) => q.eq("ownerId", args.ownerId))
+      .collect();
+  },
+});
+
+export const getWorkloadsOnNode = query({
+  args: {
+    nodeId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const vms = await ctx.db
+      .query("vms")
+      .withIndex("by_nodeId", (q) => q.eq("nodeId", args.nodeId))
+      .collect();
+
+    const jobs = await ctx.db
+      .query("jobs")
+      .withIndex("by_nodeId", (q) => q.eq("nodeId", args.nodeId))
+      .collect();
+
+    const activeVms = vms.filter(
+      (vm) => vm.status !== "deleted" && vm.status !== "expired",
+    );
+    const activeJobs = jobs.filter(
+      (job) =>
+        job.status !== "completed" &&
+        job.status !== "failed" &&
+        job.status !== "cancelled",
+    );
+
+    return {
+      vms: activeVms,
+      jobs: activeJobs,
+    };
+  },
+});
+
+export const verifyOwnership = query({
+  args: {
+    nodeId: v.string(),
+    ownerId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const node = await ctx.db
+      .query("nodes")
+      .withIndex("by_nodeId", (q) => q.eq("nodeId", args.nodeId))
+      .first();
+
+    if (!node) {
+      return { owned: false, exists: false };
+    }
+
+    return {
+      owned: node.ownerId === args.ownerId,
+      exists: true,
+      node: node.ownerId === args.ownerId ? node : null,
+    };
   },
 });

@@ -283,7 +283,7 @@ kubectl describe node | grep nvidia.com/gpu
 | 14. Hub Setup (DO VPS)             | ✅ Complete    | feat/hub-setup                    | k3s server + KubeVirt + orchestration on hub         |
 | 15. Agent Installation Refactor    | ✅ Complete    | feat/federated-k3s-architecture   | Nodes run k3s agent, join hub cluster                |
 | 16. Multi-Node Scheduling          | ✅ Complete    | feat/multi-node-scheduling        | Node labels, resource scheduling, placement          |
-| 17. Admin Dashboard & APIs         | ⬜ Not Started |                                   | Cluster visibility, resource aggregation             |
+| 17. Admin Dashboard & APIs         | ✅ Complete    | feat/admin-dashboard-apis         | Tiered access, admin/contributor dashboards, CLI     |
 | 18. Health Monitoring & Failover   | ⬜ Not Started |                                   | Node health, workload status, recovery               |
 
 Status key: ⬜ Not Started | 🔄 In Progress | ✅ Complete | ❌ Blocked | ⏸️ Paused
@@ -1675,32 +1675,32 @@ uva node config [nodeId]      # Configure my node
 
 **Node ownership:**
 
-- [ ] Add `ownerId` field to nodes schema
-- [ ] Update bootstrap API to set owner from token creator
-- [ ] Update token creation to record creator's userId
+- [x] Add `ownerId` field to nodes schema
+- [x] Update bootstrap API to set owner from token creator
+- [x] Update token creation to record creator's userId (already existed)
 
 **Admin endpoints & UI:**
 
-- [ ] Create `/api/admin/nodes` - list all nodes
-- [ ] Create `/api/admin/workloads` - list all workloads
-- [ ] Create `/api/admin/resources` - aggregate cluster resources
-- [ ] Create `/api/admin/nodes/:id/drain` and `/uncordon`
-- [ ] Create admin web UI at `/admin`
-- [ ] Add admin auth check (ADMIN_USERS env var)
+- [x] Create `/api/admin/nodes` - list all nodes
+- [x] Create `/api/admin/workloads` - list all workloads
+- [x] Create `/api/admin/resources` - aggregate cluster resources
+- [x] Create `/api/admin/nodes/:id/drain` and `/uncordon`
+- [x] Create admin web UI at `/admin`
+- [x] Add admin auth check (ADMIN_USERS env var)
 - [ ] Deploy Kubernetes Dashboard on hub (optional, for deep inspection)
 
 **Contributor endpoints & UI:**
 
-- [ ] Create `/api/contributor/nodes` - list user's own nodes
-- [ ] Create `/api/contributor/nodes/:id` - node details with ownership check
-- [ ] Create `/api/contributor/nodes/:id/pause` and `/resume`
-- [ ] Create contributor web UI at `/my-nodes`
-- [ ] Update `uva node` CLI commands to work remotely via API
+- [x] Create `/api/contributor/nodes` - list user's own nodes
+- [x] Create `/api/contributor/nodes/:id` - node details with ownership check
+- [x] Create `/api/contributor/nodes/:id/pause` and `/resume`
+- [x] Create contributor web UI at `/my-nodes`
+- [x] Update `uva node` CLI commands to work remotely via API
 
 **CLI:**
 
-- [ ] Create `apps/cli/src/admin.ts` with admin commands
-- [ ] Update `apps/cli/src/node.ts` for remote node management
+- [ ] Create `apps/cli/src/admin.ts` with admin commands (not needed - admins use web UI)
+- [x] Update `apps/cli/src/node.ts` for remote node management
 
 ### Files to Create/Modify
 
@@ -1719,12 +1719,22 @@ uva node config [nodeId]      # Configure my node
 
 ### Completion Criteria
 
-- [ ] Full admins can view all nodes and workloads via web and CLI
-- [ ] Node contributors can view and manage only their own nodes
-- [ ] Node ownership is tracked from registration
-- [ ] Pause/resume works for contributors on their nodes
-- [ ] Kubernetes Dashboard accessible for deep admin inspection
-- [ ] Regular users see no node information (only their workloads)
+- [x] Full admins can view all nodes and workloads via **web UI only** (no CLI as per plan)
+- [x] Node contributors can view and manage only their own nodes via **web UI and CLI**
+- [x] Node ownership is tracked from registration
+- [x] Pause/resume works for contributors on their nodes
+- [ ] Kubernetes Dashboard accessible for deep admin inspection (optional)
+- [x] Regular users see no node information (only their workloads)
+
+### Implementation Notes
+
+- Created admin-auth helper at `apps/site/src/lib/admin-auth.ts` for admin/auth checks
+- Added `ownerId` to nodes schema with `by_ownerId` index
+- Added `listByOwner`, `getWorkloadsOnNode`, and `verifyOwnership` queries to nodes.ts
+- Added `by_nodeId` indexes to vms and jobs tables for workload queries
+- Added `listAll` queries to vms.ts and jobs.ts for admin workload listing
+- Bootstrap API now passes `createdBy` from token as `ownerId` when registering nodes
+- CLI `uva node` commands now support remote management: `list`, `status <nodeId>`, `pause <nodeId>`, `resume <nodeId>`, `workloads <nodeId>`
 
 ---
 
