@@ -58,7 +58,7 @@ func (c *CallbackClient) NotifyVMStatusUpdate(vmId string, status string, nodeId
 	return fmt.Errorf("failed to notify site about VM status update for VM %s after %d attempts", vmId, 3)
 }
 
-func (c *CallbackClient) NotifyJobStatusUpdate(jobId string, status string, exitCode *int, errorMsg string) error {
+func (c *CallbackClient) NotifyJobStatusUpdate(jobId string, status string, exitCode *int, errorMsg string, nodeId string) error {
 	url := fmt.Sprintf("%s/api/jobs/%s/update-status", c.siteBaseUrl, jobId)
 
 	body := fmt.Sprintf(`{"status":"%s"`, status)
@@ -68,9 +68,12 @@ func (c *CallbackClient) NotifyJobStatusUpdate(jobId string, status string, exit
 	if errorMsg != "" {
 		body += fmt.Sprintf(`,"errorMessage":"%s"`, errorMsg)
 	}
+	if nodeId != "" {
+		body += fmt.Sprintf(`,"nodeId":"%s"`, nodeId)
+	}
 	body += "}"
 
-	log.Printf("Notifying site about Job %s status update: %s", jobId, status)
+	log.Printf("Notifying site about Job %s status update: %s (node: %s)", jobId, status, nodeId)
 
 	for attempt := 0; attempt < MAX_ATTEMPTS; attempt++ {
 		if attempt > 0 {

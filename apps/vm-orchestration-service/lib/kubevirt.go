@@ -135,6 +135,52 @@ func (k *KubeVirtAdapter) buildVMObject(vmId string, cpus, ram, disk, gpus int, 
 		devices["gpus"] = gpuDevices
 	}
 
+	// Build the template spec
+	templateSpec := map[string]interface{}{
+		"domain": map[string]interface{}{
+			"cpu": map[string]interface{}{
+				"cores": int64(cpus),
+			},
+			"memory": map[string]interface{}{
+				"guest": fmt.Sprintf("%dGi", ram),
+			},
+			"devices": devices,
+			"resources": map[string]interface{}{
+				"requests": map[string]interface{}{
+					"memory": fmt.Sprintf("%dGi", ram),
+					"cpu":    fmt.Sprintf("%d", cpus),
+				},
+			},
+		},
+		"networks": []interface{}{
+			map[string]interface{}{
+				"name": "default",
+				"pod":  map[string]interface{}{},
+			},
+		},
+		"volumes": []interface{}{
+			map[string]interface{}{
+				"name": "rootdisk",
+				"containerDisk": map[string]interface{}{
+					"image": image,
+				},
+			},
+			map[string]interface{}{
+				"name": "cloudinit",
+				"cloudInitNoCloud": map[string]interface{}{
+					"userData": cloudInitUserData,
+				},
+			},
+		},
+	}
+
+	// Add nodeSelector for GPU VMs to ensure they land on GPU nodes
+	if gpus > 0 {
+		templateSpec["nodeSelector"] = map[string]interface{}{
+			"uvacompute.com/has-gpu": "true",
+		}
+	}
+
 	vm := &unstructured.Unstructured{
 		Object: map[string]interface{}{
 			"apiVersion": "kubevirt.io/v1",
@@ -157,43 +203,7 @@ func (k *KubeVirtAdapter) buildVMObject(vmId string, cpus, ram, disk, gpus int, 
 							"uvacompute.io/vm-id":    vmId,
 						},
 					},
-					"spec": map[string]interface{}{
-						"domain": map[string]interface{}{
-							"cpu": map[string]interface{}{
-								"cores": int64(cpus),
-							},
-							"memory": map[string]interface{}{
-								"guest": fmt.Sprintf("%dGi", ram),
-							},
-							"devices": devices,
-							"resources": map[string]interface{}{
-								"requests": map[string]interface{}{
-									"memory": fmt.Sprintf("%dGi", ram),
-									"cpu":    fmt.Sprintf("%d", cpus),
-								},
-							},
-						},
-						"networks": []interface{}{
-							map[string]interface{}{
-								"name": "default",
-								"pod":  map[string]interface{}{},
-							},
-						},
-						"volumes": []interface{}{
-							map[string]interface{}{
-								"name": "rootdisk",
-								"containerDisk": map[string]interface{}{
-									"image": image,
-								},
-							},
-							map[string]interface{}{
-								"name": "cloudinit",
-								"cloudInitNoCloud": map[string]interface{}{
-									"userData": cloudInitUserData,
-								},
-							},
-						},
-					},
+					"spec": templateSpec,
 				},
 			},
 		},
