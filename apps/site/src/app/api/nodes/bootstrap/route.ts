@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
       nodeId: data.nodeId,
     });
 
-    // Register the node
+    // Register the node with owner from token creator
     await fetchMutation(api.nodes.register, {
       nodeId: data.nodeId,
       name: data.name,
@@ -50,6 +50,7 @@ export async function POST(request: NextRequest) {
       tunnelUser: DEFAULT_TUNNEL_USER,
       kubeconfigPath: DEFAULT_KUBECONFIG_PATH,
       sshPublicKey: data.sshPublicKey,
+      ownerId: tokenValidation.createdBy,
       cpus: data.cpus,
       ram: data.ram,
       gpus: data.gpus,

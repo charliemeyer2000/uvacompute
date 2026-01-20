@@ -187,3 +187,10 @@ export const cancel = mutation({
     return job._id;
   },
 });
+
+export const listAll = query({
+  args: {},
+  handler: async (ctx) => {
+    return await ctx.db.query("jobs").order("desc").collect();
+  },
+});
