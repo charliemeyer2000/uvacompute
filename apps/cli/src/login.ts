@@ -1,6 +1,7 @@
 import type { Command } from "commander";
 import ora from "ora";
 import open from "open";
+import { execSync } from "child_process";
 import { getBaseUrl, saveToken, loadToken, validateToken } from "./lib/utils";
 import { theme, createInfoBox } from "./lib/theme";
 import { type TokenSuccessResponse } from "./lib/types";
@@ -12,6 +13,21 @@ import {
 import { DeviceCodeResponseSchema, TokenResponseSchema } from "./lib/schemas";
 
 const BASE_URL = getBaseUrl();
+
+function canOpenBrowser(): boolean {
+  if (process.platform === "darwin" || process.platform === "win32") {
+    return true;
+  }
+  if (!process.env.DISPLAY && !process.env.WAYLAND_DISPLAY) {
+    return false;
+  }
+  try {
+    execSync("which xdg-open", { stdio: "ignore" });
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 async function deviceAuthorization(): Promise<TokenSuccessResponse> {
   let spinner = ora("Requesting device authorization...").start();
@@ -63,13 +79,21 @@ async function deviceAuthorization(): Promise<TokenSuccessResponse> {
 
     const urlToOpen = `${verification_uri}/approve?user_code=${user_code}`;
 
-    try {
-      await open(urlToOpen);
+    let browserOpened = false;
+
+    if (canOpenBrowser()) {
+      try {
+        await open(urlToOpen);
+        browserOpened = true;
+      } catch {}
+    }
+
+    if (browserOpened) {
       console.log(theme.muted("Browser opened automatically\n"));
-    } catch (error) {
+    } else {
       console.log(
-        theme.warning(
-          "Could not open browser automatically. Please visit the URL above manually.\n",
+        theme.muted(
+          "Open the URL above on any device to complete authentication.\n",
         ),
       );
     }
