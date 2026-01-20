@@ -236,3 +236,26 @@ export const verifyOwnership = query({
     };
   },
 });
+
+export const setOwner = mutation({
+  args: {
+    nodeId: v.string(),
+    ownerId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const node = await ctx.db
+      .query("nodes")
+      .withIndex("by_nodeId", (q) => q.eq("nodeId", args.nodeId))
+      .first();
+
+    if (!node) {
+      throw new Error(`Node ${args.nodeId} not found`);
+    }
+
+    await ctx.db.patch(node._id, {
+      ownerId: args.ownerId,
+    });
+
+    return node._id;
+  },
+});
