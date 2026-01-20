@@ -10,7 +10,7 @@ import (
 	"github.com/google/uuid"
 )
 
-type JobStatusCallback func(status JobStatus, exitCode *int, errorMsg string)
+type JobStatusCallback func(status JobStatus, exitCode *int, errorMsg string, nodeId string)
 
 type JobProvider interface {
 	CreateJob(jobId string, image string, command []string, env map[string]string, cpus, ram, gpus int, statusCallback JobStatusCallback) error
@@ -76,12 +76,12 @@ func (jm *JobManager) createJobAsync(jobId string, image string, command []strin
 	defer func() {
 		if r := recover(); r != nil {
 			log.Printf("ERROR: Panic in createJobAsync for Job %s: %v", jobId, r)
-			jm.UpdateJobStatus(jobId, JOB_STATUS_FAILED, nil, fmt.Sprintf("Internal error: %v", r))
+			jm.UpdateJobStatus(jobId, JOB_STATUS_FAILED, nil, fmt.Sprintf("Internal error: %v", r), "")
 		}
 	}()
 
-	statusCallback := func(status JobStatus, exitCode *int, errorMsg string) {
-		jm.UpdateJobStatus(jobId, status, exitCode, errorMsg)
+	statusCallback := func(status JobStatus, exitCode *int, errorMsg string, nodeId string) {
+		jm.UpdateJobStatus(jobId, status, exitCode, errorMsg, nodeId)
 	}
 
 	log.Printf("Starting async job creation for %s (image: %s, cpus: %d, ram: %d, gpus: %d)", jobId, image, cpus, ram, gpus)
@@ -89,7 +89,7 @@ func (jm *JobManager) createJobAsync(jobId string, image string, command []strin
 	err := jm.jobProvider.CreateJob(jobId, image, command, env, cpus, ram, gpus, statusCallback)
 	if err != nil {
 		log.Printf("ERROR: Failed to create Job %s: %v", jobId, err)
-		jm.UpdateJobStatus(jobId, JOB_STATUS_FAILED, nil, err.Error())
+		jm.UpdateJobStatus(jobId, JOB_STATUS_FAILED, nil, err.Error(), "")
 		return
 	}
 
@@ -132,12 +132,15 @@ func (jm *JobManager) StreamJobLogs(jobId string) (io.ReadCloser, error) {
 	return jm.jobProvider.StreamJobLogs(jobId)
 }
 
-func (jm *JobManager) UpdateJobStatus(jobId string, status JobStatus, exitCode *int, errorMessage string) {
+func (jm *JobManager) UpdateJobStatus(jobId string, status JobStatus, exitCode *int, errorMessage string, nodeId string) {
 	jm.mu.Lock()
 	if jobState, exists := jm.jobMap[jobId]; exists {
 		jobState.Status = status
 		jobState.ExitCode = exitCode
 		jobState.ErrorMessage = errorMessage
+		if nodeId != "" {
+			jobState.NodeId = nodeId
+		}
 		jm.jobMap[jobId] = jobState
 	}
 	jm.mu.Unlock()
@@ -146,7 +149,7 @@ func (jm *JobManager) UpdateJobStatus(jobId string, status JobStatus, exitCode *
 
 	if jm.callbackClient != nil {
 		go func() {
-			if err := jm.callbackClient.NotifyJobStatusUpdate(jobId, string(status), exitCode, errorMessage); err != nil {
+			if err := jm.callbackClient.NotifyJobStatusUpdate(jobId, string(status), exitCode, errorMessage, nodeId); err != nil {
 				log.Printf("ERROR: Failed to notify site about Job %s status update: %v", jobId, err)
 			}
 
@@ -209,7 +212,7 @@ func (jm *JobManager) CancelJob(jobId string) error {
 
 	if jm.callbackClient != nil {
 		go func() {
-			if err := jm.callbackClient.NotifyJobStatusUpdate(jobId, string(JOB_STATUS_CANCELLED), nil, ""); err != nil {
+			if err := jm.callbackClient.NotifyJobStatusUpdate(jobId, string(JOB_STATUS_CANCELLED), nil, "", ""); err != nil {
 				log.Printf("ERROR: Failed to notify site about Job %s cancellation: %v", jobId, err)
 			}
 		}()

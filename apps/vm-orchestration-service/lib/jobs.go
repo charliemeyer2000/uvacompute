@@ -62,11 +62,11 @@ func NewJobAdapter(config JobAdapterConfig) (*JobAdapter, error) {
 func (j *JobAdapter) CreateJob(jobId string, image string, command []string, env map[string]string, cpus, ram, gpus int, statusCallback structs.JobStatusCallback) error {
 	ctx := context.Background()
 
-	statusCallback(structs.JOB_STATUS_PENDING, nil, "")
+	statusCallback(structs.JOB_STATUS_PENDING, nil, "", "")
 
 	job := j.buildJobObject(jobId, image, command, env, cpus, ram, gpus)
 
-	statusCallback(structs.JOB_STATUS_SCHEDULED, nil, "")
+	statusCallback(structs.JOB_STATUS_SCHEDULED, nil, "", "")
 	_, err := j.client.BatchV1().Jobs(j.namespace).Create(ctx, job, metav1.CreateOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to create job: %w", err)
@@ -115,6 +115,20 @@ func (j *JobAdapter) buildJobObject(jobId string, image string, command []string
 		container.Command = command
 	}
 
+	podSpec := corev1.PodSpec{
+		RestartPolicy: corev1.RestartPolicyNever,
+		Containers:    []corev1.Container{container},
+	}
+
+	// Add nodeSelector and RuntimeClass for GPU jobs
+	if gpus > 0 {
+		podSpec.NodeSelector = map[string]string{
+			"uvacompute.com/has-gpu": "true",
+		}
+		runtimeClass := "nvidia"
+		podSpec.RuntimeClassName = &runtimeClass
+	}
+
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      jobId,
@@ -135,10 +149,7 @@ func (j *JobAdapter) buildJobObject(jobId string, image string, command []string
 						"uvacompute.io/job-id":   jobId,
 					},
 				},
-				Spec: corev1.PodSpec{
-					RestartPolicy: corev1.RestartPolicyNever,
-					Containers:    []corev1.Container{container},
-				},
+				Spec: podSpec,
 			},
 		},
 	}
@@ -157,67 +168,75 @@ func (j *JobAdapter) watchJobStatus(ctx context.Context, jobId string, statusCal
 		case <-ctx.Done():
 			return
 		case <-timeout:
-			statusCallback(structs.JOB_STATUS_FAILED, nil, "job watcher timeout")
+			statusCallback(structs.JOB_STATUS_FAILED, nil, "job watcher timeout", "")
 			return
 		case <-ticker.C:
-			status, exitCode, errorMsg, done := j.checkJobStatus(ctx, jobId)
+			status, exitCode, errorMsg, nodeId, done := j.checkJobStatus(ctx, jobId)
 			if done {
-				statusCallback(status, exitCode, errorMsg)
+				statusCallback(status, exitCode, errorMsg, nodeId)
 				return
 			}
-			statusCallback(status, nil, "")
+			statusCallback(status, nil, "", nodeId)
 		}
 	}
 }
 
-func (j *JobAdapter) checkJobStatus(ctx context.Context, jobId string) (structs.JobStatus, *int, string, bool) {
+func (j *JobAdapter) checkJobStatus(ctx context.Context, jobId string) (structs.JobStatus, *int, string, string, bool) {
 	job, err := j.client.BatchV1().Jobs(j.namespace).Get(ctx, jobId, metav1.GetOptions{})
 	if err != nil {
 		if errors.IsNotFound(err) {
-			return structs.JOB_STATUS_CANCELLED, nil, "job not found", true
+			return structs.JOB_STATUS_CANCELLED, nil, "job not found", "", true
 		}
 		log.Printf("Error getting job %s: %v", jobId, err)
-		return structs.JOB_STATUS_PENDING, nil, "", false
+		return structs.JOB_STATUS_PENDING, nil, "", "", false
+	}
+
+	// Get pod to extract nodeId
+	pods, err := j.client.CoreV1().Pods(j.namespace).List(ctx, metav1.ListOptions{
+		LabelSelector: fmt.Sprintf("uvacompute.io/job-id=%s", jobId),
+	})
+	
+	var nodeId string
+	var pod *corev1.Pod
+	if err == nil && len(pods.Items) > 0 {
+		pod = &pods.Items[0]
+		nodeId = pod.Spec.NodeName
 	}
 
 	for _, condition := range job.Status.Conditions {
 		if condition.Type == batchv1.JobComplete && condition.Status == corev1.ConditionTrue {
 			exitCode := 0
-			return structs.JOB_STATUS_COMPLETED, &exitCode, "", true
+			return structs.JOB_STATUS_COMPLETED, &exitCode, "", nodeId, true
 		}
 		if condition.Type == batchv1.JobFailed && condition.Status == corev1.ConditionTrue {
 			exitCode := 1
-			return structs.JOB_STATUS_FAILED, &exitCode, condition.Message, true
+			return structs.JOB_STATUS_FAILED, &exitCode, condition.Message, nodeId, true
 		}
 	}
 
-	pods, err := j.client.CoreV1().Pods(j.namespace).List(ctx, metav1.ListOptions{
-		LabelSelector: fmt.Sprintf("uvacompute.io/job-id=%s", jobId),
-	})
-	if err != nil || len(pods.Items) == 0 {
-		return structs.JOB_STATUS_SCHEDULED, nil, "", false
+	if pod == nil {
+		return structs.JOB_STATUS_SCHEDULED, nil, "", "", false
 	}
 
-	pod := pods.Items[0]
 	switch pod.Status.Phase {
 	case corev1.PodPending:
 		for _, containerStatus := range pod.Status.ContainerStatuses {
 			if containerStatus.State.Waiting != nil {
 				reason := containerStatus.State.Waiting.Reason
 				if reason == "ImagePullBackOff" || reason == "ErrImagePull" || reason == "Pulling" {
-					return structs.JOB_STATUS_PULLING, nil, "", false
+					return structs.JOB_STATUS_PULLING, nil, "", nodeId, false
 				}
 			}
 		}
-		return structs.JOB_STATUS_SCHEDULED, nil, "", false
+		return structs.JOB_STATUS_SCHEDULED, nil, "", nodeId, false
 	case corev1.PodRunning:
-		return structs.JOB_STATUS_RUNNING, nil, "", false
+		return structs.JOB_STATUS_RUNNING, nil, "", nodeId, false
 	case corev1.PodSucceeded:
 		exitCode := 0
 		if len(pod.Status.ContainerStatuses) > 0 && pod.Status.ContainerStatuses[0].State.Terminated != nil {
 			exitCode = int(pod.Status.ContainerStatuses[0].State.Terminated.ExitCode)
 		}
-		return structs.JOB_STATUS_COMPLETED, &exitCode, "", true
+		return structs.JOB_STATUS_COMPLETED, &exitCode, "", nodeId, true
 	case corev1.PodFailed:
 		exitCode := 1
 		errorMsg := ""
@@ -225,10 +244,10 @@ func (j *JobAdapter) checkJobStatus(ctx context.Context, jobId string) (structs.
 			exitCode = int(pod.Status.ContainerStatuses[0].State.Terminated.ExitCode)
 			errorMsg = pod.Status.ContainerStatuses[0].State.Terminated.Message
 		}
-		return structs.JOB_STATUS_FAILED, &exitCode, errorMsg, true
+		return structs.JOB_STATUS_FAILED, &exitCode, errorMsg, nodeId, true
 	}
 
-	return structs.JOB_STATUS_PENDING, nil, "", false
+	return structs.JOB_STATUS_PENDING, nil, "", nodeId, false
 }
 
 func (j *JobAdapter) DeleteJob(jobId string) error {
@@ -248,7 +267,7 @@ func (j *JobAdapter) DeleteJob(jobId string) error {
 func (j *JobAdapter) GetJobStatus(jobId string) (structs.JobStatus, error) {
 	ctx := context.Background()
 
-	status, _, _, _ := j.checkJobStatus(ctx, jobId)
+	status, _, _, _, _ := j.checkJobStatus(ctx, jobId)
 	return status, nil
 }
 
