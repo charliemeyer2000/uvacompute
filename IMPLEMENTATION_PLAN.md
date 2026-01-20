@@ -260,6 +260,7 @@ kubectl describe node | grep nvidia.com/gpu
 | 1. Remove Incus, finalize KubeVirt | ✅ Complete    |        | Removed all Incus code, KubeVirt-only backend       |
 | 2. Test KubeVirt on workstation    | ✅ Complete    |        | k3s v1.34.3 + KubeVirt v1.3.0 working               |
 | 3. k3s/KubeVirt install script     | ✅ Complete    |        | uva node install/uninstall/status + GPU auto-detect |
+| 3.5. Node prepare command          | ⬜ Not Started |        | uva node prepare for driver install + reboot flow   |
 | 4. Jobs schema + site API          | ⬜ Not Started |        |                                                     |
 | 5. Jobs in orchestration service   | ⬜ Not Started |        |                                                     |
 | 6. Jobs CLI commands               | ⬜ Not Started |        |                                                     |
@@ -376,6 +377,8 @@ curl -X POST http://localhost:8080/vms \
 
 **Goal:** Create `uva node install` command that sets up a machine as a contributor node.
 
+**Status:** ✅ Complete - See Plan 3.5 for the complementary `uva node prepare` command.
+
 ### Context
 
 Users should be able to run one command to join the network. The script should:
@@ -385,6 +388,8 @@ Users should be able to run one command to join the network. The script should:
 - Install NVIDIA container toolkit (if GPU present)
 - Configure resource sharing
 - Save state for clean uninstall
+
+**Note:** Testing revealed that driver installation requires a reboot before proceeding. This led to the two-phase approach where `uva node prepare` handles driver installation and `uva node install` handles the Kubernetes stack. See Plan 3.5 for the prepare command.
 
 ### Learnings from Plan 2 Testing
 
@@ -415,6 +420,63 @@ Users should be able to run one command to join the network. The script should:
 - Container mode: nvidia driver bound, containers can use GPU, no VM passthrough
 - VM passthrough mode: vfio-pci bound, KubeVirt can passthrough GPU, no container access
 - Script should generate machine-specific mode-switching scripts based on detected PCI addresses
+
+### Learnings from Plan 3 Testing (Fresh Ubuntu Install)
+
+**Tested on:** Fresh Ubuntu 24.04.3 LTS with RTX 5090, no drivers installed
+
+**Two-phase approach needed:**
+
+1. **Phase 1: System Prerequisites** (`uva node prepare`)
+   - NVIDIA driver installation requires kernel module compilation
+   - After installation, **reboot is required** to load kernel module
+   - `nvidia-smi` fails until reboot
+
+2. **Phase 2: Kubernetes Stack** (`uva node install`)
+   - k3s, KubeVirt, nvidia-container-toolkit
+   - Requires working `nvidia-smi` (driver loaded)
+
+**Driver installation by distro:**
+
+| Distro        | Command                         | Notes                            |
+| ------------- | ------------------------------- | -------------------------------- |
+| Ubuntu/Debian | `ubuntu-drivers autoinstall`    | Auto-detects best driver         |
+| Arch          | `pacman -S nvidia nvidia-utils` | Or `nvidia-open` for open driver |
+| Fedora        | `dnf install akmod-nvidia`      | RPM Fusion required              |
+| Gentoo        | `emerge nvidia-drivers`         | May need kernel config           |
+
+**Workstation test results:**
+
+- Fresh Ubuntu 24.04.3 with `nvidia-driver-580-open` (RTX 5090 Blackwell)
+- `ubuntu-drivers autoinstall` worked cleanly
+- Installed 580.95.05 driver
+- Reboot required to load kernel module
+- Workstation password: `bakedbeans`
+
+**Critical k3s containerd configuration learnings:**
+
+1. **config.toml.tmpl must use base template:**
+
+   ```
+   {{ template "base" . }}
+
+   [plugins."io.containerd.cri.v1.runtime".containerd.runtimes.nvidia]
+     runtime_type = "io.containerd.runc.v2"
+
+   [plugins."io.containerd.cri.v1.runtime".containerd.runtimes.nvidia.options]
+     BinaryName = "/usr/bin/nvidia-container-runtime"
+   ```
+
+   Without `{{ template "base" . }}`, the entire k3s containerd config is replaced, breaking CNI/networking.
+
+2. **Do NOT specify SystemdCgroup for nvidia runtime:**
+   Setting `SystemdCgroup = true` causes cgroup path format mismatch errors.
+
+3. **k3s restart required after containerd config change:**
+   After modifying config.toml.tmpl, must restart k3s and wait for node to become Ready.
+
+4. **IOMMU already enabled on modern AMD systems:**
+   AMD Threadripper PRO has IOMMU enabled by default. GPU in clean IOMMU group 19.
 
 ### Todos
 
@@ -504,6 +566,145 @@ echo "Detected Audio: $AUDIO_PCI ($AUDIO_DEVID)"
 - [x] Config files created in `~/.uvacompute/node/`
 - [ ] Uninstall cleans up properly (requires clean test machine)
 - [x] Branch created: `gt create --all --message "feat: uva node install command"`
+
+---
+
+## Plan 3.5: Node Prepare Command
+
+**Goal:** Create `uva node prepare` command for driver installation and system prerequisites that require reboot.
+
+### Context
+
+Testing on a fresh Ubuntu 24.04.3 install revealed that NVIDIA driver installation requires a reboot before the driver is loaded. This creates a two-phase setup:
+
+1. **`uva node prepare`** - Install drivers, configure IOMMU, reboot
+2. **`uva node install`** - Install k3s, KubeVirt, container toolkit (requires working driver)
+
+This separation of concerns:
+
+- Makes each step's purpose clear
+- Handles the reboot requirement gracefully
+- Allows users to verify driver works before proceeding
+- Supports different distros with different driver installation methods
+
+### Architecture
+
+```
+uva node prepare
+    │
+    ├── Detect OS (Ubuntu/Debian/Arch/Fedora/Gentoo)
+    ├── Check for NVIDIA GPU (lspci)
+    ├── Check if nvidia-smi works
+    │
+    ├── If driver missing:
+    │   ├── Ubuntu/Debian: ubuntu-drivers autoinstall
+    │   ├── Arch: Interactive guidance (pacman -S nvidia)
+    │   ├── Fedora: Interactive guidance (RPM Fusion + dnf)
+    │   └── Gentoo: Interactive guidance (emerge)
+    │
+    ├── Check IOMMU status
+    │   ├── If enabled: ✓
+    │   └── If missing: Provide GRUB/BIOS guidance
+    │
+    └── Save state + Tell user to reboot
+
+uva node install (existing)
+    │
+    ├── Check nvidia-smi works (if GPU detected)
+    │   └── If fails: "Run 'uva node prepare' first"
+    │
+    └── Continue with k3s/KubeVirt/toolkit install
+```
+
+### Todos
+
+**CLI Structure:**
+
+- [ ] Add `uva node prepare` command to `apps/cli/src/node.ts`
+- [ ] Add `--check` flag to report what would be done
+- [ ] Add `--skip-iommu` flag to skip IOMMU checks
+- [ ] Update `uva node install` to check for working driver first
+
+**Driver Installation (by distro):**
+
+- [ ] Ubuntu/Debian: Automate with `ubuntu-drivers autoinstall`
+- [ ] Arch: Interactive guidance with confirmation prompts
+- [ ] Fedora: Interactive guidance for RPM Fusion setup
+- [ ] Gentoo: Interactive guidance with kernel config notes
+
+**IOMMU Detection:**
+
+- [ ] Check `/sys/kernel/iommu_groups/` for enabled IOMMU
+- [ ] Check GPU's IOMMU group for isolation
+- [ ] Detect AMD vs Intel for correct kernel param guidance
+- [ ] Provide GRUB modification guidance (don't auto-modify)
+
+**State Management:**
+
+- [ ] Save prepare state to `~/.uvacompute/node/prepare-state.yaml`
+- [ ] Track: driver_installed, iommu_status, reboot_required
+- [ ] Update `uva node status` to show prepare state
+
+**Testing:**
+
+- [ ] Test on fresh Ubuntu (already have workstation)
+- [ ] Test `--check` flag output
+- [ ] Test detection of already-prepared system
+
+### Files to Create/Modify
+
+- `apps/cli/src/node.ts` → Add prepare command
+- `apps/cli/src/lib/constants.ts` → Add PREPARE_STATE_FILE
+- `apps/site/public/prepare-node.sh` → NEW (driver install script)
+
+### Driver Installation Commands Reference
+
+```bash
+# Ubuntu/Debian
+ubuntu-drivers devices              # List available drivers
+ubuntu-drivers autoinstall          # Install recommended driver
+
+# Arch
+pacman -S nvidia nvidia-utils       # Proprietary driver
+pacman -S nvidia-open nvidia-utils  # Open driver (newer cards)
+
+# Fedora (requires RPM Fusion)
+dnf install https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm
+dnf install https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-$(rpm -E %fedora).noarch.rpm
+dnf install akmod-nvidia
+
+# Gentoo
+emerge --ask x11-drivers/nvidia-drivers
+```
+
+### IOMMU Detection Reference
+
+```bash
+# Check if IOMMU is enabled
+ls /sys/kernel/iommu_groups/ | wc -l  # Should be > 0
+
+# Check GPU's IOMMU group
+find /sys/kernel/iommu_groups/ -type l | xargs ls -la | grep "VGA\|nvidia"
+
+# Check current kernel params
+cat /proc/cmdline | grep -E "iommu|intel_iommu|amd_iommu"
+
+# GRUB params needed (if IOMMU not enabled)
+# AMD: amd_iommu=on
+# Intel: intel_iommu=on
+```
+
+### Completion Criteria
+
+- [ ] `uva node prepare` detects OS correctly
+- [ ] Driver installation works on Ubuntu (automated)
+- [ ] Driver installation guidance works on Arch (interactive)
+- [ ] IOMMU detection provides accurate status
+- [ ] `--check` flag shows what would be done without doing it
+- [ ] State saved correctly for `uva node status`
+- [ ] `uva node install` checks for driver and guides to prepare if missing
+- [ ] Tested on fresh Ubuntu workstation
+- [ ] Branch created: `gt create --all --message "feat: uva node prepare command"`
 
 ---
 

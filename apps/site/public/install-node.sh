@@ -256,6 +256,48 @@ configure_nvidia_k3s() {
         log_warn "Could not generate CDI config (nvidia driver may not be loaded)"
     fi
 
+    # Configure k3s containerd with nvidia runtime
+    log_info "Configuring k3s containerd with nvidia runtime..."
+    local containerd_dir="/var/lib/rancher/k3s/agent/etc/containerd"
+    mkdir -p "${containerd_dir}"
+    
+    # Check if config already has nvidia runtime
+    if [[ -f "${containerd_dir}/config.toml.tmpl" ]] && grep -q "runtimes.nvidia" "${containerd_dir}/config.toml.tmpl" 2>/dev/null; then
+        log_warn "nvidia runtime already configured in containerd"
+    else
+        cat > "${containerd_dir}/config.toml.tmpl" << 'CONTAINERD_EOF'
+{{ template "base" . }}
+
+[plugins."io.containerd.cri.v1.runtime".containerd.runtimes.nvidia]
+  runtime_type = "io.containerd.runc.v2"
+
+[plugins."io.containerd.cri.v1.runtime".containerd.runtimes.nvidia.options]
+  BinaryName = "/usr/bin/nvidia-container-runtime"
+CONTAINERD_EOF
+        log_success "nvidia runtime added to containerd config"
+        
+        # Restart k3s to apply containerd config
+        log_info "Restarting k3s to apply containerd config..."
+        systemctl restart k3s
+        
+        # Wait for k3s to be ready again
+        local retries=60
+        while [[ $retries -gt 0 ]]; do
+            if kubectl get nodes &> /dev/null; then
+                local status=$(kubectl get nodes -o jsonpath='{.items[0].status.conditions[?(@.type=="Ready")].status}' 2>/dev/null)
+                if [[ "${status}" == "True" ]]; then
+                    break
+                fi
+            fi
+            sleep 2
+            ((retries--))
+        done
+        
+        if [[ $retries -eq 0 ]]; then
+            log_warn "k3s taking longer than expected to restart, continuing anyway..."
+        fi
+    fi
+
     # Create nvidia RuntimeClass
     log_info "Creating nvidia RuntimeClass..."
     kubectl apply -f - <<EOF
