@@ -172,3 +172,10 @@ export const getByVmId = query({
     return vm;
   },
 });
+
+export const listAll = query({
+  args: {},
+  handler: async (ctx) => {
+    return await ctx.db.query("vms").order("desc").collect();
+  },
+});
