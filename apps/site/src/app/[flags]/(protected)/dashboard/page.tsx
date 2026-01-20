@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
-import VMList from "./_components/vm-list";
 
 export default function DashboardPage() {
+  const router = useRouter();
   const searchParams = useSearchParams();
 
   useEffect(() => {
@@ -13,12 +13,11 @@ export default function DashboardPage() {
       toast.success("email verified successfully!", {
         description: "welcome to uvacompute",
       });
+      router.replace("/vms?verified=true");
+    } else {
+      router.replace("/vms");
     }
-  }, [searchParams]);
+  }, [searchParams, router]);
 
-  return (
-    <div className="border-t border-gray-200 pt-8">
-      <VMList />
-    </div>
-  );
+  return null;
 }
