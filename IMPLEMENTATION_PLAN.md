@@ -281,7 +281,7 @@ kubectl describe node | grep nvidia.com/gpu
 | 13. Automated node onboarding      | ✅ Complete    | feat/multi-node-ssh-routing       | Token-based registration + DO VPS key sync           |
 | **FEDERATED K3S ARCHITECTURE**     |                |                                   |                                                      |
 | 14. Hub Setup (DO VPS)             | ✅ Complete    | feat/hub-setup                    | k3s server + KubeVirt + orchestration on hub         |
-| 15. Agent Installation Refactor    | 🔄 In Progress | feat/agent-installation           | Nodes run k3s agent, join hub cluster                |
+| 15. Agent Installation Refactor    | ✅ Complete    | feat/federated-k3s-architecture   | Nodes run k3s agent, join hub cluster                |
 | 16. Multi-Node Scheduling          | ⬜ Not Started |                                   | Node labels, resource scheduling, placement          |
 | 17. Admin Dashboard & APIs         | ⬜ Not Started |                                   | Cluster visibility, resource aggregation             |
 | 18. Health Monitoring & Failover   | ⬜ Not Started |                                   | Node health, workload status, recovery               |
@@ -1378,7 +1378,7 @@ Add to `/api/nodes/bootstrap` response:
 - [x] **Update `uva node uninstall`** for agent mode
   - Checks for k3s-agent-uninstall.sh first, falls back to k3s-uninstall.sh
   - Also removes uvacompute-tunnel.service and /opt/uvacompute
-- [ ] **Test**: Node joins cluster, appears in `kubectl get nodes` (pending Vercel deploy)
+- [x] **Test**: Node joins cluster, appears in `kubectl get nodes` ✅
 
 ### Files to Create/Modify
 
@@ -1391,12 +1391,12 @@ Add to `/api/nodes/bootstrap` response:
 
 ### Completion Criteria
 
-- [ ] install-node.sh works in agent mode
-- [ ] Node joins hub cluster successfully
-- [ ] Node is labeled with resources
-- [ ] GPU detection and labeling works
-- [ ] SSH tunnel established
-- [ ] `kubectl get nodes` shows new node
+- [x] install-node.sh works in agent mode
+- [x] Node joins hub cluster successfully
+- [x] Node is labeled with resources (cpus=32, ram=125, gpu=nvidia-...)
+- [x] GPU detection and labeling works
+- [x] SSH tunnel established (port 2223)
+- [x] `kubectl get nodes` shows new node (aiworkstation Ready)
 
 ---
 
