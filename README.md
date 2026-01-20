@@ -117,5 +117,10 @@ _
 - Inbound.new (for email forwarding) - using github:
   - for email forwarding from \*@inbound.new to my personal email charlie@charliemeyer.xyz
 - digital ocean using github email:
-  - $4/mo vps, password is uvaHazNoGp000s
-  - ip is REDACTED-IP
+  - $4/mo vps (SSH proxy for nodes)
+  - ip: REDACTED-IP
+  - ssh: `ssh root@REDACTED-IP`
+  - password: `***REMOVED-PASSWORD***`
+  - NODE_KEYS_SYNC_SECRET: `***REMOVED-NODE-SYNC-SECRET***`
+    - This secret is used by the DO VPS to fetch node SSH keys from the site API
+    - Must be set as env var on Vercel for the site

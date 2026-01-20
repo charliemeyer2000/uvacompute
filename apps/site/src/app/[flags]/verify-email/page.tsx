@@ -23,7 +23,7 @@ export default function VerifyEmailPage() {
   useEffect(() => {
     if (!isPending && session?.user.emailVerified) {
       toast.success("email verified successfully!");
-      router.push("/dashboard");
+      router.push("/vms");
     }
   }, [session, isPending, router]);
 
@@ -47,7 +47,7 @@ export default function VerifyEmailPage() {
       toast.success("email verified successfully!");
 
       setTimeout(() => {
-        router.push("/dashboard");
+        router.push("/vms");
       }, 2000);
     } catch (error) {
       setVerificationStatus("error");
