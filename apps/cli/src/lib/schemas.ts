@@ -183,10 +183,8 @@ export const VMListResponseSchema = z.object({
 export const VMConnectionInfoSchema = z.object({
   vmId: z.string(),
   name: z.string().nullable(),
-  sshHost: z.string(),
-  sshPort: z.number(),
-  user: z.string(),
   status: z.string(),
+  nodeId: z.string().nullable().optional(),
 });
 
 export const UserSchema = z.object({
@@ -234,4 +232,99 @@ export const StatusApiResponseSchema = z.object({
   current: StatusCheckSchema,
   history: z.array(StatusCheckSchema),
   uptime: z.number(),
+});
+
+// Job schemas
+
+export const JobStatusEnum = z.enum([
+  "pending",
+  "scheduled",
+  "pulling",
+  "running",
+  "completed",
+  "failed",
+  "cancelled",
+]);
+export type JobStatus = z.infer<typeof JobStatusEnum>;
+
+export const JOB_STATUS_GROUPS = {
+  ACTIVE: ["pending", "scheduled", "pulling", "running"] as const,
+  TERMINAL: ["completed", "failed", "cancelled"] as const,
+  CANCELLABLE: ["pending", "scheduled", "pulling", "running"] as const,
+} as const;
+
+export function isJobStatusInGroup(
+  status: JobStatus,
+  group: readonly string[],
+): boolean {
+  return group.includes(status);
+}
+
+const JobCreationStatusEnum = z.enum([
+  "success",
+  "validation_failed",
+  "internal_error",
+  "resources_unavailable",
+]);
+
+export const JobCreationRequestSchema = z.object({
+  image: z.string().min(1, "Image is required"),
+  command: z.array(z.string()).optional(),
+  env: z.record(z.string(), z.string()).optional(),
+  name: z.string().max(255).optional(),
+  cpus: z.number().int().min(1).max(16).optional(),
+  ram: z.number().int().min(1).max(64).optional(),
+  gpus: z.number().int().min(0).max(1).optional(),
+});
+
+export const JobCreationResponseSchema = z.object({
+  status: JobCreationStatusEnum,
+  jobId: z.string().optional(),
+  msg: z.string(),
+});
+
+const JobCancellationStatusEnum = z.enum([
+  "cancellation_success",
+  "cancellation_failed_internal",
+  "cancellation_failed_not_found",
+  "cancellation_failed_not_cancellable",
+]);
+
+export const JobCancellationResponseSchema = z.object({
+  status: JobCancellationStatusEnum,
+  jobId: z.string().optional(),
+  msg: z.string(),
+});
+
+export const JobStatusResponseSchema = z.object({
+  status: JobStatusEnum,
+  msg: z.string(),
+  exitCode: z.number().optional(),
+  errorMessage: z.string().optional(),
+});
+
+export const JobInfoSchema = z.object({
+  _id: z.string(),
+  _creationTime: z.number(),
+  userId: z.string(),
+  jobId: z.string(),
+  name: z.string().optional(),
+  image: z.string(),
+  command: z.array(z.string()).optional(),
+  env: z.any().optional(),
+  cpus: z.number(),
+  ram: z.number(),
+  gpus: z.number(),
+  status: JobStatusEnum,
+  exitCode: z.number().optional(),
+  errorMessage: z.string().optional(),
+  createdAt: z.number(),
+  startedAt: z.number().optional(),
+  completedAt: z.number().optional(),
+  nodeId: z.string().optional(),
+  logsUrl: z.string().optional(),
+});
+
+export const JobListResponseSchema = z.object({
+  jobs: z.array(JobInfoSchema),
 });

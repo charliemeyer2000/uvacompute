@@ -33,7 +33,7 @@ func main() {
 	fmt.Println("Starting server...")
 
 	if structs.IsDevelopment() {
-		fmt.Println("Running in development (no incus calls)")
+		fmt.Println("Running in development mode")
 	} else {
 		fmt.Println("Running in production.")
 	}
@@ -55,11 +55,64 @@ func main() {
 	fmt.Printf("Callback client configured for: %s\n", siteBaseUrl)
 
 	callbackClient := lib.NewCallbackClient(siteBaseUrl, sharedSecret)
-	incusAdapter := lib.NewIncusAdapter()
-	app := structs.NewApp(incusAdapter, callbackClient)
 
-	if err := app.VMManager.InitializeFromIncus(); err != nil {
-		fmt.Printf("Warning: Failed to sync state from Incus: %v\n", err)
+	fmt.Println("Using KubeVirt backend for VMs")
+	kubeVirtConfig := lib.DefaultKubeVirtConfig()
+
+	vmAdapter, err := lib.NewKubeVirtAdapter(kubeVirtConfig)
+	if err != nil {
+		panic(fmt.Sprintf("Failed to create KubeVirt adapter: %v", err))
+	}
+
+	if err := vmAdapter.EnsureNamespace(); err != nil {
+		fmt.Printf("Warning: Failed to ensure namespace: %v\n", err)
+	}
+
+	if err := vmAdapter.Ping(); err != nil {
+		panic(fmt.Sprintf("Failed to connect to Kubernetes: %v", err))
+	}
+
+	fmt.Printf("Connected to Kubernetes, using namespace: %s\n", kubeVirtConfig.Namespace)
+
+	fmt.Println("Using Kubernetes Jobs backend for container jobs")
+	jobAdapterConfig := lib.JobAdapterConfig{
+		Namespace:      kubeVirtConfig.Namespace,
+		KubeconfigPath: kubeVirtConfig.KubeconfigPath,
+	}
+
+	jobAdapter, err := lib.NewJobAdapter(jobAdapterConfig)
+	if err != nil {
+		panic(fmt.Sprintf("Failed to create Job adapter: %v", err))
+	}
+
+	if err := jobAdapter.EnsureNamespace(); err != nil {
+		fmt.Printf("Warning: Failed to ensure namespace for jobs: %v\n", err)
+	}
+
+	if err := jobAdapter.Ping(); err != nil {
+		panic(fmt.Sprintf("Failed to connect to Kubernetes for jobs: %v", err))
+	}
+
+	fmt.Println("Job adapter initialized successfully")
+
+	app := structs.NewAppWithConfig(structs.AppConfig{
+		VMProvider:     vmAdapter,
+		JobProvider:    jobAdapter,
+		CallbackClient: callbackClient,
+		VMResourceLimits: structs.VMResourceLimits{
+			MaxCpus: 16,
+			MaxRam:  64,
+			MaxGpus: 1,
+		},
+		JobResourceLimits: structs.JobResourceLimits{
+			MaxCpus: 16,
+			MaxRam:  64,
+			MaxGpus: 1,
+		},
+	})
+
+	if err := app.VMManager.InitializeFromBackend(); err != nil {
+		fmt.Printf("Warning: Failed to sync state from backend: %v\n", err)
 	}
 
 	app.Router.Use(middleware.Logger)
@@ -68,10 +121,25 @@ func main() {
 	app.Router.Use(middleware.Recoverer)
 	app.Router.Use(middleware.Timeout(60 * time.Second))
 
-	app.SetupRoutes(handlers.RootHandler, handlers.CreateVMHandler, handlers.GetVMStatusHandler, handlers.DeleteVMHandler, handlers.AuthMiddleware)
+	app.SetupAllRoutes(
+		handlers.RootHandler,
+		structs.VMHandlers{
+			CreateVM:  handlers.CreateVMHandler,
+			GetStatus: handlers.GetVMStatusHandler,
+			DeleteVM:  handlers.DeleteVMHandler,
+		},
+		structs.JobHandlers{
+			CreateJob:  handlers.CreateJobHandler,
+			GetStatus:  handlers.GetJobStatusHandler,
+			DeleteJob:  handlers.DeleteJobHandler,
+			GetLogs:    handlers.GetJobLogsHandler,
+			StreamLogs: handlers.StreamJobLogsHandler,
+		},
+		handlers.AuthMiddleware,
+	)
 
 	fmt.Println("Routes configured, starting server on :8080")
-	err := http.ListenAndServe(":8080", app.Router)
+	err = http.ListenAndServe(":8080", app.Router)
 	if err != nil {
 		fmt.Printf("Server failed to start: %v\n", err)
 		panic(err)

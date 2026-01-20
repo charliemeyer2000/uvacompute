@@ -33,6 +33,16 @@ export const statusColors = {
   expired: chalk.red,
 } as const;
 
+export const jobStatusColors = {
+  pending: chalk.yellow,
+  scheduled: chalk.yellow,
+  pulling: chalk.blue,
+  running: chalk.blue,
+  completed: chalk.green,
+  failed: chalk.red,
+  cancelled: chalk.gray,
+} as const;
+
 export function createInfoBox(content: string): string {
   return boxen(content, {
     padding: 1,
