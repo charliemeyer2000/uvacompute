@@ -67,6 +67,7 @@ export const validateToken = query({
     return {
       valid: true,
       assignedPort: tokenRecord.assignedPort,
+      createdBy: tokenRecord.createdBy,
     };
   },
 });

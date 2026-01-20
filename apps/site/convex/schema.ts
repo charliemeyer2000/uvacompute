@@ -50,7 +50,8 @@ export default defineSchema({
   })
     .index("by_user", ["userId"])
     .index("by_user_and_status", ["userId", "status"])
-    .index("by_vmId", ["vmId"]),
+    .index("by_vmId", ["vmId"])
+    .index("by_nodeId", ["nodeId"]),
 
   sshKeys: defineTable({
     userId: v.string(),
@@ -100,7 +101,8 @@ export default defineSchema({
   })
     .index("by_user", ["userId"])
     .index("by_user_and_status", ["userId", "status"])
-    .index("by_jobId", ["jobId"]),
+    .index("by_jobId", ["jobId"])
+    .index("by_nodeId", ["nodeId"]),
 
   nodes: defineTable({
     nodeId: v.string(),
@@ -110,6 +112,7 @@ export default defineSchema({
     tunnelUser: v.optional(v.string()), // SSH user on the node (default: root)
     kubeconfigPath: v.optional(v.string()), // Path to kubeconfig (default: /etc/rancher/k3s/k3s.yaml)
     sshPublicKey: v.optional(v.string()), // Node's SSH public key for DO VPS tunnel
+    ownerId: v.optional(v.string()), // User who contributed this node
     status: v.union(
       v.literal("online"),
       v.literal("offline"),
@@ -122,7 +125,8 @@ export default defineSchema({
     gpus: v.optional(v.number()),
   })
     .index("by_nodeId", ["nodeId"])
-    .index("by_status", ["status"]),
+    .index("by_status", ["status"])
+    .index("by_ownerId", ["ownerId"]),
 
   nodeRegistrationTokens: defineTable({
     token: v.string(),
