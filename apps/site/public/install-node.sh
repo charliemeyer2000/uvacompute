@@ -234,6 +234,14 @@ install_k3s_agent() {
     
     curl -sfL https://get.k3s.io | K3S_URL="${K3S_URL}" K3S_TOKEN="${K3S_TOKEN}" sh -s - agent
 
+    # Configure kubelet to use systemd cgroup driver (fixes KubeVirt virt-handler cgroup issues)
+    if ! grep -q "K3S_KUBELET_ARG" /etc/systemd/system/k3s-agent.service.env 2>/dev/null; then
+        log_info "Configuring kubelet cgroup driver..."
+        echo 'K3S_KUBELET_ARG=--cgroup-driver=systemd' >> /etc/systemd/system/k3s-agent.service.env
+        systemctl daemon-reload
+        systemctl restart k3s-agent
+    fi
+
     log_info "Waiting for k3s agent to be ready..."
     local retries=30
     while [[ $retries -gt 0 ]]; do
@@ -267,16 +275,19 @@ label_node() {
     ram=$(free -g | awk '/^Mem:/{print $2}')
 
     local gpu_label="none"
+    local has_gpu="false"
     if [[ "${GPU_DETECTED}" == "true" ]]; then
         # Parse GPU name to create a label-friendly string
         # e.g., "NVIDIA GeForce RTX 5090" -> "nvidia-rtx-5090"
         gpu_label=$(echo "${GPU_NAME}" | tr '[:upper:]' '[:lower:]' | sed 's/nvidia geforce /nvidia-/g' | sed 's/ /-/g' | sed 's/[^a-z0-9-]//g')
+        has_gpu="true"
     fi
 
     log_info "Applying labels to node ${node_id}:"
     log_info "  uvacompute.com/cpus=${cpus}"
     log_info "  uvacompute.com/ram=${ram}"
     log_info "  uvacompute.com/gpu=${gpu_label}"
+    log_info "  uvacompute.com/has-gpu=${has_gpu}"
 
     # We need to use the hub's kubectl, so we'll create a script that runs on the hub
     # via SSH tunnel. For now, we'll create a label script that can be run from the hub.
@@ -288,6 +299,7 @@ labels:
   uvacompute.com/cpus: "${cpus}"
   uvacompute.com/ram: "${ram}"
   uvacompute.com/gpu: "${gpu_label}"
+  uvacompute.com/has-gpu: "${has_gpu}"
 EOF
 
     log_success "Node labels saved to ${SERVICE_DIR}/node-labels.yaml"
@@ -303,7 +315,7 @@ EOF
         # Try to SSH to hub and label the node
         if ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -i "${SSH_KEY_PATH}" \
             "root@${TUNNEL_HOST}" \
-            "kubectl get node ${node_id} &>/dev/null && kubectl label node ${node_id} uvacompute.com/cpus=${cpus} uvacompute.com/ram=${ram} uvacompute.com/gpu=${gpu_label} --overwrite" 2>/dev/null; then
+            "kubectl get node ${node_id} &>/dev/null && kubectl label node ${node_id} uvacompute.com/cpus=${cpus} uvacompute.com/ram=${ram} uvacompute.com/gpu=${gpu_label} uvacompute.com/has-gpu=${has_gpu} --overwrite" 2>/dev/null; then
             labeled=true
             break
         fi
@@ -315,7 +327,7 @@ EOF
         log_success "Node labels applied successfully"
     else
         log_warn "Could not apply labels automatically. Run this on the hub:"
-        log_warn "  kubectl label node ${node_id} uvacompute.com/cpus=${cpus} uvacompute.com/ram=${ram} uvacompute.com/gpu=${gpu_label} --overwrite"
+        log_warn "  kubectl label node ${node_id} uvacompute.com/cpus=${cpus} uvacompute.com/ram=${ram} uvacompute.com/gpu=${gpu_label} uvacompute.com/has-gpu=${has_gpu} --overwrite"
     fi
 }
 
