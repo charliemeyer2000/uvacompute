@@ -13,9 +13,39 @@ import {
   DEV_SITE_URL,
 } from "./lib/constants";
 import { theme } from "./lib/theme";
-import { loadToken } from "./lib/utils";
+import { loadToken, getBaseUrl } from "./lib/utils";
 import chalk from "chalk";
 import yaml from "js-yaml";
+
+interface RemoteNode {
+  _id: string;
+  nodeId: string;
+  name?: string;
+  status: "online" | "offline" | "draining";
+  cpus?: number;
+  ram?: number;
+  gpus?: number;
+  lastHeartbeat: number;
+  registeredAt: number;
+}
+
+interface RemoteVM {
+  vmId: string;
+  name?: string;
+  cpus: number;
+  ram: number;
+  gpus: number;
+  status: string;
+}
+
+interface RemoteJob {
+  jobId: string;
+  name?: string;
+  cpus: number;
+  ram: number;
+  gpus: number;
+  status: string;
+}
 
 interface SharingConfig {
   cpus: number;
@@ -1633,6 +1663,290 @@ async function nodeTokenList(): Promise<void> {
   }
 }
 
+async function nodeListRemote(): Promise<void> {
+  console.log(chalk.bold("\n📋 My Contributed Nodes\n"));
+
+  const token = loadToken();
+  if (!token) {
+    console.log(chalk.red("✗ Not logged in. Run 'uva login' first."));
+    process.exit(1);
+  }
+
+  const spinner = ora("Fetching your nodes...").start();
+
+  try {
+    const baseUrl = getBaseUrl();
+    const response = await fetch(`${baseUrl}/api/contributor/nodes`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    if (!response.ok) {
+      const errorBody = (await response
+        .json()
+        .catch(() => ({ error: "Unknown error" }))) as { error?: string };
+      throw new Error(errorBody.error || `HTTP ${response.status}`);
+    }
+
+    const data = (await response.json()) as { nodes: RemoteNode[] };
+    const nodes = data.nodes || [];
+
+    spinner.succeed(`Found ${nodes.length} node(s)`);
+    console.log();
+
+    if (nodes.length === 0) {
+      console.log(chalk.gray("  You haven't contributed any nodes yet."));
+      console.log(
+        chalk.gray("  Contact an admin to get an installation token."),
+      );
+    } else {
+      for (const node of nodes) {
+        const statusColor =
+          node.status === "online"
+            ? chalk.green
+            : node.status === "draining"
+              ? chalk.yellow
+              : chalk.red;
+        const statusIcon =
+          node.status === "online"
+            ? "●"
+            : node.status === "draining"
+              ? "◐"
+              : "○";
+
+        console.log(
+          `  ${statusColor(statusIcon)} ${chalk.bold(node.name || node.nodeId)}`,
+        );
+        console.log(chalk.gray(`    ID: ${node.nodeId}`));
+        console.log(
+          chalk.gray(
+            `    Resources: ${node.cpus || 0} CPUs, ${node.ram || 0}GB RAM, ${node.gpus || 0} GPUs`,
+          ),
+        );
+        console.log(chalk.gray(`    Status: ${statusColor(node.status)}`));
+        console.log(
+          chalk.gray(
+            `    Last heartbeat: ${new Date(node.lastHeartbeat).toLocaleString()}`,
+          ),
+        );
+        console.log();
+      }
+    }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    spinner.fail(`Failed to fetch nodes: ${message}`);
+    process.exit(1);
+  }
+}
+
+async function nodeStatusRemote(nodeId: string): Promise<void> {
+  console.log(chalk.bold(`\n📊 Node Status: ${nodeId}\n`));
+
+  const token = loadToken();
+  if (!token) {
+    console.log(chalk.red("✗ Not logged in. Run 'uva login' first."));
+    process.exit(1);
+  }
+
+  const spinner = ora("Fetching node status...").start();
+
+  try {
+    const baseUrl = getBaseUrl();
+    const response = await fetch(`${baseUrl}/api/contributor/nodes/${nodeId}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    if (!response.ok) {
+      const errorBody = (await response
+        .json()
+        .catch(() => ({ error: "Unknown error" }))) as { error?: string };
+      throw new Error(errorBody.error || `HTTP ${response.status}`);
+    }
+
+    const data = (await response.json()) as { node: RemoteNode };
+    const node = data.node;
+
+    spinner.succeed("Node found");
+    console.log();
+
+    const statusColor =
+      node.status === "online"
+        ? chalk.green
+        : node.status === "draining"
+          ? chalk.yellow
+          : chalk.red;
+
+    console.log(`  ${chalk.bold("Name:")} ${node.name || "(unnamed)"}`);
+    console.log(`  ${chalk.bold("Node ID:")} ${node.nodeId}`);
+    console.log(`  ${chalk.bold("Status:")} ${statusColor(node.status)}`);
+    console.log(`  ${chalk.bold("CPUs:")} ${node.cpus || 0}`);
+    console.log(`  ${chalk.bold("RAM:")} ${node.ram || 0}GB`);
+    console.log(`  ${chalk.bold("GPUs:")} ${node.gpus || 0}`);
+    console.log(
+      `  ${chalk.bold("Registered:")} ${new Date(node.registeredAt).toLocaleString()}`,
+    );
+    console.log(
+      `  ${chalk.bold("Last heartbeat:")} ${new Date(node.lastHeartbeat).toLocaleString()}`,
+    );
+    console.log();
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    spinner.fail(`Failed to fetch node: ${message}`);
+    process.exit(1);
+  }
+}
+
+async function nodePauseRemote(nodeId: string): Promise<void> {
+  console.log(chalk.bold(`\n⏸️  Pausing Node: ${nodeId}\n`));
+
+  const token = loadToken();
+  if (!token) {
+    console.log(chalk.red("✗ Not logged in. Run 'uva login' first."));
+    process.exit(1);
+  }
+
+  const spinner = ora("Pausing node...").start();
+
+  try {
+    const baseUrl = getBaseUrl();
+    const response = await fetch(
+      `${baseUrl}/api/contributor/nodes/${nodeId}/pause`,
+      {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      },
+    );
+
+    if (!response.ok) {
+      const errorBody = (await response
+        .json()
+        .catch(() => ({ error: "Unknown error" }))) as { error?: string };
+      throw new Error(errorBody.error || `HTTP ${response.status}`);
+    }
+
+    spinner.succeed("Node paused successfully");
+    console.log(chalk.gray("\n  The node will stop accepting new workloads."));
+    console.log(chalk.gray("  Existing workloads will continue to run."));
+    console.log();
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    spinner.fail(`Failed to pause node: ${message}`);
+    process.exit(1);
+  }
+}
+
+async function nodeResumeRemote(nodeId: string): Promise<void> {
+  console.log(chalk.bold(`\n▶️  Resuming Node: ${nodeId}\n`));
+
+  const token = loadToken();
+  if (!token) {
+    console.log(chalk.red("✗ Not logged in. Run 'uva login' first."));
+    process.exit(1);
+  }
+
+  const spinner = ora("Resuming node...").start();
+
+  try {
+    const baseUrl = getBaseUrl();
+    const response = await fetch(
+      `${baseUrl}/api/contributor/nodes/${nodeId}/resume`,
+      {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      },
+    );
+
+    if (!response.ok) {
+      const errorBody = (await response
+        .json()
+        .catch(() => ({ error: "Unknown error" }))) as { error?: string };
+      throw new Error(errorBody.error || `HTTP ${response.status}`);
+    }
+
+    spinner.succeed("Node resumed successfully");
+    console.log(chalk.gray("\n  The node is now accepting new workloads."));
+    console.log();
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    spinner.fail(`Failed to resume node: ${message}`);
+    process.exit(1);
+  }
+}
+
+async function nodeWorkloadsRemote(nodeId: string): Promise<void> {
+  console.log(chalk.bold(`\n📦 Workloads on Node: ${nodeId}\n`));
+
+  const token = loadToken();
+  if (!token) {
+    console.log(chalk.red("✗ Not logged in. Run 'uva login' first."));
+    process.exit(1);
+  }
+
+  const spinner = ora("Fetching workloads...").start();
+
+  try {
+    const baseUrl = getBaseUrl();
+    const response = await fetch(
+      `${baseUrl}/api/contributor/nodes/${nodeId}/workloads`,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      },
+    );
+
+    if (!response.ok) {
+      const errorBody = (await response
+        .json()
+        .catch(() => ({ error: "Unknown error" }))) as { error?: string };
+      throw new Error(errorBody.error || `HTTP ${response.status}`);
+    }
+
+    const data = (await response.json()) as {
+      vms: RemoteVM[];
+      jobs: RemoteJob[];
+    };
+    const { vms, jobs } = data;
+
+    const total = vms.length + jobs.length;
+    spinner.succeed(`Found ${total} active workload(s)`);
+    console.log();
+
+    if (total === 0) {
+      console.log(chalk.gray("  No active workloads on this node."));
+    } else {
+      if (vms.length > 0) {
+        console.log(chalk.bold("  VMs:"));
+        for (const vm of vms) {
+          console.log(chalk.blue(`    • ${vm.name || vm.vmId.slice(0, 8)}`));
+          console.log(
+            chalk.gray(
+              `      ${vm.cpus} CPUs, ${vm.ram}GB RAM, ${vm.gpus} GPUs - ${vm.status}`,
+            ),
+          );
+        }
+        console.log();
+      }
+
+      if (jobs.length > 0) {
+        console.log(chalk.bold("  Jobs:"));
+        for (const job of jobs) {
+          console.log(
+            chalk.magenta(`    • ${job.name || job.jobId.slice(0, 8)}`),
+          );
+          console.log(
+            chalk.gray(
+              `      ${job.cpus} CPUs, ${job.ram}GB RAM, ${job.gpus} GPUs - ${job.status}`,
+            ),
+          );
+        }
+        console.log();
+      }
+    }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    spinner.fail(`Failed to fetch workloads: ${message}`);
+    process.exit(1);
+  }
+}
+
 export function registerNodeCommands(program: Command) {
   const node = program
     .command("node")
@@ -1658,19 +1972,53 @@ export function registerNodeCommands(program: Command) {
     .action(nodeUninstall);
 
   node
-    .command("status")
-    .description("Show current node status including k3s, KubeVirt, and GPU")
-    .action(nodeStatus);
+    .command("list")
+    .description("List your contributed nodes (remote)")
+    .action(nodeListRemote);
 
   node
-    .command("pause")
-    .description("Stop accepting new workloads (existing workloads continue)")
-    .action(nodePause);
+    .command("status [nodeId]")
+    .description(
+      "Show node status (local if no nodeId, remote if nodeId provided)",
+    )
+    .action((nodeId?: string) => {
+      if (nodeId) {
+        nodeStatusRemote(nodeId);
+      } else {
+        nodeStatus();
+      }
+    });
 
   node
-    .command("resume")
-    .description("Resume accepting new workloads")
-    .action(nodeResume);
+    .command("pause [nodeId]")
+    .description(
+      "Pause node - stop accepting workloads (local if no nodeId, remote if nodeId provided)",
+    )
+    .action((nodeId?: string) => {
+      if (nodeId) {
+        nodePauseRemote(nodeId);
+      } else {
+        nodePause();
+      }
+    });
+
+  node
+    .command("resume [nodeId]")
+    .description(
+      "Resume node - start accepting workloads (local if no nodeId, remote if nodeId provided)",
+    )
+    .action((nodeId?: string) => {
+      if (nodeId) {
+        nodeResumeRemote(nodeId);
+      } else {
+        nodeResume();
+      }
+    });
+
+  node
+    .command("workloads <nodeId>")
+    .description("Show active workloads on a remote node")
+    .action(nodeWorkloadsRemote);
 
   node
     .command("config")
