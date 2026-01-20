@@ -6,12 +6,12 @@ import (
 	"testing"
 )
 
-type MockIncusProvider struct {
+type MockVMProvider struct {
 	mu          sync.Mutex
 	LastSSHKeys []string
 }
 
-func (m *MockIncusProvider) CreateVM(vmId string, cpus, ram, disk, gpus int, sshPublicKeys []string, statusCallback StatusCallback, startupScript, cloudInitConfig string) error {
+func (m *MockVMProvider) CreateVM(vmId string, cpus, ram, disk, gpus int, sshPublicKeys []string, statusCallback StatusCallback, startupScript, cloudInitConfig string) error {
 	m.mu.Lock()
 	m.LastSSHKeys = sshPublicKeys
 	m.mu.Unlock()
@@ -24,26 +24,26 @@ func (m *MockIncusProvider) CreateVM(vmId string, cpus, ram, disk, gpus int, ssh
 	return nil
 }
 
-func (m *MockIncusProvider) DestroyVM(vmId string) error {
+func (m *MockVMProvider) DestroyVM(vmId string) error {
 	return nil
 }
 
-func (m *MockIncusProvider) GetVMStatus(vmId string) (string, error) {
+func (m *MockVMProvider) GetVMStatus(vmId string) (string, error) {
 	return "", nil
 }
 
-func (m *MockIncusProvider) GetVMInfo(vmId string) (*IncusVMInfo, error) {
-	return &IncusVMInfo{}, nil
+func (m *MockVMProvider) GetVMInfo(vmId string) (*VMInfo, error) {
+	return &VMInfo{}, nil
 }
 
-func (m *MockIncusProvider) ListVMs() ([]IncusListVM, error) {
-	return []IncusListVM{}, nil
+func (m *MockVMProvider) ListVMs() ([]ListVM, error) {
+	return []ListVM{}, nil
 }
 
 func TestCreateVM(t *testing.T) {
 	limits := VMResourceLimits{MaxCpus: 16, MaxRam: 64, MaxGpus: 1}
-	mockIncus := &MockIncusProvider{}
-	vm := NewVMManager(limits, mockIncus, nil)
+	mockProvider := &MockVMProvider{}
+	vm := NewVMManager(limits, mockProvider, nil)
 
 	req := VMCreationRequest{
 		Hours:  24,
@@ -75,8 +75,8 @@ func TestCreateVM(t *testing.T) {
 
 func TestCreateVMWithCustomValues(t *testing.T) {
 	limits := VMResourceLimits{MaxCpus: 16, MaxRam: 64, MaxGpus: 1}
-	mockIncus := &MockIncusProvider{}
-	vm := NewVMManager(limits, mockIncus, nil)
+	mockProvider := &MockVMProvider{}
+	vm := NewVMManager(limits, mockProvider, nil)
 
 	cpus := 4
 	ram := 16
@@ -114,8 +114,8 @@ func TestCreateVMWithCustomValues(t *testing.T) {
 
 func TestDeleteVM(t *testing.T) {
 	limits := VMResourceLimits{MaxCpus: 16, MaxRam: 64, MaxGpus: 1}
-	mockIncus := &MockIncusProvider{}
-	vm := NewVMManager(limits, mockIncus, nil)
+	mockProvider := &MockVMProvider{}
+	vm := NewVMManager(limits, mockProvider, nil)
 
 	req := VMCreationRequest{
 		Hours:  24,
@@ -140,8 +140,8 @@ func TestDeleteVM(t *testing.T) {
 
 func TestResourceLimits(t *testing.T) {
 	limits := VMResourceLimits{MaxCpus: 4, MaxRam: 8, MaxGpus: 1}
-	mockIncus := &MockIncusProvider{}
-	vm := NewVMManager(limits, mockIncus, nil)
+	mockProvider := &MockVMProvider{}
+	vm := NewVMManager(limits, mockProvider, nil)
 
 	cpus := 4
 	req := VMCreationRequest{
@@ -167,8 +167,8 @@ func TestResourceLimits(t *testing.T) {
 
 func TestCreateVMWithSSHKeys(t *testing.T) {
 	limits := VMResourceLimits{MaxCpus: 16, MaxRam: 64, MaxGpus: 1}
-	mockIncus := &MockIncusProvider{}
-	vm := NewVMManager(limits, mockIncus, nil)
+	mockProvider := &MockVMProvider{}
+	vm := NewVMManager(limits, mockProvider, nil)
 
 	sshKeys := []string{
 		"ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC... user@example.com",
@@ -192,13 +192,13 @@ func TestCreateVMWithSSHKeys(t *testing.T) {
 
 	vm.WaitForStatus(vmId, VM_STATUS_RUNNING)
 
-	mockIncus.mu.Lock()
-	keysCount := len(mockIncus.LastSSHKeys)
+	mockProvider.mu.Lock()
+	keysCount := len(mockProvider.LastSSHKeys)
 	keysMatch := keysCount == 2
 	if keysMatch {
-		keysMatch = mockIncus.LastSSHKeys[0] == sshKeys[0] && mockIncus.LastSSHKeys[1] == sshKeys[1]
+		keysMatch = mockProvider.LastSSHKeys[0] == sshKeys[0] && mockProvider.LastSSHKeys[1] == sshKeys[1]
 	}
-	mockIncus.mu.Unlock()
+	mockProvider.mu.Unlock()
 
 	if keysCount != 2 {
 		t.Fatalf("expected 2 SSH keys passed to provider, got %d", keysCount)
@@ -211,8 +211,8 @@ func TestCreateVMWithSSHKeys(t *testing.T) {
 
 func TestCreateVMWithoutSSHKeys(t *testing.T) {
 	limits := VMResourceLimits{MaxCpus: 16, MaxRam: 64, MaxGpus: 1}
-	mockIncus := &MockIncusProvider{}
-	vm := NewVMManager(limits, mockIncus, nil)
+	mockProvider := &MockVMProvider{}
+	vm := NewVMManager(limits, mockProvider, nil)
 
 	req := VMCreationRequest{
 		Hours:         24,
@@ -231,9 +231,9 @@ func TestCreateVMWithoutSSHKeys(t *testing.T) {
 
 	vm.WaitForStatus(vmId, VM_STATUS_RUNNING)
 
-	mockIncus.mu.Lock()
-	keysCount := len(mockIncus.LastSSHKeys)
-	mockIncus.mu.Unlock()
+	mockProvider.mu.Lock()
+	keysCount := len(mockProvider.LastSSHKeys)
+	mockProvider.mu.Unlock()
 
 	if keysCount != 0 {
 		t.Fatalf("expected 0 SSH keys passed to provider, got %d", keysCount)
@@ -242,8 +242,8 @@ func TestCreateVMWithoutSSHKeys(t *testing.T) {
 
 func TestCreateVMWithSingleSSHKey(t *testing.T) {
 	limits := VMResourceLimits{MaxCpus: 16, MaxRam: 64, MaxGpus: 1}
-	mockIncus := &MockIncusProvider{}
-	vm := NewVMManager(limits, mockIncus, nil)
+	mockProvider := &MockVMProvider{}
+	vm := NewVMManager(limits, mockProvider, nil)
 
 	sshKey := "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC... user@example.com"
 
@@ -264,10 +264,10 @@ func TestCreateVMWithSingleSSHKey(t *testing.T) {
 
 	vm.WaitForStatus(vmId, VM_STATUS_RUNNING)
 
-	mockIncus.mu.Lock()
-	keysCount := len(mockIncus.LastSSHKeys)
-	keyMatch := keysCount == 1 && mockIncus.LastSSHKeys[0] == sshKey
-	mockIncus.mu.Unlock()
+	mockProvider.mu.Lock()
+	keysCount := len(mockProvider.LastSSHKeys)
+	keyMatch := keysCount == 1 && mockProvider.LastSSHKeys[0] == sshKey
+	mockProvider.mu.Unlock()
 
 	if keysCount != 1 {
 		t.Fatalf("expected 1 SSH key passed to provider, got %d", keysCount)
@@ -280,8 +280,8 @@ func TestCreateVMWithSingleSSHKey(t *testing.T) {
 
 func TestCreateVMWithSSHKeysAndCustomResources(t *testing.T) {
 	limits := VMResourceLimits{MaxCpus: 16, MaxRam: 64, MaxGpus: 1}
-	mockIncus := &MockIncusProvider{}
-	vm := NewVMManager(limits, mockIncus, nil)
+	mockProvider := &MockVMProvider{}
+	vm := NewVMManager(limits, mockProvider, nil)
 
 	cpus := 4
 	ram := 16
@@ -317,9 +317,9 @@ func TestCreateVMWithSSHKeysAndCustomResources(t *testing.T) {
 		t.Fatalf("expected name 'ssh-test-vm', got %s", vmState.Name)
 	}
 
-	mockIncus.mu.Lock()
-	keysCount := len(mockIncus.LastSSHKeys)
-	mockIncus.mu.Unlock()
+	mockProvider.mu.Lock()
+	keysCount := len(mockProvider.LastSSHKeys)
+	mockProvider.mu.Unlock()
 
 	if keysCount != 1 {
 		t.Fatalf("expected 1 SSH key passed to provider, got %d", keysCount)

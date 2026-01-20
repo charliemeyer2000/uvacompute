@@ -26,7 +26,7 @@ export default function DeviceApprovalPage() {
       toast.success("device approved", {
         description: "device has been authorized to access your account",
       });
-      setTimeout(() => router.push("/dashboard"), 2000);
+      setTimeout(() => router.push("/vms"), 2000);
     } catch (error) {
       toast.error("approval failed", {
         description: "failed to approve device, please try again",
@@ -46,7 +46,7 @@ export default function DeviceApprovalPage() {
       toast.success("device denied", {
         description: "device access has been denied",
       });
-      setTimeout(() => router.push("/dashboard"), 2000);
+      setTimeout(() => router.push("/vms"), 2000);
     } catch (error) {
       toast.error("denial failed", {
         description: "failed to deny device, please try again",

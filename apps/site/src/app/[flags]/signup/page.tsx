@@ -78,7 +78,7 @@ export default function SignUpPage() {
     await authClient.signIn.social(
       {
         provider,
-        callbackURL: "/dashboard",
+        callbackURL: "/vms",
         newUserCallbackURL: "/onboarding",
       },
       {

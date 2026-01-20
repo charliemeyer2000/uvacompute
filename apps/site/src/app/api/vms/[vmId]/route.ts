@@ -61,10 +61,24 @@ export async function DELETE(
       },
     );
 
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(
+        `Orchestration service error: ${response.status} ${errorText}`,
+      );
+      return NextResponse.json(
+        {
+          status: "failed",
+          msg: `Orchestration service error: ${response.status}`,
+        },
+        { status: response.status },
+      );
+    }
+
     const rawData = await response.json();
     const data = VMDeletionResponseSchema.parse(rawData);
 
-    if (response.ok && data.status === "deletion_success") {
+    if (data.status === "deletion_success") {
       try {
         await fetchMutation(api.vms.updateStatus, {
           vmId,
@@ -149,6 +163,20 @@ export async function GET(
         headers: authHeaders,
       },
     );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(
+        `Orchestration service error: ${response.status} ${errorText}`,
+      );
+      return NextResponse.json(
+        {
+          status: "failed",
+          msg: `Orchestration service error: ${response.status}`,
+        },
+        { status: response.status },
+      );
+    }
 
     const rawData = await response.json();
     const data = VMStatusResponseSchema.parse(rawData);
