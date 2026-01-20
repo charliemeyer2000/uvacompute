@@ -53,7 +53,8 @@ export default function ProtectedLayout({
   const firstName = user?.name ? user.name.split(" ")[0].toLowerCase() : "";
   const isOnProfile = pathname?.includes("/profile");
   const isOnDevTools = pathname?.includes("/dev-tools");
-  const isOnDashboard = pathname?.includes("/dashboard");
+  const isOnVMs = pathname?.includes("/vms");
+  const isOnJobs = pathname?.includes("/jobs");
   const isOnOnboarding = pathname?.includes("/onboarding");
 
   return (
@@ -63,7 +64,7 @@ export default function ProtectedLayout({
           <div className="flex items-start justify-between mb-8">
             <div>
               <Link
-                href="/dashboard"
+                href="/vms"
                 className="text-4xl font-normal leading-tight hover:text-gray-700"
               >
                 uvacompute
@@ -95,11 +96,14 @@ export default function ProtectedLayout({
                 <>
                   {(!isOnOnboarding || hasEarlyAccess) && (
                     <>
+                      <Button variant={isOnVMs ? "default" : "outline"} asChild>
+                        <Link href="/vms">vms</Link>
+                      </Button>
                       <Button
-                        variant={isOnDashboard ? "default" : "outline"}
+                        variant={isOnJobs ? "default" : "outline"}
                         asChild
                       >
-                        <Link href="/dashboard">dashboard</Link>
+                        <Link href="/jobs">jobs</Link>
                       </Button>
                       <Button
                         variant={isOnProfile ? "default" : "outline"}

@@ -88,10 +88,24 @@ export async function POST(request: NextRequest) {
       body: requestBody,
     });
 
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(
+        `Orchestration service error: ${response.status} ${errorText}`,
+      );
+      return NextResponse.json(
+        {
+          error: `Orchestration service error: ${response.status}`,
+          details: errorText,
+        },
+        { status: response.status },
+      );
+    }
+
     const rawData = await response.json();
     const data = VMCreationResponseSchema.parse(rawData);
 
-    if (response.ok && data.status === "success" && data.vmId) {
+    if (data.status === "success" && data.vmId) {
       try {
         await fetchMutation(api.vms.create, {
           userId: session.user.id,

@@ -1,17 +1,23 @@
 [Unit]
 Description=VM Orchestration Service
-After=network-online.target tailscaled.service
+After=network-online.target k3s.service
 Wants=network-online.target
 
 [Service]
 Type=simple
 WorkingDirectory=/opt/vm-orchestration-service
+EnvironmentFile=-/opt/vm-orchestration-service/.env.production
+EnvironmentFile=-/opt/vm-orchestration-service/tunnel.env
 Environment="ENV=production"
+Environment="KUBECONFIG=/etc/rancher/k3s/k3s.yaml"
+Environment="KUBEVIRT_NAMESPACE=uvacompute"
 ExecStart=/usr/local/bin/vm-orchestration
-ExecStartPost=-/usr/bin/tailscale serve --bg --https 443 8080
-ExecStartPost=-/usr/bin/tailscale funnel --bg --https 443 8080
-ExecStartPost=-/usr/bin/autossh -M 0 -f -N -o "ServerAliveInterval 30" -o "ServerAliveCountMax 3" -o "ExitOnForwardFailure yes" -R 2222:localhost:2222 -R 8080:localhost:8080 root@***REDACTED_IP***
-ExecStopPost=-/usr/bin/tailscale funnel --https=443 off
+# Establish reverse SSH tunnel to DO VPS for SSH routing
+# Tunnel config should be in /opt/vm-orchestration-service/tunnel.env:
+#   TUNNEL_PORT=2222
+#   TUNNEL_HOST=***REDACTED_IP***
+#   SSH_KEY_PATH=/root/.ssh/id_ed25519_uvacompute
+ExecStartPost=-/bin/bash -c 'if [ -n "$TUNNEL_PORT" ]; then /usr/bin/autossh -M 0 -f -N -o "ServerAliveInterval 30" -o "ServerAliveCountMax 3" -o "ExitOnForwardFailure yes" -i "${SSH_KEY_PATH:-/root/.ssh/id_ed25519_uvacompute}" -R ${TUNNEL_PORT}:localhost:22 root@${TUNNEL_HOST:-***REDACTED_IP***}; fi'
 ExecStopPost=-/usr/bin/pkill -f "autossh.****REDACTED_IP***"
 Restart=always
 RestartSec=10s
