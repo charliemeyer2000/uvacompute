@@ -273,6 +273,7 @@ export const JobCreationRequestSchema = z.object({
   cpus: z.number().int().min(1).max(16).optional(),
   ram: z.number().int().min(1).max(64).optional(),
   gpus: z.number().int().min(0).max(1).optional(),
+  disk: z.number().int().min(0).max(100).optional(),
 });
 
 export const JobCreationResponseSchema = z.object({
@@ -313,6 +314,7 @@ export const JobInfoSchema = z.object({
   cpus: z.number(),
   ram: z.number(),
   gpus: z.number(),
+  disk: z.number().optional(),
   status: JobStatusEnum,
   exitCode: z.number().optional(),
   errorMessage: z.string().optional(),

@@ -13,6 +13,7 @@ export const create = mutation({
     cpus: v.number(),
     ram: v.number(),
     gpus: v.number(),
+    disk: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const now = Date.now();
@@ -27,6 +28,7 @@ export const create = mutation({
       cpus: args.cpus,
       ram: args.ram,
       gpus: args.gpus,
+      disk: args.disk,
       status: "pending",
       createdAt: now,
     });

@@ -103,6 +103,7 @@ export async function POST(request: NextRequest) {
           cpus: body.cpus ?? 1,
           ram: body.ram ?? 4,
           gpus: body.gpus ?? 0,
+          disk: body.disk ?? 0,
         });
       } catch (convexError: unknown) {
         console.error(

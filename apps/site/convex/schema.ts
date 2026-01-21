@@ -88,6 +88,7 @@ export default defineSchema({
     cpus: v.number(),
     ram: v.number(),
     gpus: v.number(),
+    disk: v.optional(v.number()),
     status: v.union(...JOB_STATUSES.map((s) => v.literal(s))),
     exitCode: v.optional(v.number()),
     errorMessage: v.optional(v.string()),

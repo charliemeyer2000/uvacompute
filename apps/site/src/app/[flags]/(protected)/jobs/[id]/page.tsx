@@ -39,6 +39,7 @@ import {
   Search,
   Pause,
   Play,
+  Database,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -559,6 +560,12 @@ export default function JobDetailPage() {
               <Zap className="h-3.5 w-3.5 text-gray-400" />
               <span className="text-black">
                 {job.gpus > 0 ? `${job.gpus}x GPU` : "no GPU"}
+              </span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <Database className="h-3.5 w-3.5 text-gray-400" />
+              <span className="text-black">
+                {job.disk ? `${job.disk} GB scratch` : "no scratch"}
               </span>
             </div>
           </div>
