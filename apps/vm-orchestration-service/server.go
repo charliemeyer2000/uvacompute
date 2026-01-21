@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"os"
@@ -94,6 +95,18 @@ func main() {
 	}
 
 	fmt.Println("Job adapter initialized successfully")
+
+	healthMonitor, err := lib.NewHealthMonitor(lib.HealthMonitorConfig{
+		KubeconfigPath: kubeVirtConfig.KubeconfigPath,
+		Interval:       30 * time.Second,
+	}, callbackClient)
+	if err != nil {
+		fmt.Printf("Warning: Failed to create health monitor: %v\n", err)
+	} else {
+		ctx := context.Background()
+		go healthMonitor.Start(ctx)
+		fmt.Println("Health monitor started")
+	}
 
 	app := structs.NewAppWithConfig(structs.AppConfig{
 		VMProvider:     vmAdapter,

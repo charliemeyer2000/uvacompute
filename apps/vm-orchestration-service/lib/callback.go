@@ -4,6 +4,7 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -92,6 +93,34 @@ func (c *CallbackClient) NotifyJobStatusUpdate(jobId string, status string, exit
 	}
 
 	return fmt.Errorf("failed to notify site about Job status update for Job %s after %d attempts", jobId, MAX_ATTEMPTS)
+}
+
+func (c *CallbackClient) NotifyNodeHealth(nodes []NodeHealthStatus) error {
+	url := fmt.Sprintf("%s/api/nodes/health", c.siteBaseUrl)
+
+	body, err := json.Marshal(map[string]interface{}{
+		"nodes": nodes,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to marshal node health: %w", err)
+	}
+
+	for attempt := 0; attempt < MAX_ATTEMPTS; attempt++ {
+		if attempt > 0 {
+			backoff := time.Duration(attempt) * BACKOFF_BASE
+			log.Printf("Retrying health callback after %v", backoff)
+			time.Sleep(backoff)
+		}
+
+		err := c.makeRequest("POST", url, string(body))
+		if err == nil {
+			return nil
+		}
+
+		log.Printf("Attempt %d to notify site about node health failed: %v", attempt+1, err)
+	}
+
+	return fmt.Errorf("failed to notify site about node health after %d attempts", MAX_ATTEMPTS)
 }
 
 func (c *CallbackClient) UploadJobLogs(jobId string, logs string) error {

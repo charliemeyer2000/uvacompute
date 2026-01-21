@@ -1,4 +1,4 @@
-import { mutation, query } from "./_generated/server";
+import { mutation, query, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
 import { JOB_STATUSES } from "./schema";
 
@@ -135,7 +135,12 @@ export const listInactiveByUser = query({
       .order("desc")
       .collect();
 
-    const inactiveStatuses = ["completed", "failed", "cancelled"];
+    const inactiveStatuses = [
+      "completed",
+      "failed",
+      "cancelled",
+      "node_offline",
+    ];
 
     return allJobs.filter((job) => inactiveStatuses.includes(job.status));
   },
@@ -192,5 +197,31 @@ export const listAll = query({
   args: {},
   handler: async (ctx) => {
     return await ctx.db.query("jobs").order("desc").collect();
+  },
+});
+
+export const markNodeOffline = internalMutation({
+  args: {
+    nodeId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const jobs = await ctx.db
+      .query("jobs")
+      .withIndex("by_nodeId", (q) => q.eq("nodeId", args.nodeId))
+      .collect();
+
+    const activeStatuses = ["pending", "scheduled", "pulling", "running"];
+
+    let count = 0;
+    for (const job of jobs) {
+      if (activeStatuses.includes(job.status)) {
+        await ctx.db.patch(job._id, {
+          status: "node_offline",
+        });
+        count++;
+      }
+    }
+
+    return count;
   },
 });

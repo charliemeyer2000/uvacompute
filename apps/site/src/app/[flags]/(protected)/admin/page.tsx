@@ -5,6 +5,25 @@ import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../../../convex/_generated/api";
 import { authClient } from "@/lib/auth-client";
 
+function formatRelativeTime(timestamp: number): string {
+  const now = Date.now();
+  const diff = now - timestamp;
+  const seconds = Math.floor(diff / 1000);
+  const minutes = Math.floor(seconds / 60);
+  const hours = Math.floor(minutes / 60);
+  const days = Math.floor(hours / 24);
+
+  if (days > 0) return `${days}d ago`;
+  if (hours > 0) return `${hours}h ago`;
+  if (minutes > 0) return `${minutes}m ago`;
+  return `${seconds}s ago`;
+}
+
+function isStaleHeartbeat(timestamp: number): boolean {
+  const fiveMinutes = 5 * 60 * 1000;
+  return Date.now() - timestamp > fiveMinutes;
+}
+
 export default function AdminPage() {
   const { data: session, isPending } = authClient.useSession();
 
@@ -12,6 +31,13 @@ export default function AdminPage() {
   const nodes = useQuery(api.nodes.listAll, isAdmin ? {} : "skip");
   const allVMs = useQuery(api.vms.listAll, isAdmin ? {} : "skip");
   const allJobs = useQuery(api.jobs.listAll, isAdmin ? {} : "skip");
+
+  const forceCleanup = useMutation(api.nodes.forceCleanup);
+
+  const offlineNodes = useMemo(() => {
+    if (!nodes) return [];
+    return nodes.filter((n) => n.status === "offline");
+  }, [nodes]);
 
   const resources = useMemo(() => {
     if (!nodes || !allVMs || !allJobs) return null;
@@ -112,6 +138,24 @@ export default function AdminPage() {
     }
   }
 
+  async function handleCleanup(nodeId: string) {
+    if (
+      !confirm(
+        "This will force-delete all VMs and cancel all jobs on this node. Continue?",
+      )
+    ) {
+      return;
+    }
+    try {
+      const result = await forceCleanup({ nodeId });
+      alert(
+        `Cleaned up: ${result.vmsDeleted} VMs deleted, ${result.jobsCancelled} jobs cancelled`,
+      );
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to cleanup node");
+    }
+  }
+
   if (isPending || isAdmin === undefined) {
     return (
       <div className="p-6">
@@ -165,6 +209,26 @@ export default function AdminPage() {
         <h1 className="text-2xl font-bold">Admin Dashboard</h1>
       </div>
 
+      {/* Health Alert Banner */}
+      {offlineNodes.length > 0 && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <div className="flex items-center gap-2">
+            <span className="text-red-600 font-semibold">
+              ⚠ Node Health Alert
+            </span>
+          </div>
+          <p className="text-red-700 text-sm mt-1">
+            {offlineNodes.length} node
+            {offlineNodes.length > 1 ? "s are" : " is"} offline:{" "}
+            {offlineNodes.map((n) => n.name || n.nodeId).join(", ")}
+          </p>
+          <p className="text-red-600 text-xs mt-2">
+            Workloads on offline nodes may be affected. Use the cleanup action
+            to force-delete workloads on dead nodes.
+          </p>
+        </div>
+      )}
+
       {/* Resource Summary */}
       {resources && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -215,6 +279,9 @@ export default function AdminPage() {
                   Status
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  Last Seen
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                   CPUs
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
@@ -229,48 +296,70 @@ export default function AdminPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {nodes.map((node) => (
-                <tr key={node._id}>
-                  <td className="px-4 py-3 text-sm font-mono">
-                    {node.name || node.nodeId}
-                  </td>
-                  <td className="px-4 py-3">
-                    <span
-                      className={`px-2 py-1 text-xs font-medium rounded-full ${statusColors[node.status as keyof typeof statusColors]}`}
-                    >
-                      {node.status}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-sm">{node.cpus || "-"}</td>
-                  <td className="px-4 py-3 text-sm">
-                    {node.ram ? `${node.ram}GB` : "-"}
-                  </td>
-                  <td className="px-4 py-3 text-sm">{node.gpus || 0}</td>
-                  <td className="px-4 py-3">
-                    {node.status === "online" ? (
-                      <button
-                        onClick={() => handleDrain(node.nodeId)}
-                        className="text-sm text-yellow-600 hover:text-yellow-800"
+              {nodes.map((node) => {
+                const stale = isStaleHeartbeat(node.lastHeartbeat);
+                return (
+                  <tr key={node._id} className={stale ? "bg-red-50" : ""}>
+                    <td className="px-4 py-3 text-sm font-mono">
+                      {node.name || node.nodeId}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span
+                        className={`px-2 py-1 text-xs font-medium rounded-full ${statusColors[node.status as keyof typeof statusColors]}`}
                       >
-                        Drain
-                      </button>
-                    ) : node.status === "draining" ? (
-                      <button
-                        onClick={() => handleUncordon(node.nodeId)}
-                        className="text-sm text-green-600 hover:text-green-800"
+                        {node.status}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-sm">
+                      <span
+                        className={
+                          stale ? "text-red-600 font-medium" : "text-gray-600"
+                        }
                       >
-                        Resume
-                      </button>
-                    ) : (
-                      <span className="text-sm text-gray-400">-</span>
-                    )}
-                  </td>
-                </tr>
-              ))}
+                        {formatRelativeTime(node.lastHeartbeat)}
+                      </span>
+                      {stale && (
+                        <span className="ml-1 text-xs text-red-500">⚠</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-sm">{node.cpus || "-"}</td>
+                    <td className="px-4 py-3 text-sm">
+                      {node.ram ? `${node.ram}GB` : "-"}
+                    </td>
+                    <td className="px-4 py-3 text-sm">{node.gpus || 0}</td>
+                    <td className="px-4 py-3 space-x-2">
+                      {node.status === "online" ? (
+                        <button
+                          onClick={() => handleDrain(node.nodeId)}
+                          className="text-sm text-yellow-600 hover:text-yellow-800"
+                        >
+                          Drain
+                        </button>
+                      ) : node.status === "draining" ? (
+                        <button
+                          onClick={() => handleUncordon(node.nodeId)}
+                          className="text-sm text-green-600 hover:text-green-800"
+                        >
+                          Resume
+                        </button>
+                      ) : node.status === "offline" ? (
+                        <button
+                          onClick={() => handleCleanup(node.nodeId)}
+                          className="text-sm text-red-600 hover:text-red-800"
+                        >
+                          Cleanup
+                        </button>
+                      ) : (
+                        <span className="text-sm text-gray-400">-</span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
               {nodes.length === 0 && (
                 <tr>
                   <td
-                    colSpan={6}
+                    colSpan={7}
                     className="px-4 py-8 text-center text-gray-500"
                   >
                     No nodes registered
