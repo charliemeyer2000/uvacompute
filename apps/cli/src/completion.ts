@@ -18,6 +18,13 @@ import {
   SSHKeyListResponseSchema,
   VM_STATUS_GROUPS,
   isVMStatusInGroup,
+  JobListResponseSchema,
+  JOB_STATUS_GROUPS,
+  isJobStatusInGroup,
+  JobStatusEnum,
+  NodeListResponseSchema,
+  NODE_STATUS_GROUPS,
+  isNodeStatusInGroup,
 } from "./lib/schemas";
 import { theme } from "./lib/theme";
 
@@ -219,8 +226,33 @@ function needsSSHKeyCompletion(
   return args.length > 0;
 }
 
+function needsJobCompletion(commandObj: Command): boolean {
+  // Job commands (logs, cancel) are top-level commands that take jobId argument
+  const commandName = commandObj.name();
+  return commandName === "logs" || commandName === "cancel";
+}
+
+function needsNodeCompletion(
+  commandObj: Command,
+  subcommandObj: Command,
+): boolean {
+  // Check if this is the "node" command and subcommand needs nodeId
+  if (commandObj.name() !== "node") return false;
+  const subcommandName = subcommandObj.name();
+  // These subcommands take optional or required nodeId
+  return ["status", "pause", "resume", "workloads"].includes(subcommandName);
+}
+
 function truncateVmId(vmId: string): string {
   return vmId.slice(0, 8);
+}
+
+function truncateJobId(jobId: string): string {
+  return jobId.slice(0, 8);
+}
+
+function truncateNodeId(nodeId: string): string {
+  return nodeId.slice(0, 8);
 }
 
 async function fetchVMsForCompletion(
@@ -316,6 +348,142 @@ async function fetchSSHKeysForCompletion(): Promise<string[]> {
   }
 }
 
+async function fetchJobsForCompletion(commandName: string): Promise<string[]> {
+  try {
+    const token = loadToken();
+    if (!token) return [];
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 500);
+
+    try {
+      const response = await fetch(`${BASE_URL}/api/jobs`, {
+        method: "GET",
+        headers: { Authorization: `Bearer ${token}` },
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) return [];
+
+      const data = JobListResponseSchema.parse(await response.json());
+
+      const filteredJobs = data.jobs.filter((job) => {
+        if (commandName === "cancel") {
+          return isJobStatusInGroup(job.status, JOB_STATUS_GROUPS.CANCELLABLE);
+        }
+        // For logs, show all jobs (users may want completed job logs)
+        return true;
+      });
+
+      const nameCounts = new Map<string, number>();
+      for (const job of filteredJobs) {
+        if (job.name) {
+          nameCounts.set(job.name, (nameCounts.get(job.name) || 0) + 1);
+        }
+      }
+
+      const completions: string[] = [];
+      for (const job of filteredJobs) {
+        if (!job.name) {
+          completions.push(truncateJobId(job.jobId));
+        } else {
+          const count = nameCounts.get(job.name) ?? 0;
+          if (count > 1) {
+            completions.push(`${job.name} (${truncateJobId(job.jobId)})`);
+          } else {
+            completions.push(job.name);
+          }
+        }
+      }
+
+      return completions;
+    } catch (fetchError) {
+      clearTimeout(timeoutId);
+      return [];
+    }
+  } catch (error) {
+    return [];
+  }
+}
+
+async function fetchNodesForCompletion(
+  subcommandName: string,
+): Promise<string[]> {
+  try {
+    const token = loadToken();
+    if (!token) return [];
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 500);
+
+    try {
+      const response = await fetch(`${BASE_URL}/api/contributor/nodes`, {
+        method: "GET",
+        headers: { Authorization: `Bearer ${token}` },
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) return [];
+
+      const data = NodeListResponseSchema.parse(await response.json());
+
+      const filteredNodes = data.nodes.filter((node) => {
+        if (subcommandName === "pause") {
+          return isNodeStatusInGroup(node.status, NODE_STATUS_GROUPS.PAUSABLE);
+        } else if (subcommandName === "resume") {
+          return isNodeStatusInGroup(node.status, NODE_STATUS_GROUPS.RESUMABLE);
+        }
+        // For status and workloads, show all nodes
+        return true;
+      });
+
+      const nameCounts = new Map<string, number>();
+      for (const node of filteredNodes) {
+        if (node.name) {
+          nameCounts.set(node.name, (nameCounts.get(node.name) || 0) + 1);
+        }
+      }
+
+      const completions: string[] = [];
+      for (const node of filteredNodes) {
+        if (!node.name) {
+          completions.push(truncateNodeId(node.nodeId));
+        } else {
+          const count = nameCounts.get(node.name) ?? 0;
+          if (count > 1) {
+            completions.push(`${node.name} (${truncateNodeId(node.nodeId)})`);
+          } else {
+            completions.push(node.name);
+          }
+        }
+      }
+
+      return completions;
+    } catch (fetchError) {
+      clearTimeout(timeoutId);
+      return [];
+    }
+  } catch (error) {
+    return [];
+  }
+}
+
+function getJobStatusValues(): string[] {
+  return JobStatusEnum.options;
+}
+
+function needsOptionValueCompletion(
+  prev: string,
+  commandName: string,
+): boolean {
+  // Check if we're completing the value for --status on the jobs command
+  return commandName === "jobs" && (prev === "--status" || prev === "-s");
+}
+
 export async function handleCompletion(): Promise<void> {
   const env = parseEnv(process.env);
   if (!env.complete || !cachedProgram) return;
@@ -387,15 +555,42 @@ export async function handleCompletion(): Promise<void> {
       }
     }
 
+    if (needsNodeCompletion(commandObj, subcommandObj)) {
+      if (!lastPartial.startsWith("-")) {
+        const nodes = await fetchNodesForCompletion(subcommandObj.name());
+        log(nodes.filter((node) => node.startsWith(lastPartial)));
+        process.exit(0);
+      }
+    }
+
     if (lastPartial.startsWith("-")) {
       const options = getCommandOptions(cachedProgram, command, subcommand);
       log(options.filter((opt) => opt.startsWith(lastPartial)));
       process.exit(0);
     }
-  } else if (lastPartial.startsWith("-")) {
-    const options = getCommandOptions(cachedProgram, command);
-    log(options.filter((opt) => opt.startsWith(lastPartial)));
-    process.exit(0);
+  } else {
+    // Handle option value completion (e.g., --status for jobs command)
+    if (needsOptionValueCompletion(prev, command)) {
+      const statusValues = getJobStatusValues();
+      log(statusValues.filter((val) => val.startsWith(lastPartial)));
+      process.exit(0);
+    }
+
+    // Handle job completion for top-level commands (logs, cancel)
+    if (needsJobCompletion(commandObj)) {
+      if (!lastPartial.startsWith("-")) {
+        const jobs = await fetchJobsForCompletion(command);
+        log(jobs.filter((job) => job.startsWith(lastPartial)));
+        process.exit(0);
+      }
+    }
+
+    // Handle options for commands without subcommands
+    if (lastPartial.startsWith("-")) {
+      const options = getCommandOptions(cachedProgram, command);
+      log(options.filter((opt) => opt.startsWith(lastPartial)));
+      process.exit(0);
+    }
   }
 
   log([]);

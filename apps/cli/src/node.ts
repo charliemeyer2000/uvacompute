@@ -1973,6 +1973,7 @@ export function registerNodeCommands(program: Command) {
 
   node
     .command("list")
+    .alias("ls")
     .description("List your contributed nodes (remote)")
     .action(nodeListRemote);
 
@@ -2038,6 +2039,7 @@ export function registerNodeCommands(program: Command) {
 
   token
     .command("list")
+    .alias("ls")
     .description("List all registration tokens")
     .action(nodeTokenList);
 }
