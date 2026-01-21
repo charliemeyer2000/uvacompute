@@ -239,9 +239,13 @@ function VMCard({ vm, isActive }: { vm: VM; isActive: boolean }) {
           </div>
           {isActive && (
             <div className="flex justify-between">
-              <span className="text-gray-400">expires</span>
+              <span className="text-gray-400">
+                {vm.status === "ready" ? "expires" : "status"}
+              </span>
               <span className="text-black font-medium">
-                {formatTimeRemaining(vm.expiresAt)}
+                {vm.status === "ready"
+                  ? formatTimeRemaining(vm.expiresAt)
+                  : "Provisioning..."}
               </span>
             </div>
           )}
