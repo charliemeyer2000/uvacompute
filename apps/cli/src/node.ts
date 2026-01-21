@@ -701,13 +701,40 @@ async function installNvidiaDriver(
         message: "Please install manually and reboot",
       };
 
-    case "fedora":
-      console.log(chalk.yellow("\n  Fedora requires RPM Fusion setup:"));
-      printDriverInstructions("fedora");
-      return {
-        success: false,
-        message: "Please install manually and reboot",
-      };
+    case "fedora": {
+      // Check if RPM Fusion nonfree is enabled
+      const repoCheck = await runCommand("dnf", ["repolist", "--enabled"], {
+        sudo: true,
+        silent: true,
+      });
+
+      if (!repoCheck.stdout.includes("rpmfusion-nonfree")) {
+        console.log(
+          chalk.yellow("\n  RPM Fusion nonfree repository required."),
+        );
+        printDriverInstructions("fedora");
+        return { success: false, message: "Enable RPM Fusion first" };
+      }
+
+      console.log(chalk.gray("\n  Running: sudo dnf install akmod-nvidia"));
+      const result = await runCommand(
+        "dnf",
+        ["install", "-y", "akmod-nvidia"],
+        {
+          sudo: true,
+        },
+      );
+
+      if (result.exitCode === 0) {
+        console.log(
+          chalk.yellow(
+            "\n  Note: akmod-nvidia compiles on reboot. First boot may take 5-10 minutes.",
+          ),
+        );
+        return { success: true };
+      }
+      return { success: false, message: "dnf install failed" };
+    }
 
     case "gentoo":
       console.log(
