@@ -326,11 +326,16 @@ label_node() {
         has_gpu="true"
     fi
 
+    local gpu_mode="nvidia"  # Default to nvidia mode (for containers)
+
     log_info "Applying labels to node ${node_id}:"
     log_info "  uvacompute.com/cpus=${cpus}"
     log_info "  uvacompute.com/ram=${ram}"
     log_info "  uvacompute.com/gpu=${gpu_label}"
     log_info "  uvacompute.com/has-gpu=${has_gpu}"
+    if [[ "${has_gpu}" == "true" ]]; then
+        log_info "  uvacompute.com/gpu-mode=${gpu_mode}"
+    fi
 
     # We need to use the hub's kubectl, so we'll create a script that runs on the hub
     # via SSH tunnel. For now, we'll create a label script that can be run from the hub.
@@ -343,6 +348,7 @@ labels:
   uvacompute.com/ram: "${ram}"
   uvacompute.com/gpu: "${gpu_label}"
   uvacompute.com/has-gpu: "${has_gpu}"
+  uvacompute.com/gpu-mode: "${gpu_mode}"
 EOF
 
     log_success "Node labels saved to ${SERVICE_DIR}/node-labels.yaml"
@@ -358,7 +364,7 @@ EOF
         # Try to SSH to hub and label the node
         if ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -i "${SSH_KEY_PATH}" \
             "root@${TUNNEL_HOST}" \
-            "kubectl get node ${node_id} &>/dev/null && kubectl label node ${node_id} uvacompute.com/cpus=${cpus} uvacompute.com/ram=${ram} uvacompute.com/gpu=${gpu_label} uvacompute.com/has-gpu=${has_gpu} --overwrite" 2>/dev/null; then
+            "kubectl get node ${node_id} &>/dev/null && kubectl label node ${node_id} uvacompute.com/cpus=${cpus} uvacompute.com/ram=${ram} uvacompute.com/gpu=${gpu_label} uvacompute.com/has-gpu=${has_gpu} uvacompute.com/gpu-mode=${gpu_mode} --overwrite" 2>/dev/null; then
             labeled=true
             break
         fi
@@ -370,7 +376,7 @@ EOF
         log_success "Node labels applied successfully"
     else
         log_warn "Could not apply labels automatically. Run this on the hub:"
-        log_warn "  kubectl label node ${node_id} uvacompute.com/cpus=${cpus} uvacompute.com/ram=${ram} uvacompute.com/gpu=${gpu_label} uvacompute.com/has-gpu=${has_gpu} --overwrite"
+        log_warn "  kubectl label node ${node_id} uvacompute.com/cpus=${cpus} uvacompute.com/ram=${ram} uvacompute.com/gpu=${gpu_label} uvacompute.com/has-gpu=${has_gpu} uvacompute.com/gpu-mode=${gpu_mode} --overwrite"
     fi
 }
 
@@ -591,6 +597,9 @@ sleep 2
 if nvidia-smi > /dev/null 2>&1; then
     echo "✓ GPU is now in nvidia mode"
     nvidia-smi --query-gpu=name,driver_version --format=csv,noheader
+    # Update Kubernetes label
+    kubectl label node \$(hostname) uvacompute.com/gpu-mode=nvidia --overwrite 2>/dev/null || \
+        echo "Note: Could not update Kubernetes label (kubectl may not be configured)"
 else
     echo "✗ Failed to switch to nvidia mode"
     exit 1
@@ -648,6 +657,9 @@ sleep 1
 if lspci -nnk -s \${GPU_PCI} | grep -q "vfio-pci"; then
     echo "✓ GPU is now in vfio mode (ready for VM passthrough)"
     lspci -nnk -s \${GPU_PCI} | grep -E "VGA|driver"
+    # Update Kubernetes label
+    kubectl label node \$(hostname) uvacompute.com/gpu-mode=vfio --overwrite 2>/dev/null || \
+        echo "Note: Could not update Kubernetes label (kubectl may not be configured)"
 else
     echo "✗ Failed to switch to vfio mode"
     exit 1
