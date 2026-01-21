@@ -7,6 +7,7 @@ import {
   VMCreationRequestSchema,
   VMCreationResponseSchema,
 } from "@/lib/vm-schemas";
+import { randomUUID } from "crypto";
 
 const VM_ORCHESTRATION_SERVICE_URL =
   process.env.VM_ORCHESTRATION_SERVICE_URL || "http://localhost:8080";
@@ -55,6 +56,9 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // Generate vmId upfront so we can create Convex record immediately
+  const vmId = randomUUID();
+
   try {
     const rawBody = await request.json();
 
@@ -68,8 +72,34 @@ export async function POST(request: NextRequest) {
       console.warn(`User ${session.user.id} has no SSH keys configured`);
     }
 
+    // Create Convex record FIRST with "creating" status so it shows up in UI immediately
+    try {
+      await fetchMutation(api.vms.create, {
+        userId: session.user.id,
+        vmId,
+        name: body.name,
+        cpus: body.cpus || 1,
+        ram: body.ram || 8,
+        disk: body.disk || 64,
+        gpus: body.gpus || 0,
+        gpuType: body["gpu-type"] || "5090",
+        hours: body.hours,
+      });
+    } catch (convexError: any) {
+      console.error("Failed to create VM record in Convex:", convexError);
+      return NextResponse.json(
+        {
+          status: "internal_error",
+          msg: "Failed to create VM record in database.",
+        },
+        { status: 500 },
+      );
+    }
+
+    // Now call orchestration service with the pre-generated vmId
     const vmCreationRequest = {
       ...body,
+      vmId, // Pass the pre-generated vmId
       userId: session.user.id,
       sshPublicKeys,
       ...(body.startupScript && { startupScript: body.startupScript }),
@@ -93,9 +123,22 @@ export async function POST(request: NextRequest) {
       console.error(
         `Orchestration service error: ${response.status} ${errorText}`,
       );
+
+      // Mark VM as failed in Convex since orchestration failed
+      try {
+        await fetchMutation(api.vms.updateStatus, {
+          vmId,
+          status: "failed",
+        });
+      } catch (updateError: any) {
+        console.error("Failed to mark VM as failed in Convex:", updateError);
+      }
+
       return NextResponse.json(
         {
-          error: `Orchestration service error: ${response.status}`,
+          status: "internal_error",
+          vmId,
+          msg: `Orchestration service error: ${response.status}`,
           details: errorText,
         },
         { status: response.status },
@@ -105,57 +148,40 @@ export async function POST(request: NextRequest) {
     const rawData = await response.json();
     const data = VMCreationResponseSchema.parse(rawData);
 
-    if (data.status === "success" && data.vmId) {
+    // If orchestration returned a failure status (validation, resources), mark as failed
+    if (data.status !== "success") {
       try {
-        await fetchMutation(api.vms.create, {
-          userId: session.user.id,
-          vmId: data.vmId,
-          name: body.name,
-          cpus: body.cpus || 1,
-          ram: body.ram || 8,
-          disk: body.disk || 64,
-          gpus: body.gpus || 0,
-          gpuType: body["gpu-type"] || "5090",
-          hours: body.hours,
-          orchestrationResponse: data,
+        await fetchMutation(api.vms.updateStatus, {
+          vmId,
+          status: "failed",
         });
-      } catch (convexError: any) {
-        console.error(
-          "Critical error: Failed to save VM to Convex:",
-          convexError,
-        );
-
-        try {
-          const deleteAuthHeaders = createAuthHeaders(
-            "DELETE",
-            `/vms/${data.vmId}`,
-            "",
-          );
-          await fetch(`${VM_ORCHESTRATION_SERVICE_URL}/vms/${data.vmId}`, {
-            method: "DELETE",
-            headers: deleteAuthHeaders,
-          });
-          console.log(`Rolled back VM ${data.vmId} from orchestration service`);
-        } catch (rollbackError: any) {
-          console.error(
-            `Failed to rollback VM ${data.vmId} from orchestration service:`,
-            rollbackError,
-          );
-        }
-
-        return NextResponse.json(
-          {
-            status: "internal_error",
-            msg: "Failed to save VM to database. VM creation has been rolled back.",
-          },
-          { status: 500 },
-        );
+      } catch (updateError: any) {
+        console.error("Failed to mark VM as failed in Convex:", updateError);
       }
+
+      return NextResponse.json(
+        { ...data, vmId },
+        { status: data.status === "resources_unavailable" ? 409 : 400 },
+      );
     }
 
-    return NextResponse.json(data, { status: response.status });
+    // Success - orchestration accepted the request and will update status via callbacks
+    return NextResponse.json(
+      { status: "success", vmId, msg: "VM creation started" },
+      { status: 200 },
+    );
   } catch (error: any) {
     console.error("Error creating VM:", error);
+
+    // If we already created the Convex record, mark it as failed
+    try {
+      await fetchMutation(api.vms.updateStatus, {
+        vmId,
+        status: "failed",
+      });
+    } catch {
+      // Ignore - record might not exist if the error was before Convex insert
+    }
 
     if (error.name === "ZodError") {
       return NextResponse.json(

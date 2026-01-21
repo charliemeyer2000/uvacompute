@@ -30,6 +30,7 @@ type VMStatus string
 
 const (
 	VM_STATUS_NOT_FOUND     VMStatus = "not_found"     // vm not found (API response only)
+	VM_STATUS_CREATING      VMStatus = "creating"      // VM creation initiated, waiting for orchestration
 	VM_STATUS_PENDING       VMStatus = "pending"       // request received, queued
 	VM_STATUS_BOOTING       VMStatus = "booting"       // VM is starting up (scheduling, booting, waiting for agent)
 	VM_STATUS_PROVISIONING  VMStatus = "provisioning"  // cloud-init running, installing software
@@ -47,6 +48,7 @@ const (
 )
 
 type VMCreationRequest struct {
+	VMId            string   `json:"vmId" validate:"required"` // Pre-generated VM ID from frontend
 	Hours           int      `json:"hours" validate:"required,min=1"`
 	UserId          string   `json:"userId" validate:"required"`
 	Name            *string  `json:"name,omitempty" validate:"omitempty,max=255"`
