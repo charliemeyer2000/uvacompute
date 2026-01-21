@@ -133,14 +133,8 @@ func (vm *VMManager) createVMSync(vmId string, cpus, ram, disk, gpus int, sshPub
 	return nil
 }
 
-// StartExpirationTimer starts a timer that will expire the VM at the given time (unix milliseconds)
 func (vm *VMManager) StartExpirationTimer(vmId string, expiresAt int64) {
 	remaining := time.Until(time.UnixMilli(expiresAt))
-	if remaining <= 0 {
-		log.Printf("VM %s already expired (expiresAt: %d), scheduling immediate cleanup", vmId, expiresAt)
-		remaining = time.Second // Small delay to avoid race conditions
-	}
-
 	log.Printf("VM %s expiration timer set for %v from now", vmId, remaining)
 	time.AfterFunc(remaining, func() {
 		log.Printf("VM %s expired, deleting", vmId)
