@@ -125,6 +125,9 @@ export default defineSchema({
     cpus: v.optional(v.number()),
     ram: v.optional(v.number()),
     gpus: v.optional(v.number()),
+    gpuType: v.optional(v.string()), // e.g., "nvidia-rtx-5090", "nvidia-rtx-4090", "none"
+    supportsVMs: v.optional(v.boolean()), // Default: true if KubeVirt available
+    supportsJobs: v.optional(v.boolean()), // Default: true (container runtime)
   })
     .index("by_nodeId", ["nodeId"])
     .index("by_status", ["status"])
