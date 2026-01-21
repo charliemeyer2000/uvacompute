@@ -1,7 +1,16 @@
 import type { Command } from "commander";
 import ora, { type Ora } from "ora";
 import { spawn } from "child_process";
-import { readFileSync, existsSync, statSync } from "fs";
+import {
+  readFileSync,
+  writeFileSync,
+  existsSync,
+  statSync,
+  mkdirSync,
+  chmodSync,
+} from "fs";
+import { homedir } from "os";
+import { join } from "path";
 import { select, confirm } from "@inquirer/prompts";
 import { getBaseUrl, loadToken, checkServiceStatus } from "./lib/utils";
 import {
@@ -821,14 +830,36 @@ interface ConnectionInfo {
   vmId: string;
   name: string | null;
   status: string;
-  nodeId: string | null;
-  node: {
-    nodeId: string;
-    tunnelHost: string;
-    tunnelPort: number;
-    tunnelUser: string;
-    kubeconfigPath: string;
-  } | null;
+  proxy: {
+    host: string;
+    port: number;
+    user: string;
+  };
+  token: string;
+}
+
+async function ensureProxyKey(): Promise<string> {
+  const uvaDir = join(homedir(), ".uva");
+  const keyPath = join(uvaDir, "vmproxy-key");
+
+  if (!existsSync(keyPath)) {
+    // Download the key from the site
+    const response = await fetch(`${BASE_URL}/api/vmproxy-key`);
+    if (!response.ok) {
+      throw new Error("Failed to download proxy key");
+    }
+    const keyContent = await response.text();
+
+    // Ensure directory exists
+    if (!existsSync(uvaDir)) {
+      mkdirSync(uvaDir, { recursive: true });
+    }
+
+    // Write key with proper permissions
+    writeFileSync(keyPath, keyContent, { mode: 0o600 });
+  }
+
+  return keyPath;
 }
 
 async function sshToVM(nameOrVmId: string): Promise<void> {
@@ -925,21 +956,24 @@ async function sshToVM(nameOrVmId: string): Promise<void> {
 
     const connectionInfo = (await connectionResponse.json()) as ConnectionInfo;
 
-    if (!connectionInfo.node) {
-      spinner.fail("VM is not assigned to a node yet. Please try again.");
+    if (!connectionInfo.proxy) {
+      spinner.fail("Failed to get proxy connection info. Please try again.");
       process.exit(1);
     }
+
+    spinner.text = "Setting up secure connection...";
+    const proxyKeyPath = await ensureProxyKey();
 
     spinner.succeed(theme.success("Connecting to VM..."));
 
     console.log(formatSectionHeader("SSH Session"));
     console.log();
 
-    const { tunnelHost, tunnelPort, tunnelUser, kubeconfigPath } =
-      connectionInfo.node;
-    // SSH to the node through DO VPS reverse tunnel, then run virtctl to connect to VM
-    // KUBECONFIG is needed for virtctl to access the k8s API
-    const proxyCommand = `ssh -p ${tunnelPort} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${tunnelUser}@${tunnelHost} 'KUBECONFIG=${kubeconfigPath} virtctl port-forward --stdio=true --namespace=uvacompute vmi/${vm.vmId} 22'`;
+    const { host, port, user } = connectionInfo.proxy;
+    const accessToken = connectionInfo.token;
+    // SSH to the VM through the hub's proxy service
+    // The proxy validates the token and runs virtctl to connect to the VM
+    const proxyCommand = `ssh -i ${proxyKeyPath} -p ${port} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${user}@${host} ${accessToken}`;
 
     const sshArgs = [
       "-o",
