@@ -42,6 +42,17 @@ export default function Page() {
           we're working to build serverless containers and k8s vclusters.
         </p>
 
+        <h2 className="text-xl font-semibold mt-8 mb-4 text-black">
+          documentation
+        </h2>
+        <p className="mb-4 text-base leading-relaxed">
+          learn how to use uvacompute with our{" "}
+          <Link href="/docs" className="text-orange-accent underline">
+            documentation
+          </Link>
+          .
+        </p>
+
         {shouldShowAccessSection && (
           <>
             <h2 className="text-xl font-semibold mt-8 mb-4 text-black">
