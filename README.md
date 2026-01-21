@@ -23,6 +23,10 @@ Hello contributor, text charlie. rough idea of what needs to be done can be foun
 - [ ] can this be rearchitected without incus and only using k8s?
 - [ ] make some market out of this (?)
 
+## Infra
+
+![Infrastructure Diagram](apps/site/public/infra.png)
+
 ## Setup
 
 ### General
