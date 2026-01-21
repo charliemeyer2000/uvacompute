@@ -33,9 +33,9 @@ export async function GET(request: NextRequest) {
     // Calculate used resources from active workloads
     const activeVms = vms.filter(
       (vm: any) =>
-        vm.status !== "deleted" &&
-        vm.status !== "expired" &&
-        vm.status !== "failed",
+        vm.status !== "stopped" &&
+        vm.status !== "failed" &&
+        vm.status !== "offline",
     );
     const activeJobs = jobs.filter(
       (job: any) =>

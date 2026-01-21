@@ -94,31 +94,21 @@ export const VMDeletionResponseSchema = z.object({
 
 export const VMStatusEnum = z.enum([
   "not_found",
-  "creating",
-  "initializing",
-  "starting",
-  "waiting_for_agent",
-  "configuring",
-  "running",
+  "pending",
+  "booting",
+  "provisioning",
+  "ready",
+  "stopping",
+  "stopped",
   "failed",
-  "deleting",
-  "deleted",
-  "expired",
-  "updating",
+  "offline",
 ]);
 export type VMStatus = z.infer<typeof VMStatusEnum>;
 
 export const VM_STATUS_GROUPS = {
-  RUNNING: ["running"] as const,
-  DELETABLE: [
-    "creating",
-    "initializing",
-    "starting",
-    "waiting_for_agent",
-    "configuring",
-    "running",
-    "updating",
-  ] as const,
+  READY: ["ready"] as const,
+  ACTIVE: ["pending", "booting", "provisioning", "ready"] as const,
+  DELETABLE: ["pending", "booting", "provisioning", "ready"] as const,
 } as const;
 
 export function isVMStatusInGroup(
