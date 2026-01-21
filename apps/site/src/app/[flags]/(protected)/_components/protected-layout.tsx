@@ -11,6 +11,30 @@ import { toast } from "sonner";
 import { EarlyAccessProvider } from "./early-access-context";
 import { useRedirectLogic } from "./use-redirect-logic";
 
+function NavLink({
+  href,
+  isActive,
+  children,
+}: {
+  href: string;
+  isActive: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <Link
+      href={href}
+      className={`relative py-2 text-sm transition-colors ${
+        isActive ? "text-black" : "text-gray-500 hover:text-black"
+      }`}
+    >
+      {children}
+      {isActive && (
+        <span className="absolute bottom-0 left-0 right-0 h-[2px] bg-orange-accent" />
+      )}
+    </Link>
+  );
+}
+
 export default function ProtectedLayout({
   children,
   earlyAccessEnabled,
@@ -63,81 +87,105 @@ export default function ProtectedLayout({
     <EarlyAccessProvider earlyAccessEnabled={earlyAccessEnabled}>
       <main className="max-w-7xl mx-auto px-8 py-8 min-h-screen font-mono">
         <div>
-          <div className="flex items-start justify-between mb-8">
-            <div>
+          {/* Header Section */}
+          <div className="mb-8">
+            {/* Brand Row */}
+            <div className="flex items-center justify-between">
               <Link
                 href="/vms"
-                className="text-4xl font-normal leading-tight hover:text-gray-700"
+                className="text-3xl font-normal tracking-tight hover:text-gray-700 transition-colors"
               >
                 uvacompute
               </Link>
-              <div className="mt-2 text-base text-gray-600">
+              <div className="text-sm text-gray-500">
                 {isOnOnboarding ? "welcome" : "welcome back"}
                 {user ? (
                   firstName ? (
-                    `, ${firstName}`
+                    <span className="text-black">, {firstName}</span>
                   ) : (
                     ""
                   )
                 ) : (
                   <>
                     ,{" "}
-                    <Skeleton className="inline-block h-5 w-24 align-middle" />
+                    <Skeleton className="inline-block h-4 w-20 align-middle" />
                   </>
                 )}
               </div>
             </div>
-            <div className="flex gap-2">
-              {isRedirecting ? (
-                <>
-                  <Skeleton className="h-10 w-24" />
-                  <Skeleton className="h-10 w-20" />
-                  <Skeleton className="h-10 w-20" />
-                </>
-              ) : (
-                <>
-                  {(!isOnOnboarding || hasEarlyAccess) && (
-                    <>
-                      <Button variant={isOnVMs ? "default" : "outline"} asChild>
-                        <Link href="/vms">vms</Link>
-                      </Button>
-                      <Button
-                        variant={isOnJobs ? "default" : "outline"}
-                        asChild
-                      >
-                        <Link href="/jobs">jobs</Link>
-                      </Button>
-                      <Button
-                        variant={isOnNodes ? "default" : "outline"}
-                        asChild
-                      >
-                        <Link href="/my-nodes">nodes</Link>
-                      </Button>
-                      <Button
-                        variant={isOnProfile ? "default" : "outline"}
-                        asChild
-                      >
-                        <Link href="/profile">profile</Link>
-                      </Button>
-                      <Button
-                        variant={isOnDocs ? "default" : "outline"}
-                        asChild
-                      >
-                        <Link href="/docs">docs</Link>
-                      </Button>
-                      {hasDevAccess && (
-                        <Button
-                          variant={isOnAdmin ? "default" : "outline"}
-                          asChild
+
+            {/* Orange Accent Bar */}
+            <div className="h-[3px] bg-orange-accent mt-4 mb-4" />
+
+            {/* Navigation Row */}
+            <div className="flex items-center justify-between">
+              {/* Main Navigation */}
+              <nav className="flex items-center gap-6">
+                {isRedirecting ? (
+                  <>
+                    <Skeleton className="h-5 w-12" />
+                    <Skeleton className="h-5 w-12" />
+                    <Skeleton className="h-5 w-14" />
+                    <Skeleton className="h-5 w-12" />
+                  </>
+                ) : (
+                  <>
+                    {(!isOnOnboarding || hasEarlyAccess) && (
+                      <>
+                        <NavLink href="/vms" isActive={isOnVMs ?? false}>
+                          vms
+                        </NavLink>
+                        <NavLink href="/jobs" isActive={isOnJobs ?? false}>
+                          jobs
+                        </NavLink>
+                        <NavLink href="/my-nodes" isActive={isOnNodes ?? false}>
+                          nodes
+                        </NavLink>
+                        <NavLink href="/docs" isActive={isOnDocs ?? false}>
+                          docs
+                        </NavLink>
+                      </>
+                    )}
+                  </>
+                )}
+              </nav>
+
+              {/* User Actions */}
+              <div className="flex items-center gap-6">
+                {isRedirecting ? (
+                  <>
+                    <Skeleton className="h-5 w-14" />
+                    <Skeleton className="h-5 w-16" />
+                  </>
+                ) : (
+                  <>
+                    {(!isOnOnboarding || hasEarlyAccess) && (
+                      <>
+                        <span className="text-gray-200">|</span>
+                        <NavLink
+                          href="/profile"
+                          isActive={isOnProfile ?? false}
                         >
-                          <Link href="/admin">admin</Link>
-                        </Button>
-                      )}
-                    </>
-                  )}
-                  <Button onClick={handleSignOut}>sign out</Button>
-                </>
-              )}
+                          profile
+                        </NavLink>
+                        {hasDevAccess && (
+                          <NavLink href="/admin" isActive={isOnAdmin ?? false}>
+                            admin
+                          </NavLink>
+                        )}
+                      </>
+                    )}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleSignOut}
+                      className="text-gray-500 hover:text-black hover:bg-transparent px-0"
+                    >
+                      sign out
+                    </Button>
+                  </>
+                )}
+              </div>
             </div>
           </div>
 

@@ -248,7 +248,7 @@ async function fetchVMsForCompletion(
 
       const filteredVMs = data.vms.filter((vm) => {
         if (subcommandName === "ssh") {
-          return isVMStatusInGroup(vm.status, VM_STATUS_GROUPS.RUNNING);
+          return isVMStatusInGroup(vm.status, VM_STATUS_GROUPS.READY);
         } else if (subcommandName === "delete" || subcommandName === "rm") {
           return isVMStatusInGroup(vm.status, VM_STATUS_GROUPS.DELETABLE);
         }
