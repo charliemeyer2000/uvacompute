@@ -29,16 +29,16 @@ const (
 type VMStatus string
 
 const (
-	VM_STATUS_NOT_FOUND     VMStatus = "not_found"     // vm not found (API response only)
-	VM_STATUS_CREATING      VMStatus = "creating"      // VM creation initiated, waiting for orchestration
-	VM_STATUS_PENDING       VMStatus = "pending"       // request received, queued
-	VM_STATUS_BOOTING       VMStatus = "booting"       // VM is starting up (scheduling, booting, waiting for agent)
-	VM_STATUS_PROVISIONING  VMStatus = "provisioning"  // cloud-init running, installing software
-	VM_STATUS_READY         VMStatus = "ready"         // VM is ready to use
-	VM_STATUS_STOPPING      VMStatus = "stopping"      // VM is being deleted
-	VM_STATUS_STOPPED       VMStatus = "stopped"       // VM has stopped (deleted or expired)
-	VM_STATUS_FAILED        VMStatus = "failed"        // VM failed to create
-	VM_STATUS_OFFLINE       VMStatus = "offline"       // node hosting VM went offline
+	VM_STATUS_NOT_FOUND    VMStatus = "not_found"    // vm not found (API response only)
+	VM_STATUS_CREATING     VMStatus = "creating"     // VM creation initiated, waiting for orchestration
+	VM_STATUS_PENDING      VMStatus = "pending"      // request received, queued
+	VM_STATUS_BOOTING      VMStatus = "booting"      // VM is starting up (scheduling, booting, waiting for agent)
+	VM_STATUS_PROVISIONING VMStatus = "provisioning" // cloud-init running, installing software
+	VM_STATUS_READY        VMStatus = "ready"        // VM is ready to use
+	VM_STATUS_STOPPING     VMStatus = "stopping"     // VM is being deleted
+	VM_STATUS_STOPPED      VMStatus = "stopped"      // VM has stopped (deleted or expired)
+	VM_STATUS_FAILED       VMStatus = "failed"       // VM failed to create
+	VM_STATUS_OFFLINE      VMStatus = "offline"      // node hosting VM went offline
 )
 
 type GPUType string

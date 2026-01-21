@@ -220,7 +220,7 @@ func (j *JobAdapter) checkJobStatus(ctx context.Context, jobId string) (structs.
 	pods, err := j.client.CoreV1().Pods(j.namespace).List(ctx, metav1.ListOptions{
 		LabelSelector: fmt.Sprintf("uvacompute.io/job-id=%s", jobId),
 	})
-	
+
 	var nodeId string
 	var pod *corev1.Pod
 	if err == nil && len(pods.Items) > 0 {
