@@ -218,6 +218,7 @@ export function registerSSHKeyCommands(program: Command) {
 
   sshKey
     .command("remove")
+    .alias("rm")
     .description("Remove an SSH key")
     .argument("<keyId>", "SSH key ID to remove")
     .action(removeSSHKey);

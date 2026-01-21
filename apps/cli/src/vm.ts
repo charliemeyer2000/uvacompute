@@ -990,12 +990,8 @@ export function registerVMCommands(program: Command) {
     .action(createVM);
 
   vm.command("delete")
+    .alias("rm")
     .description("Delete a VM")
-    .argument("<nameOrVmId>", "VM name or VM ID")
-    .action(deleteVM);
-
-  vm.command("rm")
-    .description("Delete a VM (alias for delete)")
     .argument("<nameOrVmId>", "VM name or VM ID")
     .action(deleteVM);
 
@@ -1005,12 +1001,8 @@ export function registerVMCommands(program: Command) {
     .action(getVMStatus);
 
   vm.command("list")
+    .alias("ls")
     .description("List running VMs")
-    .option("-a, --all", "Show all VMs (including non-running)")
-    .action(listVMs);
-
-  vm.command("ls")
-    .description("List running VMs (alias for list)")
     .option("-a, --all", "Show all VMs (including non-running)")
     .action(listVMs);
 
