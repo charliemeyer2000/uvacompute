@@ -8,8 +8,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-
-	"github.com/google/uuid"
 )
 
 type VMResourceLimits struct {
@@ -55,7 +53,8 @@ func (vm *VMManager) CreateVM(req VMCreationRequest) (string, error) {
 		return "", err
 	}
 
-	vmId := uuid.New().String()
+	// Use the pre-generated vmId from the request
+	vmId := req.VMId
 
 	cpus := IntOrDefault(req.Cpus, DefaultCpus)
 	ram := IntOrDefault(req.Ram, DefaultRam)
@@ -79,18 +78,34 @@ func (vm *VMManager) CreateVM(req VMCreationRequest) (string, error) {
 		Status:       VM_STATUS_PENDING,
 	}
 
-	// Release lock before synchronous VM creation (can take minutes)
+	// Release lock before async VM creation
 	vm.mu.Unlock()
 
-	// Create VM synchronously - only return success after VM actually exists
-	err := vm.createVMSync(vmId, cpus, ram, disk, gpus, req.SSHPublicKeys, req.Hours, startupScript, cloudInitConfig)
-	if err != nil {
-		// VM creation failed - remove from map and return error
-		vm.mu.Lock()
-		delete(vm.vmMap, vmId)
-		vm.mu.Unlock()
-		return "", err
-	}
+	// Notify that we've moved to pending status
+	vm.UpdateVMStatus(vmId, VM_STATUS_PENDING, "")
+
+	// Create VM asynchronously - return immediately so UI shows "creating" status
+	go func() {
+		err := vm.createVMSync(vmId, cpus, ram, disk, gpus, req.SSHPublicKeys, req.Hours, startupScript, cloudInitConfig)
+		if err != nil {
+			// VM creation failed - update status to failed and notify
+			log.Printf("ERROR: VM %s creation failed: %v", vmId, err)
+			vm.mu.Lock()
+			if vmState, exists := vm.vmMap[vmId]; exists {
+				vmState.Status = VM_STATUS_FAILED
+				vmState.ErrorMessage = err.Error()
+				vm.vmMap[vmId] = vmState
+			}
+			vm.mu.Unlock()
+
+			// Notify the site about the failure
+			if vm.callbackClient != nil {
+				if notifyErr := vm.callbackClient.NotifyVMStatusUpdate(vmId, string(VM_STATUS_FAILED), ""); notifyErr != nil {
+					log.Printf("ERROR: Failed to notify site about VM %s failure: %v", vmId, notifyErr)
+				}
+			}
+		}
+	}()
 
 	return vmId, nil
 }

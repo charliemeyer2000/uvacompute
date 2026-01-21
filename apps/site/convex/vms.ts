@@ -13,7 +13,6 @@ export const create = mutation({
     gpus: v.number(),
     gpuType: v.string(),
     hours: v.number(),
-    orchestrationResponse: v.optional(v.any()),
   },
   handler: async (ctx, args) => {
     const now = Date.now();
@@ -28,11 +27,10 @@ export const create = mutation({
       disk: args.disk,
       gpus: args.gpus,
       gpuType: args.gpuType,
-      status: "pending",
+      status: "creating", // Start with "creating" so UI shows VM immediately
       hours: args.hours,
       createdAt: now,
       expiresAt,
-      orchestrationResponse: args.orchestrationResponse,
     });
 
     return vmDocId;
@@ -63,7 +61,12 @@ export const updateStatus = mutation({
       updates.nodeId = args.nodeId;
     }
 
-    const provisioningStatuses = ["pending", "booting", "provisioning"];
+    const provisioningStatuses = [
+      "creating",
+      "pending",
+      "booting",
+      "provisioning",
+    ];
 
     // When VM becomes ready, reset the expiration timer (provisioning time doesn't count)
     if (args.status === "ready" && provisioningStatuses.includes(vm.status)) {
@@ -107,7 +110,13 @@ export const listActiveByUser = query({
       .order("desc")
       .collect();
 
-    const activeStatuses = ["pending", "booting", "provisioning", "ready"];
+    const activeStatuses = [
+      "creating",
+      "pending",
+      "booting",
+      "provisioning",
+      "ready",
+    ];
 
     const runningStatuses = ["ready"];
 
@@ -177,7 +186,13 @@ export const markNodeOffline = internalMutation({
       .withIndex("by_nodeId", (q) => q.eq("nodeId", args.nodeId))
       .collect();
 
-    const activeStatuses = ["pending", "booting", "provisioning", "ready"];
+    const activeStatuses = [
+      "creating",
+      "pending",
+      "booting",
+      "provisioning",
+      "ready",
+    ];
 
     let count = 0;
     for (const vm of vms) {

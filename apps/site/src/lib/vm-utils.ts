@@ -47,6 +47,7 @@ export function getStatusColor(status: VMStatus): string {
   switch (status) {
     case "ready":
       return "bg-green-100 text-green-800 border-green-200";
+    case "creating":
     case "pending":
     case "booting":
     case "provisioning":
