@@ -28,7 +28,7 @@ export const create = mutation({
       disk: args.disk,
       gpus: args.gpus,
       gpuType: args.gpuType,
-      status: "creating",
+      status: "pending",
       hours: args.hours,
       createdAt: now,
       expiresAt,
@@ -63,20 +63,15 @@ export const updateStatus = mutation({
       updates.nodeId = args.nodeId;
     }
 
-    const provisioningStatuses = [
-      "creating",
-      "initializing",
-      "starting",
-      "waiting_for_agent",
-      "configuring",
-    ];
+    const provisioningStatuses = ["pending", "booting", "provisioning"];
 
-    if (args.status === "running" && provisioningStatuses.includes(vm.status)) {
+    // When VM becomes ready, reset the expiration timer (provisioning time doesn't count)
+    if (args.status === "ready" && provisioningStatuses.includes(vm.status)) {
       const now = Date.now();
       updates.expiresAt = now + vm.hours * 60 * 60 * 1000;
     }
 
-    if (args.status === "deleted" || args.status === "expired") {
+    if (args.status === "stopped") {
       updates.deletedAt = Date.now();
     }
 
@@ -112,17 +107,9 @@ export const listActiveByUser = query({
       .order("desc")
       .collect();
 
-    const activeStatuses = [
-      "creating",
-      "initializing",
-      "starting",
-      "waiting_for_agent",
-      "configuring",
-      "running",
-      "updating",
-    ];
+    const activeStatuses = ["pending", "booting", "provisioning", "ready"];
 
-    const runningStatuses = ["running", "updating"];
+    const runningStatuses = ["ready"];
 
     return allVms.filter((vm) => {
       if (!activeStatuses.includes(vm.status)) {
@@ -149,11 +136,10 @@ export const listInactiveByUser = query({
 
     const inactiveStatuses = [
       "failed",
-      "deleted",
-      "expired",
+      "stopped",
       "not_found",
-      "deleting",
-      "node_offline",
+      "stopping",
+      "offline",
     ];
 
     return allVms.filter((vm) => inactiveStatuses.includes(vm.status));
@@ -191,21 +177,13 @@ export const markNodeOffline = internalMutation({
       .withIndex("by_nodeId", (q) => q.eq("nodeId", args.nodeId))
       .collect();
 
-    const activeStatuses = [
-      "creating",
-      "initializing",
-      "starting",
-      "waiting_for_agent",
-      "configuring",
-      "running",
-      "updating",
-    ];
+    const activeStatuses = ["pending", "booting", "provisioning", "ready"];
 
     let count = 0;
     for (const vm of vms) {
       if (activeStatuses.includes(vm.status)) {
         await ctx.db.patch(vm._id, {
-          status: "node_offline",
+          status: "offline",
         });
         count++;
       }

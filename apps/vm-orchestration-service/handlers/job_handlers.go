@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"time"
 
 	"vm-orchestration-service/structs"
 
@@ -206,22 +207,66 @@ func StreamJobLogsHandler(app *structs.App, w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	scanner := bufio.NewScanner(stream)
-	for scanner.Scan() {
-		line := scanner.Text()
-		fmt.Fprintf(w, "data: %s\n\n", line)
-		flusher.Flush()
+	// Channel to receive log lines from scanner goroutine
+	lineChan := make(chan string)
+	errChan := make(chan error, 1)
+	doneChan := make(chan struct{})
 
-		if r.Context().Err() != nil {
+	// Start scanner in a goroutine so we can also send heartbeats
+	go func() {
+		defer close(doneChan)
+		scanner := bufio.NewScanner(stream)
+		for scanner.Scan() {
+			select {
+			case lineChan <- scanner.Text():
+			case <-r.Context().Done():
+				return
+			}
+		}
+		if err := scanner.Err(); err != nil && err != io.EOF {
+			errChan <- err
+		}
+	}()
+
+	// Heartbeat ticker - send every 30 seconds to keep connection alive
+	heartbeat := time.NewTicker(30 * time.Second)
+	defer heartbeat.Stop()
+
+	for {
+		select {
+		case <-r.Context().Done():
+			// Client disconnected
+			return
+		case <-heartbeat.C:
+			// SSE comment (ignored by EventSource, but keeps connection alive)
+			fmt.Fprintf(w, ": heartbeat\n\n")
+			flusher.Flush()
+		case line, ok := <-lineChan:
+			if !ok {
+				// Channel closed, scanner done
+				select {
+				case err := <-errChan:
+					fmt.Fprintf(w, "event: error\ndata: %s\n\n", err.Error())
+					flusher.Flush()
+				default:
+				}
+				fmt.Fprintf(w, "event: done\ndata: stream ended\n\n")
+				flusher.Flush()
+				return
+			}
+			fmt.Fprintf(w, "data: %s\n\n", line)
+			flusher.Flush()
+		case <-doneChan:
+			// Scanner goroutine finished
+			select {
+			case err := <-errChan:
+				fmt.Fprintf(w, "event: error\ndata: %s\n\n", err.Error())
+				flusher.Flush()
+			default:
+			}
+			fmt.Fprintf(w, "event: done\ndata: stream ended\n\n")
+			flusher.Flush()
 			return
 		}
 	}
-
-	if err := scanner.Err(); err != nil && err != io.EOF {
-		fmt.Fprintf(w, "event: error\ndata: %s\n\n", err.Error())
-		flusher.Flush()
-	}
-
-	fmt.Fprintf(w, "event: done\ndata: stream ended\n\n")
-	flusher.Flush()
 }

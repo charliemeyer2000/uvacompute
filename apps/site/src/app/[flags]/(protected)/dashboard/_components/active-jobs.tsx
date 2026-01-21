@@ -32,13 +32,48 @@ import {
   Job,
   formatDate,
   formatJobStatus,
-  getJobStatusColor,
   formatDuration,
   isJobCancellable,
 } from "@/lib/job-utils";
-import { MoreVertical, Loader2, FileText } from "lucide-react";
+import { MoreVertical, Loader2, FileText, Container } from "lucide-react";
 import { toast } from "sonner";
 import JobLogViewer from "./job-log-viewer";
+
+function getStatusBorderColor(status: string): string {
+  switch (status) {
+    case "running":
+    case "pulling":
+      return "border-l-blue-500";
+    case "pending":
+    case "scheduled":
+      return "border-l-yellow-500";
+    case "completed":
+      return "border-l-green-500";
+    case "failed":
+      return "border-l-red-500";
+    case "cancelled":
+      return "border-l-gray-300";
+    default:
+      return "border-l-gray-300";
+  }
+}
+
+function getStatusDotColor(status: string): string {
+  switch (status) {
+    case "running":
+    case "pulling":
+      return "bg-blue-500";
+    case "pending":
+    case "scheduled":
+      return "bg-yellow-500";
+    case "completed":
+      return "bg-green-500";
+    case "failed":
+      return "bg-red-500";
+    default:
+      return "bg-gray-400";
+  }
+}
 
 function JobCard({ job }: { job: Job }) {
   const [showCancelDialog, setShowCancelDialog] = useState(false);
@@ -75,20 +110,27 @@ function JobCard({ job }: { job: Job }) {
 
   return (
     <>
-      <div className="bg-white border border-gray-200 p-6 relative">
-        <div className="flex justify-between items-start mb-4">
-          <div className="flex-1">
-            <h3 className="text-base font-semibold text-black">
+      <div
+        className={`bg-white border border-gray-200 border-l-4 ${getStatusBorderColor(job.status)} p-5 hover:border-gray-300 transition-colors`}
+      >
+        <div className="flex justify-between items-start mb-3">
+          <div className="flex-1 min-w-0">
+            <h3 className="text-sm font-semibold text-black truncate">
               {job.name || "unnamed job"}
             </h3>
-            <p className="text-xs text-gray-500 font-mono">{job.jobId}</p>
+            <p className="text-xs text-gray-400 font-mono truncate mt-0.5">
+              {job.jobId}
+            </p>
           </div>
-          <div className="flex items-center gap-2">
-            <span
-              className={`px-2 py-1 text-xs font-medium border ${getJobStatusColor(job.status)}`}
-            >
-              {formatJobStatus(job.status)}
-            </span>
+          <div className="flex items-center gap-2 flex-shrink-0 ml-3">
+            <div className="flex items-center gap-1.5">
+              <span
+                className={`w-2 h-2 rounded-full ${getStatusDotColor(job.status)}`}
+              />
+              <span className="text-xs text-gray-600">
+                {formatJobStatus(job.status)}
+              </span>
+            </div>
             <DropdownMenu modal={false}>
               <DropdownMenuTrigger asChild>
                 <Button
@@ -122,38 +164,46 @@ function JobCard({ job }: { job: Job }) {
           </div>
         </div>
 
-        <div className="mb-4">
-          <p className="text-xs text-gray-500">image</p>
-          <p className="font-medium text-black text-sm font-mono truncate">
+        <div className="mb-3">
+          <p className="text-gray-400 uppercase tracking-wide text-[10px]">
+            image
+          </p>
+          <p className="font-medium text-black text-xs font-mono truncate">
             {job.image}
           </p>
         </div>
 
-        <div className="grid grid-cols-3 gap-4 mb-4 text-xs">
+        <div className="grid grid-cols-3 gap-3 mb-4 text-xs">
           <div>
-            <p className="text-gray-500">cpus</p>
+            <p className="text-gray-400 uppercase tracking-wide text-[10px]">
+              cpu
+            </p>
             <p className="font-medium text-black">{job.cpus} vCPU</p>
           </div>
           <div>
-            <p className="text-gray-500">ram</p>
+            <p className="text-gray-400 uppercase tracking-wide text-[10px]">
+              ram
+            </p>
             <p className="font-medium text-black">{job.ram} GB</p>
           </div>
           <div>
-            <p className="text-gray-500">gpus</p>
+            <p className="text-gray-400 uppercase tracking-wide text-[10px]">
+              gpu
+            </p>
             <p className="font-medium text-black">
-              {job.gpus > 0 ? `${job.gpus}` : "none"}
+              {job.gpus > 0 ? `${job.gpus}x` : "—"}
             </p>
           </div>
         </div>
 
-        <div className="border-t border-gray-200 pt-4 space-y-2 text-xs">
+        <div className="border-t border-gray-100 pt-3 space-y-1.5 text-xs">
           <div className="flex justify-between">
-            <span className="text-gray-500">created:</span>
-            <span className="text-black">{formatDate(job.createdAt)}</span>
+            <span className="text-gray-400">created</span>
+            <span className="text-gray-600">{formatDate(job.createdAt)}</span>
           </div>
           {job.startedAt && (
             <div className="flex justify-between">
-              <span className="text-gray-500">running for:</span>
+              <span className="text-gray-400">running for</span>
               <span className="text-black font-medium">
                 {formatDuration(job.startedAt)}
               </span>
@@ -231,56 +281,42 @@ export default function ActiveJobs() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-xl font-semibold text-black">active jobs</h2>
-        {activeJobs ? (
-          <span className="text-sm text-gray-500">
-            {activeJobs.length} {activeJobs.length === 1 ? "job" : "jobs"}
-          </span>
-        ) : (
-          <div className="h-5 w-16 bg-gray-200 animate-pulse" />
-        )}
-      </div>
-
       {!activeJobs ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 min-h-[280px]">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="bg-white border border-gray-200 p-6">
-              <div className="flex justify-between items-start mb-4">
+            <div
+              key={i}
+              className="bg-white border border-gray-200 border-l-4 border-l-gray-200 p-5"
+            >
+              <div className="flex justify-between items-start mb-3">
                 <div className="flex-1">
-                  <div className="h-6 w-32 bg-gray-200 animate-pulse mb-2" />
-                  <div className="h-4 w-48 bg-gray-200 animate-pulse" />
+                  <div className="h-5 w-32 bg-gray-100 animate-pulse mb-1" />
+                  <div className="h-3 w-40 bg-gray-100 animate-pulse" />
                 </div>
-                <div className="h-6 w-16 bg-gray-200 animate-pulse" />
+                <div className="h-4 w-16 bg-gray-100 animate-pulse" />
               </div>
-              <div className="mb-4">
-                <div className="h-3 w-12 bg-gray-200 animate-pulse mb-1" />
-                <div className="h-5 w-40 bg-gray-200 animate-pulse" />
+              <div className="mb-3">
+                <div className="h-2 w-10 bg-gray-100 animate-pulse mb-1" />
+                <div className="h-4 w-36 bg-gray-100 animate-pulse" />
               </div>
-              <div className="grid grid-cols-3 gap-4 mb-4">
-                <div>
-                  <div className="h-3 w-12 bg-gray-200 animate-pulse mb-1" />
-                  <div className="h-4 w-16 bg-gray-200 animate-pulse" />
-                </div>
-                <div>
-                  <div className="h-3 w-12 bg-gray-200 animate-pulse mb-1" />
-                  <div className="h-4 w-16 bg-gray-200 animate-pulse" />
-                </div>
-                <div>
-                  <div className="h-3 w-12 bg-gray-200 animate-pulse mb-1" />
-                  <div className="h-4 w-16 bg-gray-200 animate-pulse" />
-                </div>
+              <div className="grid grid-cols-3 gap-3 mb-4">
+                {[1, 2, 3].map((j) => (
+                  <div key={j}>
+                    <div className="h-2 w-8 bg-gray-100 animate-pulse mb-1" />
+                    <div className="h-4 w-12 bg-gray-100 animate-pulse" />
+                  </div>
+                ))}
               </div>
-              <div className="border-t border-gray-200 pt-4 space-y-2">
-                <div className="h-3 w-full bg-gray-200 animate-pulse" />
-                <div className="h-3 w-full bg-gray-200 animate-pulse" />
+              <div className="border-t border-gray-100 pt-3 space-y-1.5">
+                <div className="h-3 w-full bg-gray-100 animate-pulse" />
+                <div className="h-3 w-3/4 bg-gray-100 animate-pulse" />
               </div>
             </div>
           ))}
         </div>
       ) : activeJobs.length > 0 ? (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 min-h-[280px]">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {paginatedActiveJobs?.map((job) => (
               <JobCard key={job._id} job={job as Job} />
             ))}
@@ -354,14 +390,19 @@ export default function ActiveJobs() {
           )}
         </>
       ) : (
-        <div className="border border-gray-200 p-8 text-center min-h-[280px] flex flex-col items-center justify-center">
+        <div className="border border-gray-200 bg-white p-12 text-center">
+          <div className="mx-auto w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center mb-4">
+            <Container className="w-6 h-6 text-gray-400" />
+          </div>
           <p className="text-gray-500 mb-2 text-sm">no active jobs</p>
-          <p className="text-xs text-gray-400">
-            run a container job using the cli:{" "}
-            <code className="bg-gray-50 px-2 py-1 border border-gray-200">
+          <p className="text-xs text-gray-400 mb-4">
+            run a container job using the cli
+          </p>
+          <div className="bg-gray-50 border border-gray-200 px-3 py-2 inline-block">
+            <code className="text-xs text-gray-600">
               uva run alpine echo hello
             </code>
-          </p>
+          </div>
         </div>
       )}
     </div>
