@@ -13,6 +13,7 @@ import { homedir } from "os";
 import { join } from "path";
 import { select, confirm } from "@inquirer/prompts";
 import { getBaseUrl, loadToken, checkServiceStatus } from "./lib/utils";
+import { ensureSSHKeysConfigured, getRegisteredKeys } from "./lib/ssh-utils";
 import {
   theme,
   statusColors,
@@ -26,7 +27,6 @@ import {
   VMDeletionResponseSchema,
   VMStatusResponseSchema,
   VMListResponseSchema,
-  SSHKeyListResponseSchema,
   VM_STATUS_GROUPS,
 } from "./lib/schemas";
 import {
@@ -41,6 +41,48 @@ import {
 } from "./lib/errors";
 import yaml from "js-yaml";
 const BASE_URL = getBaseUrl();
+
+function stripAnsi(value: string): string {
+  return value.replace(/\x1b\[[0-9;]*m/g, "");
+}
+
+function formatAge(date: Date): string {
+  const diffMs = Date.now() - date.getTime();
+  if (diffMs < 0) return "0m";
+  const minutes = Math.floor(diffMs / 60000);
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h`;
+  const days = Math.floor(hours / 24);
+  return `${days}d`;
+}
+
+function formatResources(vm: {
+  cpus: number;
+  ram: number;
+  disk: number;
+  gpus: number;
+  gpuType?: string | null;
+}): string {
+  const gpuPart = vm.gpus > 0 ? ` | ${vm.gpus}x ${vm.gpuType}` : "";
+  return `${vm.cpus} vCPU | ${vm.ram}GB RAM | ${vm.disk}GB disk${gpuPart}`;
+}
+
+function formatStatus(status: string): string {
+  const expiredStatuses = new Set([
+    "stopped",
+    "failed",
+    "offline",
+    "not_found",
+  ]);
+  if (expiredStatuses.has(status)) {
+    return `${theme.error("●")} Expired`;
+  }
+  if (status === "ready") {
+    return `${theme.success("●")} Ready`;
+  }
+  return `${theme.warning("●")} Provisioning`;
+}
 
 function getStatusMessage(status: string): string {
   const messages: Record<string, string> = {
@@ -249,35 +291,23 @@ async function createVM(options: {
       process.exit(1);
     }
 
-    const keysResponse = await fetch(`${BASE_URL}/api/ssh-keys`, {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
+    const keysResult = await getRegisteredKeys(token);
+    if (!keysResult.success) {
+      console.log(theme.error("Failed to check SSH keys. Please try again."));
+      console.log(theme.muted(`Error: ${keysResult.error}`));
+      process.exit(1);
+    }
 
-    if (keysResponse.ok) {
-      const keysData = SSHKeyListResponseSchema.parse(
-        await keysResponse.json(),
-      );
-      if (keysData.keys.length === 0) {
+    if (keysResult.keys.length === 0) {
+      const configured = await ensureSSHKeysConfigured(token);
+      if (!configured) {
         console.log(
-          theme.error(
-            "No SSH keys configured. You must add an SSH key before creating a VM.",
-          ),
-        );
-        console.log(theme.muted("\nAdd an SSH key with:"));
-        console.log(
-          formatCommand(
-            "uva ssh-key add ~/.ssh/id_ed25519.pub --name 'My Key'",
+          theme.warning(
+            "Continuing without SSH access. You won't be able to SSH into this VM.",
           ),
         );
         console.log();
-        process.exit(1);
       }
-    } else {
-      console.log(theme.error("Failed to check SSH keys. Please try again."));
-      process.exit(1);
     }
 
     if (options.name) {
@@ -339,6 +369,7 @@ async function createVM(options: {
 
     if (options.name) requestBody.name = options.name;
 
+    const defaultDisk = 64;
     if (options.cpus) {
       const cpus = parseInt(options.cpus, 10);
       if (isNaN(cpus)) {
@@ -364,6 +395,8 @@ async function createVM(options: {
         process.exit(1);
       }
       requestBody.disk = disk;
+    } else {
+      requestBody.disk = defaultDisk;
     }
 
     if (options.gpus) {
@@ -514,37 +547,29 @@ async function createVM(options: {
         console.log(formatDetail("GPU Type", options.gpuType));
       console.log();
 
-      const keysResponse = await fetch(`${BASE_URL}/api/ssh-keys`, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      if (keysResponse.ok) {
-        const keysData = SSHKeyListResponseSchema.parse(
-          await keysResponse.json(),
+      const postCreationKeysResult = await getRegisteredKeys(token);
+      if (!postCreationKeysResult.success) {
+        console.log(theme.error("Failed to check SSH keys. Please try again."));
+        console.log(theme.muted(`Error: ${postCreationKeysResult.error}`));
+        console.log();
+      } else if (postCreationKeysResult.keys.length > 0) {
+        console.log(theme.success("SSH access configured"));
+        console.log(theme.muted("\nTo connect:"));
+        const identifier = options.name || data.vmId || "vm-id";
+        console.log(formatCommand(`uva vm ssh ${identifier}`));
+        console.log();
+      } else {
+        console.log(
+          theme.warning(
+            "No SSH keys configured. Add one to enable SSH access:",
+          ),
         );
-
-        if (keysData.keys.length === 0) {
-          console.log(
-            theme.warning(
-              "No SSH keys configured. Add one to enable SSH access:",
-            ),
-          );
-          console.log(
-            formatCommand(
-              "uva ssh-key add ~/.ssh/id_ed25519.pub --name 'Some Key Name'",
-            ),
-          );
-          console.log();
-        } else {
-          console.log(theme.success("SSH access configured"));
-          console.log(theme.muted("\nTo connect:"));
-          const identifier = options.name || data.vmId || "vm-id";
-          console.log(formatCommand(`uva vm ssh ${identifier}`));
-          console.log();
-        }
+        console.log(
+          formatCommand(
+            "uva ssh-key add ~/.ssh/id_ed25519.pub --name 'My Key'",
+          ),
+        );
+        console.log();
       }
     } else {
       spinner.fail(`VM creation failed: ${data.msg}`);
@@ -735,7 +760,7 @@ async function getVMStatus(vmId: string): Promise<void> {
   }
 }
 
-async function listVMs(options: { all?: boolean }): Promise<void> {
+async function listVMs(): Promise<void> {
   const spinner = ora("Fetching VMs...").start();
 
   try {
@@ -771,54 +796,51 @@ async function listVMs(options: { all?: boolean }): Promise<void> {
 
     const data = VMListResponseSchema.parse(rawData);
 
-    const filteredVMs = options.all
-      ? data.vms
-      : data.vms.filter((vm) => vm.status === "ready");
-
     spinner.succeed(theme.success("VMs retrieved!"));
 
-    if (filteredVMs.length === 0) {
-      if (options.all) {
-        console.log(theme.warning("\nNo VMs found."));
-        console.log(
-          theme.muted("Create one with: uva vm create -h 1 -n myvm\n"),
-        );
-      } else {
-        console.log(theme.warning("\nNo running VMs found."));
-        console.log(theme.muted("Use 'uva vm list --all' to see all VMs\n"));
-      }
+    if (data.vms.length === 0) {
+      console.log(theme.warning("\nNo VMs found."));
+      console.log(theme.muted("Create one with: uva vm create -h 1 -n myvm\n"));
       return;
     }
 
-    if (options.all) {
-      console.log(formatSectionHeader("All VMs"));
-    } else {
-      console.log(formatSectionHeader("Running VMs"));
+    const sorted = [...data.vms].sort(
+      (a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    );
+
+    console.log();
+    const headers = ["Age", "VM", "Resources", "Status"];
+    const rows = sorted.map((vm) => {
+      const nameDisplay = vm.name ? vm.name : "(unnamed)";
+      const vmLabel = `${nameDisplay} ${theme.muted(vm.vmId)}`;
+      return [
+        formatAge(new Date(vm.createdAt)),
+        vmLabel,
+        formatResources(vm),
+        formatStatus(vm.status),
+      ];
+    });
+
+    const widths = headers.map((header, index) => {
+      const cellWidths = rows.map((row) => stripAnsi(row[index] ?? "").length);
+      return Math.max(header.length, ...cellWidths);
+    });
+
+    const renderRow = (cols: string[]) =>
+      cols
+        .map((col, index) => {
+          const padding = (widths[index] ?? 0) - stripAnsi(col).length;
+          return `${col}${" ".repeat(Math.max(0, padding + 2))}`;
+        })
+        .join("")
+        .trimEnd();
+
+    console.log(renderRow(headers.map((h) => theme.muted(h))));
+    for (const row of rows) {
+      console.log(renderRow(row));
     }
     console.log();
-
-    for (const vm of filteredVMs) {
-      const statusColor =
-        statusColors[vm.status as keyof typeof statusColors] || theme.muted;
-
-      const nameDisplay = vm.name
-        ? theme.emphasis(vm.name)
-        : theme.muted("(unnamed)");
-      console.log(`${nameDisplay} ${statusColor(`[${vm.status}]`)}`);
-      console.log(theme.muted(`  VM ID: ${vm.vmId}`));
-      console.log(
-        theme.muted(
-          `  Resources: ${vm.cpus} vCPU | ${vm.ram}GB RAM | ${vm.disk}GB disk${vm.gpus > 0 ? ` | ${vm.gpus}x ${vm.gpuType}` : ""}`,
-        ),
-      );
-      console.log(
-        theme.muted(`  Created: ${new Date(vm.createdAt).toLocaleString()}`),
-      );
-      console.log(
-        theme.muted(`  Expires: ${new Date(vm.expiresAt).toLocaleString()}`),
-      );
-      console.log();
-    }
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Unknown error";
     spinner.fail(`Error: ${message}`);
@@ -906,29 +928,32 @@ async function sshToVM(nameOrVmId: string): Promise<void> {
       process.exit(1);
     }
 
-    const keysResponse = await fetch(`${BASE_URL}/api/ssh-keys`, {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
+    const sshKeysResult = await getRegisteredKeys(token);
+    if (!sshKeysResult.success) {
+      spinner.fail("Failed to check SSH keys. Please try again.");
+      console.log(theme.muted(`Error: ${sshKeysResult.error}`));
+      process.exit(1);
+    }
 
-    if (keysResponse.ok) {
-      const keysData = SSHKeyListResponseSchema.parse(
-        await keysResponse.json(),
+    if (sshKeysResult.keys.length === 0) {
+      spinner.stop();
+      console.log(
+        theme.warning("\nNo SSH keys configured. Cannot connect to VM."),
       );
-
-      if (keysData.keys.length === 0) {
-        spinner.warn(theme.warning("No SSH keys configured"));
-        console.log(theme.muted("\nAdd an SSH key to enable access:"));
-        console.log(
-          formatCommand(
-            "uva ssh-key add ~/.ssh/id_ed25519.pub --name 'My Key'",
-          ),
-        );
-        console.log();
+      const configured = await ensureSSHKeysConfigured(token);
+      if (!configured) {
         process.exit(1);
       }
+      console.log(
+        theme.muted(
+          "Note: The VM was created before this key was added. SSH may not work.",
+        ),
+      );
+      console.log(
+        theme.muted("You may need to create a new VM for SSH access to work."),
+      );
+      console.log();
+      spinner.start("Connecting to VM...");
     }
 
     spinner.text = "Getting connection info...";
@@ -975,7 +1000,11 @@ async function sshToVM(nameOrVmId: string): Promise<void> {
     // The proxy validates the token and runs virtctl to connect to the VM
     const proxyCommand = `ssh -i ${proxyKeyPath} -p ${port} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${user}@${host} ${accessToken}`;
 
+    const uvaKeyPath = join(homedir(), ".ssh", "id_ed25519_uvacompute");
     const sshArgs = [
+      ...(existsSync(uvaKeyPath)
+        ? ["-i", uvaKeyPath, "-o", "IdentitiesOnly=yes"]
+        : []),
       "-o",
       `ProxyCommand=${proxyCommand}`,
       "-o",
@@ -1034,11 +1063,7 @@ export function registerVMCommands(program: Command) {
     .argument("<vmId>", "VM ID to check")
     .action(getVMStatus);
 
-  vm.command("list")
-    .alias("ls")
-    .description("List running VMs")
-    .option("-a, --all", "Show all VMs (including non-running)")
-    .action(listVMs);
+  vm.command("list").alias("ls").description("List VMs").action(listVMs);
 
   vm.command("ssh")
     .description("Connect to VM via SSH")
