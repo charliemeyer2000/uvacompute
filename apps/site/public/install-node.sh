@@ -79,8 +79,17 @@ detect_os() {
         ubuntu|debian)
             log_info "Detected OS: ${OS_NAME}"
             ;;
+        fedora)
+            log_info "Detected OS: ${OS_NAME}"
+            ;;
+        arch)
+            log_info "Detected OS: ${OS_NAME}"
+            ;;
+        gentoo)
+            log_warn "Detected OS: ${OS_NAME} (experimental support)"
+            ;;
         *)
-            die "Unsupported OS: ${OS_NAME}. Only Ubuntu and Debian are supported."
+            die "Unsupported OS: ${OS_NAME}. Supported: Ubuntu, Debian, Fedora, Arch, Gentoo."
             ;;
     esac
 }
@@ -100,8 +109,21 @@ check_prerequisites() {
     if [[ ${#missing[@]} -gt 0 ]]; then
         log_error "Missing required commands: ${missing[*]}"
         log_info "Installing missing dependencies..."
-        apt-get update -qq
-        apt-get install -y -qq curl systemd pciutils jq
+        case "${OS_ID}" in
+            ubuntu|debian)
+                apt-get update -qq
+                apt-get install -y -qq curl systemd pciutils jq
+                ;;
+            fedora)
+                dnf install -y curl systemd pciutils jq
+                ;;
+            arch)
+                pacman -Sy --noconfirm curl pciutils jq
+                ;;
+            gentoo)
+                emerge --ask=n net-misc/curl sys-apps/pciutils app-misc/jq
+                ;;
+        esac
     fi
 
     log_success "All prerequisites satisfied"
@@ -398,17 +420,48 @@ install_nvidia_toolkit() {
     if command -v nvidia-ctk &> /dev/null; then
         log_warn "nvidia-container-toolkit is already installed"
     else
-        log_info "Adding NVIDIA apt repository..."
-        curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | \
-            gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg --yes
+        case "${OS_ID}" in
+            ubuntu|debian)
+                log_info "Adding NVIDIA apt repository..."
+                curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | \
+                    gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg --yes
 
-        curl -s -L https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list | \
-            sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' | \
-            tee /etc/apt/sources.list.d/nvidia-container-toolkit.list > /dev/null
+                curl -s -L https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list | \
+                    sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' | \
+                    tee /etc/apt/sources.list.d/nvidia-container-toolkit.list > /dev/null
 
-        log_info "Installing nvidia-container-toolkit..."
-        apt-get update -qq
-        apt-get install -y -qq nvidia-container-toolkit
+                log_info "Installing nvidia-container-toolkit..."
+                apt-get update -qq
+                apt-get install -y -qq nvidia-container-toolkit
+                ;;
+            fedora)
+                log_info "Adding NVIDIA RPM repository..."
+                curl -s -L https://nvidia.github.io/libnvidia-container/stable/rpm/nvidia-container-toolkit.repo | \
+                    tee /etc/yum.repos.d/nvidia-container-toolkit.repo > /dev/null
+
+                log_info "Installing nvidia-container-toolkit..."
+                dnf install -y nvidia-container-toolkit
+                ;;
+            arch)
+                log_info "Installing nvidia-container-toolkit from extra repo..."
+                pacman -Sy --noconfirm nvidia-container-toolkit
+                ;;
+            gentoo)
+                log_warn "nvidia-container-toolkit requires manual installation on Gentoo"
+                log_warn "Options:"
+                log_warn "  1. Use GURU overlay: eselect repository enable guru && emerge nvidia-container-toolkit"
+                log_warn "  2. Build from source: https://github.com/NVIDIA/nvidia-container-toolkit"
+                log_warn "Continuing without nvidia-container-toolkit..."
+                ;;
+        esac
+    fi
+
+    # SELinux configuration for Fedora
+    if [[ "${OS_ID}" == "fedora" ]] && command -v getenforce &> /dev/null; then
+        if [[ "$(getenforce)" != "Disabled" ]]; then
+            log_info "Configuring SELinux for container GPU access..."
+            setsebool -P container_use_devices on 2>/dev/null || true
+        fi
     fi
 
     log_success "nvidia-container-toolkit installed"
@@ -661,8 +714,21 @@ setup_ssh_tunnel() {
     # Install autossh if not present
     if ! command -v autossh &> /dev/null; then
         log_info "Installing autossh..."
-        apt-get update -qq
-        apt-get install -y -qq autossh
+        case "${OS_ID}" in
+            ubuntu|debian)
+                apt-get update -qq
+                apt-get install -y -qq autossh
+                ;;
+            fedora)
+                dnf install -y autossh
+                ;;
+            arch)
+                pacman -S --noconfirm autossh
+                ;;
+            gentoo)
+                emerge --ask=n net-misc/autossh
+                ;;
+        esac
     fi
 
     # Create systemd service for SSH tunnel
