@@ -16,14 +16,16 @@ export function GPUBreakdown({ byType }: GPUBreakdownProps) {
   );
 
   if (entries.length === 0) {
-    return <span className="text-gray-400 text-xs font-mono">no gpus</span>;
+    return <span className="text-gray-400 text-xs">no gpus</span>;
   }
 
   return (
-    <div className="flex flex-wrap gap-2 text-xs font-mono">
+    <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
       {entries.map(([type, counts]) => (
         <span key={type} className="text-gray-600">
-          {counts.total}× {formatGPUType(type)}
+          <span className="font-medium text-black">{counts.total}×</span>{" "}
+          {formatGPUType(type)}
+          <span className="text-gray-400 ml-1">({counts.available} free)</span>
         </span>
       ))}
     </div>
