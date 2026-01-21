@@ -14,7 +14,10 @@ export async function GET(request: NextRequest) {
     const jobs = await fetchQuery(api.jobs.listAll, {});
 
     const activeVms = vms.filter(
-      (vm: any) => vm.status !== "deleted" && vm.status !== "expired",
+      (vm: any) =>
+        vm.status !== "stopped" &&
+        vm.status !== "failed" &&
+        vm.status !== "offline",
     );
     const activeJobs = jobs.filter(
       (job: any) =>
