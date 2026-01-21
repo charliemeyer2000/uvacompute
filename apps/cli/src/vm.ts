@@ -327,6 +327,7 @@ async function createVM(options: {
 
     if (options.name) requestBody.name = options.name;
 
+    const defaultDisk = 64;
     if (options.cpus) {
       const cpus = parseInt(options.cpus, 10);
       if (isNaN(cpus)) {
@@ -352,6 +353,8 @@ async function createVM(options: {
         process.exit(1);
       }
       requestBody.disk = disk;
+    } else {
+      requestBody.disk = defaultDisk;
     }
 
     if (options.gpus) {
