@@ -94,6 +94,7 @@ export const VMDeletionResponseSchema = z.object({
 
 export const VMStatusEnum = z.enum([
   "not_found",
+  "creating",
   "pending",
   "booting",
   "provisioning",
@@ -107,8 +108,14 @@ export type VMStatus = z.infer<typeof VMStatusEnum>;
 
 export const VM_STATUS_GROUPS = {
   READY: ["ready"] as const,
-  ACTIVE: ["pending", "booting", "provisioning", "ready"] as const,
-  DELETABLE: ["pending", "booting", "provisioning", "ready"] as const,
+  ACTIVE: ["creating", "pending", "booting", "provisioning", "ready"] as const,
+  DELETABLE: [
+    "creating",
+    "pending",
+    "booting",
+    "provisioning",
+    "ready",
+  ] as const,
 } as const;
 
 export function isVMStatusInGroup(

@@ -40,20 +40,22 @@ export default function VMsDocsPage() {
             <span className="text-2xl font-semibold text-black">1</span>
             <h3 className="text-lg font-semibold text-black">setup ssh keys</h3>
           </div>
-          <p className="text-sm text-gray-600 ml-8 mb-3">
-            add your public key for secure vm access:
-          </p>
-          <div className="ml-8 bg-gray-50 border border-gray-200 p-4">
-            <code className="text-sm text-black">
-              uva ssh-key add ~/.ssh/id_ed25519.pub
-            </code>
+          <div className="pl-9">
+            <p className="text-sm text-gray-600 mb-3">
+              add your public key for secure vm access:
+            </p>
+            <div className="bg-gray-50 border border-gray-200 p-4">
+              <code className="text-sm text-black">
+                uva ssh-key add ~/.ssh/id_ed25519.pub
+              </code>
+            </div>
+            <p className="text-xs text-gray-500 mt-2">
+              don&apos;t have an ssh key? generate one with:{" "}
+              <code className="bg-gray-100 px-1 py-0.5 border border-gray-200">
+                ssh-keygen -t ed25519 -C &quot;your_email@example.com&quot;
+              </code>
+            </p>
           </div>
-          <p className="text-xs text-gray-500 ml-8 mt-2">
-            don&apos;t have an ssh key? generate one with:{" "}
-            <code className="bg-gray-100 px-1 py-0.5 border border-gray-200">
-              ssh-keygen -t ed25519 -C &quot;your_email@example.com&quot;
-            </code>
-          </p>
         </div>
 
         <div>
@@ -61,17 +63,19 @@ export default function VMsDocsPage() {
             <span className="text-2xl font-semibold text-black">2</span>
             <h3 className="text-lg font-semibold text-black">create a vm</h3>
           </div>
-          <p className="text-sm text-gray-600 ml-8 mb-3">
-            provision a new virtual machine:
-          </p>
-          <div className="ml-8 bg-gray-50 border border-gray-200 p-4">
-            <code className="text-sm text-black">
-              uva vm create -h 1 -n my-vm
-            </code>
+          <div className="pl-9">
+            <p className="text-sm text-gray-600 mb-3">
+              provision a new virtual machine:
+            </p>
+            <div className="bg-gray-50 border border-gray-200 p-4">
+              <code className="text-sm text-black">
+                uva vm create -h 1 -n my-vm
+              </code>
+            </div>
+            <p className="text-xs text-gray-500 mt-2">
+              -h specifies the number of hours, -n sets the vm name
+            </p>
           </div>
-          <p className="text-xs text-gray-500 ml-8 mt-2">
-            -h specifies the number of hours, -n sets the vm name
-          </p>
         </div>
 
         <div>
@@ -81,11 +85,13 @@ export default function VMsDocsPage() {
               connect to your vm
             </h3>
           </div>
-          <p className="text-sm text-gray-600 ml-8 mb-3">
-            ssh into your running vm:
-          </p>
-          <div className="ml-8 bg-gray-50 border border-gray-200 p-4">
-            <code className="text-sm text-black">uva vm ssh my-vm</code>
+          <div className="pl-9">
+            <p className="text-sm text-gray-600 mb-3">
+              ssh into your running vm:
+            </p>
+            <div className="bg-gray-50 border border-gray-200 p-4">
+              <code className="text-sm text-black">uva vm ssh my-vm</code>
+            </div>
           </div>
         </div>
       </section>

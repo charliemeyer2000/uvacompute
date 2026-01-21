@@ -24,13 +24,15 @@ export default function DocsPage() {
               install the cli
             </h3>
           </div>
-          <p className="text-sm text-gray-600 ml-8 mb-3">
-            run this command in your terminal to install the uva cli:
-          </p>
-          <div className="ml-8 bg-gray-50 border border-gray-200 p-4">
-            <code className="text-sm text-black">
-              curl -fsSL https://uvacompute.com/install.sh | bash
-            </code>
+          <div className="pl-9">
+            <p className="text-sm text-gray-600 mb-3">
+              run this command in your terminal to install the uva cli:
+            </p>
+            <div className="bg-gray-50 border border-gray-200 p-4">
+              <code className="text-sm text-black">
+                curl -fsSL https://uvacompute.com/install.sh | bash
+              </code>
+            </div>
           </div>
         </div>
 
@@ -41,16 +43,18 @@ export default function DocsPage() {
               create an account
             </h3>
           </div>
-          <p className="text-sm text-gray-600 ml-8 mb-3">
-            sign up for uvacompute if you haven&apos;t already:
-          </p>
-          <div className="ml-8 bg-gray-50 border border-gray-200 p-4">
-            <code className="text-sm text-black">
-              visit{" "}
-              <a href="/signup" className="text-orange-accent underline">
-                uvacompute.com/signup
-              </a>
-            </code>
+          <div className="pl-9">
+            <p className="text-sm text-gray-600 mb-3">
+              sign up for uvacompute if you haven&apos;t already:
+            </p>
+            <div className="bg-gray-50 border border-gray-200 p-4">
+              <code className="text-sm text-black">
+                visit{" "}
+                <a href="/signup" className="text-orange-accent underline">
+                  uvacompute.com/signup
+                </a>
+              </code>
+            </div>
           </div>
         </div>
 
@@ -61,15 +65,17 @@ export default function DocsPage() {
               authenticate your cli
             </h3>
           </div>
-          <p className="text-sm text-gray-600 ml-8 mb-3">
-            link your cli to your account:
-          </p>
-          <div className="ml-8 bg-gray-50 border border-gray-200 p-4">
-            <code className="text-sm text-black">uva login</code>
+          <div className="pl-9">
+            <p className="text-sm text-gray-600 mb-3">
+              link your cli to your account:
+            </p>
+            <div className="bg-gray-50 border border-gray-200 p-4">
+              <code className="text-sm text-black">uva login</code>
+            </div>
+            <p className="text-xs text-gray-500 mt-2">
+              this will open a browser window for authentication
+            </p>
           </div>
-          <p className="text-xs text-gray-500 ml-8 mt-2">
-            this will open a browser window for authentication
-          </p>
         </div>
       </section>
 

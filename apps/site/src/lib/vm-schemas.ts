@@ -2,6 +2,7 @@ import { z } from "zod";
 
 export const VMStatusEnum = z.enum([
   "not_found",
+  "creating",
   "pending",
   "booting",
   "provisioning",
