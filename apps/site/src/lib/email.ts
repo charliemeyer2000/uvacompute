@@ -75,3 +75,38 @@ If you have any questions or need help getting started, just email me personally
 - Charlie`,
   });
 }
+
+export async function sendWorkloadOfflineEmail({
+  email,
+  name,
+  workloadType,
+  workloadName,
+  nodeName,
+}: {
+  email: string;
+  name: string;
+  workloadType: "VM" | "Job";
+  workloadName: string;
+  nodeName: string;
+}) {
+  const firstName = name.split(" ")[0];
+  const workloadTypeLower = workloadType.toLowerCase();
+
+  await resend.emails.send({
+    from: FROM_EMAIL,
+    to: email,
+    subject: `${workloadTypeLower} offline - uvacompute`,
+    html: `
+      <p><b>hey ${firstName},</b></p>
+      <p>your ${workloadTypeLower} <b>${workloadName}</b> has been marked as offline because the node (<b>${nodeName}</b>) it was running on became unreachable.</p>
+      <p><b>what this means:</b></p>
+      <ul>
+        <li>the ${workloadTypeLower} may resume if the node comes back online</li>
+        <li>if the node stays offline, you may need to recreate your ${workloadTypeLower}</li>
+        <li>any unsaved data on the ${workloadTypeLower} may be lost</li>
+      </ul>
+      <p>you can check the status of your ${workloadTypeLower}s in your <a href="https://uvacompute.com/dashboard">dashboard</a>.</p>
+      <p><i>if you have questions, email charlie@uvacompute.com</i></p>
+    `,
+  });
+}

@@ -41,6 +41,7 @@ const (
 	VM_STATUS_DELETED           VMStatus = "deleted"           // vm is deleted (likely will never be used)
 	VM_STATUS_EXPIRED           VMStatus = "expired"           // vm expired and was automatically deleted
 	VM_STATUS_UPDATING          VMStatus = "updating"          // vm is being updated (extended, update config)
+	VM_STATUS_NODE_OFFLINE      VMStatus = "node_offline"      // node hosting VM went offline
 )
 
 type GPUType string
@@ -209,13 +210,14 @@ func ParseVMInfo(yamlData []byte) (*VMInfo, error) {
 type JobStatus string
 
 const (
-	JOB_STATUS_PENDING   JobStatus = "pending"
-	JOB_STATUS_SCHEDULED JobStatus = "scheduled"
-	JOB_STATUS_PULLING   JobStatus = "pulling"
-	JOB_STATUS_RUNNING   JobStatus = "running"
-	JOB_STATUS_COMPLETED JobStatus = "completed"
-	JOB_STATUS_FAILED    JobStatus = "failed"
-	JOB_STATUS_CANCELLED JobStatus = "cancelled"
+	JOB_STATUS_PENDING      JobStatus = "pending"
+	JOB_STATUS_SCHEDULED    JobStatus = "scheduled"
+	JOB_STATUS_PULLING      JobStatus = "pulling"
+	JOB_STATUS_RUNNING      JobStatus = "running"
+	JOB_STATUS_COMPLETED    JobStatus = "completed"
+	JOB_STATUS_FAILED       JobStatus = "failed"
+	JOB_STATUS_CANCELLED    JobStatus = "cancelled"
+	JOB_STATUS_NODE_OFFLINE JobStatus = "node_offline" // node hosting job went offline
 )
 
 type JobCreationStatus string
