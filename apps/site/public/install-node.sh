@@ -140,14 +140,22 @@ register_node() {
     ram=$(free -g | awk '/^Mem:/{print $2}')
 
     local gpus=0
+    local gpu_type="none"
     if lspci | grep -qi nvidia; then
         gpus=$(lspci | grep -ci 'vga.*nvidia' || echo 0)
+        # Get GPU name and format as type (e.g., "nvidia-rtx-5090")
+        local gpu_name
+        gpu_name=$(lspci | grep -i 'vga.*nvidia' | head -1 | sed 's/.*: //')
+        if [[ -n "${gpu_name}" ]]; then
+            gpu_type=$(echo "${gpu_name}" | tr '[:upper:]' '[:lower:]' | sed 's/nvidia corporation /nvidia-/g' | sed 's/nvidia geforce /nvidia-/g' | sed 's/ /-/g' | sed 's/[^a-z0-9-]//g')
+        fi
     fi
 
     log_info "Registering as node: ${node_id}"
     log_info "  CPUs: ${cpus}"
     log_info "  RAM: ${ram}GB"
     log_info "  GPUs: ${gpus}"
+    log_info "  GPU Type: ${gpu_type}"
 
     local response
     response=$(curl -sf -X POST "${SITE_URL}/api/nodes/bootstrap" \
@@ -159,7 +167,10 @@ register_node() {
             \"name\": \"${node_id}\",
             \"cpus\": ${cpus},
             \"ram\": ${ram},
-            \"gpus\": ${gpus}
+            \"gpus\": ${gpus},
+            \"gpuType\": \"${gpu_type}\",
+            \"supportsVMs\": true,
+            \"supportsJobs\": true
         }" 2>&1) || {
         log_error "Failed to register node with platform"
         log_error "Response: ${response}"
