@@ -176,6 +176,48 @@ export const listAll = query({
   },
 });
 
+export const listActive = query({
+  args: {},
+  handler: async (ctx) => {
+    const allVms = await ctx.db.query("vms").order("desc").collect();
+
+    const activeStatuses = [
+      "creating",
+      "pending",
+      "booting",
+      "provisioning",
+      "ready",
+    ];
+
+    const now = Date.now();
+
+    return allVms
+      .filter((vm) => {
+        if (!activeStatuses.includes(vm.status)) {
+          return false;
+        }
+        if (vm.status === "ready") {
+          return vm.expiresAt > now;
+        }
+        return true;
+      })
+      .map((vm) => ({
+        vmId: vm.vmId,
+        userId: vm.userId,
+        name: vm.name,
+        status: vm.status,
+        cpus: vm.cpus,
+        ram: vm.ram,
+        disk: vm.disk,
+        gpus: vm.gpus,
+        gpuType: vm.gpuType,
+        hours: vm.hours,
+        expiresAt: vm.expiresAt,
+        nodeId: vm.nodeId,
+      }));
+  },
+});
+
 export const markNodeOffline = internalMutation({
   args: {
     nodeId: v.string(),
