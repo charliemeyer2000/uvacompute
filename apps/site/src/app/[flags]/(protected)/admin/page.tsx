@@ -1,106 +1,98 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useMemo } from "react";
+import { useQuery } from "convex/react";
+import { api } from "../../../../../convex/_generated/api";
 import { authClient } from "@/lib/auth-client";
-import { useRouter } from "next/navigation";
-
-interface Node {
-  _id: string;
-  nodeId: string;
-  name?: string;
-  ownerId?: string;
-  status: "online" | "offline" | "draining";
-  cpus?: number;
-  ram?: number;
-  gpus?: number;
-  lastHeartbeat: number;
-  registeredAt: number;
-}
-
-interface VM {
-  _id: string;
-  vmId: string;
-  userId: string;
-  name?: string;
-  cpus: number;
-  ram: number;
-  gpus: number;
-  status: string;
-  nodeId?: string;
-}
-
-interface Job {
-  _id: string;
-  jobId: string;
-  userId: string;
-  name?: string;
-  image: string;
-  cpus: number;
-  ram: number;
-  gpus: number;
-  status: string;
-  nodeId?: string;
-}
-
-interface Resources {
-  nodes: { total: number; online: number; offline: number; draining: number };
-  cpus: { total: number; used: number; available: number };
-  ram: { total: number; used: number; available: number };
-  gpus: { total: number; used: number; available: number };
-  workloads: { activeVms: number; activeJobs: number };
-}
 
 export default function AdminPage() {
   const { data: session, isPending } = authClient.useSession();
-  const router = useRouter();
-  const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
-  const [nodes, setNodes] = useState<Node[]>([]);
-  const [vms, setVms] = useState<VM[]>([]);
-  const [jobs, setJobs] = useState<Job[]>([]);
-  const [resources, setResources] = useState<Resources | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    async function checkAdminAndFetchData() {
-      if (!session?.user) return;
+  const isAdmin = useQuery(api.devAccess.hasDevAccess);
+  const nodes = useQuery(api.nodes.listAll, isAdmin ? {} : "skip");
+  const allVMs = useQuery(api.vms.listAll, isAdmin ? {} : "skip");
+  const allJobs = useQuery(api.jobs.listAll, isAdmin ? {} : "skip");
 
-      try {
-        // Fetch resources (this will fail if not admin)
-        const resourcesRes = await fetch("/api/admin/resources");
-        if (resourcesRes.status === 403) {
-          setIsAdmin(false);
-          setLoading(false);
-          return;
-        }
-        if (!resourcesRes.ok) throw new Error("Failed to fetch resources");
-        const resourcesData = await resourcesRes.json();
-        setResources(resourcesData);
-        setIsAdmin(true);
+  const resources = useMemo(() => {
+    if (!nodes || !allVMs || !allJobs) return null;
 
-        // Fetch nodes
-        const nodesRes = await fetch("/api/admin/nodes");
-        if (!nodesRes.ok) throw new Error("Failed to fetch nodes");
-        const nodesData = await nodesRes.json();
-        setNodes(nodesData.nodes);
+    const onlineNodes = nodes.filter((n) => n.status === "online");
 
-        // Fetch workloads
-        const workloadsRes = await fetch("/api/admin/workloads");
-        if (!workloadsRes.ok) throw new Error("Failed to fetch workloads");
-        const workloadsData = await workloadsRes.json();
-        setVms(workloadsData.vms);
-        setJobs(workloadsData.jobs);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "An error occurred");
-      } finally {
-        setLoading(false);
-      }
-    }
+    const totalCpus = onlineNodes.reduce((sum, n) => sum + (n.cpus || 0), 0);
+    const totalRam = onlineNodes.reduce((sum, n) => sum + (n.ram || 0), 0);
+    const totalGpus = onlineNodes.reduce((sum, n) => sum + (n.gpus || 0), 0);
 
-    if (!isPending) {
-      checkAdminAndFetchData();
-    }
-  }, [session, isPending]);
+    const activeVms = allVMs.filter(
+      (vm) =>
+        vm.status !== "deleted" &&
+        vm.status !== "expired" &&
+        vm.status !== "failed",
+    );
+    const activeJobs = allJobs.filter(
+      (job) =>
+        job.status !== "completed" &&
+        job.status !== "failed" &&
+        job.status !== "cancelled",
+    );
+
+    const usedCpus =
+      activeVms.reduce((sum, vm) => sum + (vm.cpus || 0), 0) +
+      activeJobs.reduce((sum, job) => sum + (job.cpus || 0), 0);
+    const usedRam =
+      activeVms.reduce((sum, vm) => sum + (vm.ram || 0), 0) +
+      activeJobs.reduce((sum, job) => sum + (job.ram || 0), 0);
+    const usedGpus =
+      activeVms.reduce((sum, vm) => sum + (vm.gpus || 0), 0) +
+      activeJobs.reduce((sum, job) => sum + (job.gpus || 0), 0);
+
+    return {
+      nodes: {
+        total: nodes.length,
+        online: onlineNodes.length,
+        offline: nodes.filter((n) => n.status === "offline").length,
+        draining: nodes.filter((n) => n.status === "draining").length,
+      },
+      cpus: {
+        total: totalCpus,
+        used: usedCpus,
+        available: totalCpus - usedCpus,
+      },
+      ram: {
+        total: totalRam,
+        used: usedRam,
+        available: totalRam - usedRam,
+      },
+      gpus: {
+        total: totalGpus,
+        used: usedGpus,
+        available: totalGpus - usedGpus,
+      },
+      workloads: {
+        activeVms: activeVms.length,
+        activeJobs: activeJobs.length,
+      },
+    };
+  }, [nodes, allVMs, allJobs]);
+
+  const activeVms = useMemo(() => {
+    if (!allVMs) return [];
+    return allVMs.filter(
+      (vm) =>
+        vm.status !== "deleted" &&
+        vm.status !== "expired" &&
+        vm.status !== "failed",
+    );
+  }, [allVMs]);
+
+  const activeJobs = useMemo(() => {
+    if (!allJobs) return [];
+    return allJobs.filter(
+      (job) =>
+        job.status !== "completed" &&
+        job.status !== "failed" &&
+        job.status !== "cancelled",
+    );
+  }, [allJobs]);
 
   async function handleDrain(nodeId: string) {
     try {
@@ -108,11 +100,6 @@ export default function AdminPage() {
         method: "POST",
       });
       if (!res.ok) throw new Error("Failed to drain node");
-      setNodes((prev) =>
-        prev.map((n) =>
-          n.nodeId === nodeId ? { ...n, status: "draining" } : n,
-        ),
-      );
     } catch (err) {
       alert(err instanceof Error ? err.message : "Failed to drain node");
     }
@@ -124,15 +111,12 @@ export default function AdminPage() {
         method: "POST",
       });
       if (!res.ok) throw new Error("Failed to uncordon node");
-      setNodes((prev) =>
-        prev.map((n) => (n.nodeId === nodeId ? { ...n, status: "online" } : n)),
-      );
     } catch (err) {
       alert(err instanceof Error ? err.message : "Failed to uncordon node");
     }
   }
 
-  if (isPending || loading) {
+  if (isPending || isAdmin === undefined) {
     return (
       <div className="p-6">
         <div className="animate-pulse space-y-4">
@@ -159,12 +143,15 @@ export default function AdminPage() {
     );
   }
 
-  if (error) {
+  const loading = !nodes || !allVMs || !allJobs;
+
+  if (loading) {
     return (
       <div className="p-6">
-        <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
-          <h2 className="text-xl font-semibold text-red-800 mb-2">Error</h2>
-          <p className="text-red-600">{error}</p>
+        <div className="animate-pulse space-y-4">
+          <div className="h-8 bg-gray-200 rounded w-1/4"></div>
+          <div className="h-32 bg-gray-200 rounded"></div>
+          <div className="h-64 bg-gray-200 rounded"></div>
         </div>
       </div>
     );
@@ -253,7 +240,7 @@ export default function AdminPage() {
                   </td>
                   <td className="px-4 py-3">
                     <span
-                      className={`px-2 py-1 text-xs font-medium rounded-full ${statusColors[node.status]}`}
+                      className={`px-2 py-1 text-xs font-medium rounded-full ${statusColors[node.status as keyof typeof statusColors]}`}
                     >
                       {node.status}
                     </span>
@@ -303,7 +290,7 @@ export default function AdminPage() {
       <div className="bg-white border rounded-lg">
         <div className="p-4 border-b">
           <h2 className="text-lg font-semibold">
-            Active Workloads ({vms.length + jobs.length})
+            Active Workloads ({activeVms.length + activeJobs.length})
           </h2>
         </div>
         <div className="overflow-x-auto">
@@ -328,7 +315,7 @@ export default function AdminPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {vms.map((vm) => (
+              {activeVms.map((vm) => (
                 <tr key={vm._id}>
                   <td className="px-4 py-3 text-sm font-mono">
                     {vm.name || vm.vmId.slice(0, 8)}
@@ -347,7 +334,7 @@ export default function AdminPage() {
                   </td>
                 </tr>
               ))}
-              {jobs.map((job) => (
+              {activeJobs.map((job) => (
                 <tr key={job._id}>
                   <td className="px-4 py-3 text-sm font-mono">
                     {job.name || job.jobId.slice(0, 8)}
@@ -366,7 +353,7 @@ export default function AdminPage() {
                   </td>
                 </tr>
               ))}
-              {vms.length === 0 && jobs.length === 0 && (
+              {activeVms.length === 0 && activeJobs.length === 0 && (
                 <tr>
                   <td
                     colSpan={5}
