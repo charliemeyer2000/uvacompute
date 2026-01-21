@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { useQuery } from "convex/react";
+import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../../../convex/_generated/api";
 import { authClient } from "@/lib/auth-client";
 
@@ -94,12 +94,11 @@ export default function AdminPage() {
     );
   }, [allJobs]);
 
+  const setNodeStatus = useMutation(api.nodes.setStatusAsAdmin);
+
   async function handleDrain(nodeId: string) {
     try {
-      const res = await fetch(`/api/admin/nodes/${nodeId}/drain`, {
-        method: "POST",
-      });
-      if (!res.ok) throw new Error("Failed to drain node");
+      await setNodeStatus({ nodeId, status: "draining" });
     } catch (err) {
       alert(err instanceof Error ? err.message : "Failed to drain node");
     }
@@ -107,10 +106,7 @@ export default function AdminPage() {
 
   async function handleUncordon(nodeId: string) {
     try {
-      const res = await fetch(`/api/admin/nodes/${nodeId}/uncordon`, {
-        method: "POST",
-      });
-      if (!res.ok) throw new Error("Failed to uncordon node");
+      await setNodeStatus({ nodeId, status: "online" });
     } catch (err) {
       alert(err instanceof Error ? err.message : "Failed to uncordon node");
     }

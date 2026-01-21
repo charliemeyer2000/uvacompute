@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useQuery } from "convex/react";
+import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../../../convex/_generated/api";
 import { authClient } from "@/lib/auth-client";
 
@@ -42,12 +42,11 @@ export default function MyNodesPage() {
     expandedNode ? { nodeId: expandedNode } : "skip",
   );
 
+  const setNodeStatus = useMutation(api.nodes.setStatusAsOwner);
+
   async function handlePause(nodeId: string) {
     try {
-      const res = await fetch(`/api/contributor/nodes/${nodeId}/pause`, {
-        method: "POST",
-      });
-      if (!res.ok) throw new Error("Failed to pause node");
+      await setNodeStatus({ nodeId, status: "draining" });
     } catch (err) {
       alert(err instanceof Error ? err.message : "Failed to pause node");
     }
@@ -55,10 +54,7 @@ export default function MyNodesPage() {
 
   async function handleResume(nodeId: string) {
     try {
-      const res = await fetch(`/api/contributor/nodes/${nodeId}/resume`, {
-        method: "POST",
-      });
-      if (!res.ok) throw new Error("Failed to resume node");
+      await setNodeStatus({ nodeId, status: "online" });
     } catch (err) {
       alert(err instanceof Error ? err.message : "Failed to resume node");
     }
