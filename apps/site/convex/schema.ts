@@ -3,6 +3,7 @@ import { v } from "convex/values";
 
 export const VM_STATUSES = [
   "not_found",
+  "creating",
   "pending",
   "booting",
   "provisioning",
