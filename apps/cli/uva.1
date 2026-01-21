@@ -110,6 +110,10 @@ Alias for
 .B ssh-key remove \fIkeyId\fR
 Remove an SSH public key by its ID. Prevents future use of this key for VM access.
 .TP
+.B ssh-key rm \fIkeyId\fR
+Alias for
+.BR "ssh-key remove" .
+.TP
 .B ssh-key set-primary \fIkeyId\fR
 Set specified SSH key as the primary key. Primary key is used by default for new VM deployments.
 .SS Container Job Management
@@ -258,6 +262,42 @@ GPU sharing mode (container or none)
 .RE
 .IP
 Configuration is saved to ~/.uvacompute/node/config.yaml.
+.SS Remote Node Management
+.TP
+.B node list
+List all nodes you have contributed to the uvacompute network. Displays node ID, name, status, resources, and last heartbeat.
+.TP
+.B node ls
+Alias for
+.BR "node list" .
+.TP
+.B node status \fInodeId\fR
+Display status and detailed information about a specific remote node you own. Without a nodeId argument, shows local node status instead.
+.TP
+.B node pause \fInodeId\fR
+Pause a remote node to stop accepting new workloads. Existing workloads continue running. Without a nodeId argument, pauses the local node instead.
+.TP
+.B node resume \fInodeId\fR
+Resume a remote node to start accepting workloads again. Without a nodeId argument, resumes the local node instead.
+.TP
+.B node workloads \fInodeId\fR
+Display active workloads (VMs and jobs) running on a specific remote node.
+.SS Node Registration Tokens
+.TP
+.B node token create
+Create a new node registration token for adding nodes to the network. Tokens are single-use and expire after 24 hours.
+.RS
+.TP
+.BR \-n ", " \-\-name " \fIname\fR"
+Optional name or description for the token.
+.RE
+.TP
+.B node token list
+List all registration tokens you have created, showing status (active, used, expired), assigned port, and creation date.
+.TP
+.B node token ls
+Alias for
+.BR "node token list" .
 .SH OPTIONS
 .TP
 .B \-\-version
@@ -439,6 +479,14 @@ Remove SSH key:
 .nf
 .RS
 $ uva ssh-key remove key_abc123
+.RE
+.fi
+.PP
+Or using the shorthand:
+.PP
+.nf
+.RS
+$ uva ssh-key rm key_abc123
 .RE
 .fi
 .PP
@@ -649,6 +697,70 @@ Configure resource sharing interactively:
 $ uva node config
 .RE
 .fi
+.SS Remote Node Management
+List your contributed nodes:
+.PP
+.nf
+.RS
+$ uva node list
+.RE
+.fi
+.PP
+Or using the shorthand:
+.PP
+.nf
+.RS
+$ uva node ls
+.RE
+.fi
+.PP
+Check status of a specific remote node:
+.PP
+.nf
+.RS
+$ uva node status abc12345
+.RE
+.fi
+.PP
+Pause a remote node:
+.PP
+.nf
+.RS
+$ uva node pause abc12345
+.RE
+.fi
+.PP
+Resume a remote node:
+.PP
+.nf
+.RS
+$ uva node resume abc12345
+.RE
+.fi
+.PP
+View workloads on a remote node:
+.PP
+.nf
+.RS
+$ uva node workloads abc12345
+.RE
+.fi
+.PP
+Create a node registration token:
+.PP
+.nf
+.RS
+$ uva node token create --name "Home Server"
+.RE
+.fi
+.PP
+List registration tokens:
+.PP
+.nf
+.RS
+$ uva node token list
+.RE
+.fi
 .SH DIAGNOSTICS
 The CLI uses OAuth 2.0 device authorization flow. During login, if browser does not open automatically, manually visit the displayed URL and enter the provided code.
 .PP
@@ -658,7 +770,13 @@ which supports Bash and Zsh shells. After installation, restart your shell or ru
 .B source ~/.bashrc
 (or
 .BR ~/.zshrc )
-to activate completion. Tab completion provides command, subcommand, flag, and dynamic VM name suggestions. VM name completion requires authentication and fetches current VM list from the API with a 500ms timeout.
+to activate completion. Tab completion provides command, subcommand, flag, and dynamic suggestions for VM names, job IDs, node IDs, and option values (e.g., job status). Completion requires authentication and fetches current resources from the API with a 500ms timeout. Job completion for
+.B cancel
+only shows cancellable jobs (pending, scheduled, pulling, running). Node completion for
+.B pause
+only shows pausable nodes (online, offline) and for
+.B resume
+only shows resumable nodes (draining).
 .PP
 VM creation may take several minutes. The CLI polls status through the following stages:
 .B creating
