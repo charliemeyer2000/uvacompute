@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../../../convex/_generated/api";
 import { authClient } from "@/lib/auth-client";
@@ -69,6 +69,17 @@ export default function MyNodesPage() {
   const workloads = useQuery(
     api.nodes.getWorkloadsOnNode,
     expandedNode ? { nodeId: expandedNode } : "skip",
+  );
+
+  const drainingNodeIds = useMemo(
+    () =>
+      nodes?.filter((n) => n.status === "draining").map((n) => n.nodeId) ?? [],
+    [nodes],
+  );
+
+  const drainingWorkloadCounts = useQuery(
+    api.nodes.getWorkloadCountsForNodes,
+    drainingNodeIds.length > 0 ? { nodeIds: drainingNodeIds } : "skip",
   );
 
   const setNodeStatus = useMutation(api.nodes.setStatusAsOwner);
@@ -229,11 +240,43 @@ export default function MyNodesPage() {
                       </p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-1.5">
-                    <span
-                      className={`w-2 h-2 rounded-full ${getStatusDotColor(node.status)}`}
-                    />
-                    <span className="text-xs text-gray-600">{node.status}</span>
+                  <div className="flex items-center gap-3">
+                    {node.status === "draining" &&
+                      drainingWorkloadCounts?.[node.nodeId] && (
+                        <span
+                          className={`text-xs px-2 py-0.5 ${
+                            drainingWorkloadCounts[node.nodeId].vmCount +
+                              drainingWorkloadCounts[node.nodeId].jobCount ===
+                            0
+                              ? "text-green-700 bg-green-50 border border-green-200"
+                              : "text-yellow-700 bg-yellow-50 border border-yellow-200"
+                          }`}
+                        >
+                          {(() => {
+                            const counts = drainingWorkloadCounts[node.nodeId];
+                            const total = counts.vmCount + counts.jobCount;
+                            if (total === 0) return "ready to offline";
+                            const parts = [];
+                            if (counts.vmCount > 0)
+                              parts.push(
+                                `${counts.vmCount} VM${counts.vmCount > 1 ? "s" : ""}`,
+                              );
+                            if (counts.jobCount > 0)
+                              parts.push(
+                                `${counts.jobCount} job${counts.jobCount > 1 ? "s" : ""}`,
+                              );
+                            return `${parts.join(", ")} draining`;
+                          })()}
+                        </span>
+                      )}
+                    <div className="flex items-center gap-1.5">
+                      <span
+                        className={`w-2 h-2 rounded-full ${getStatusDotColor(node.status)}`}
+                      />
+                      <span className="text-xs text-gray-600">
+                        {node.status}
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>
