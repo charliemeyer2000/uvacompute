@@ -4,17 +4,25 @@
 package_update: true
 package_upgrade: false
 
-# Configure external DNS to bypass cluster DNS issues
-# (Cluster DNS requires overlay networking which may not work across nodes)
-manage_resolv_conf: true
-resolv_conf:
-  nameservers:
-    - 8.8.8.8
-    - 8.8.4.4
-  searchdomains: []
-  options:
-    timeout: 2
-    attempts: 3
+# Configure external DNS early using bootcmd (runs before networking/packages)
+# This bypasses cluster DNS issues and works with systemd-resolved
+bootcmd:
+  # Configure systemd-resolved to use Google DNS
+  - mkdir -p /etc/systemd/resolved.conf.d
+  - |
+    cat > /etc/systemd/resolved.conf.d/dns.conf << 'EOF'
+    [Resolve]
+    DNS=8.8.8.8 8.8.4.4
+    FallbackDNS=1.1.1.1 1.0.0.1
+    EOF
+  - systemctl restart systemd-resolved || true
+  # Also set resolv.conf directly as fallback
+  - |
+    if [ -L /etc/resolv.conf ]; then
+      rm -f /etc/resolv.conf
+      echo "nameserver 8.8.8.8" > /etc/resolv.conf
+      echo "nameserver 8.8.4.4" >> /etc/resolv.conf
+    fi
 
 packages:
   - curl
