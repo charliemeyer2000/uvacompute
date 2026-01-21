@@ -149,12 +149,14 @@ func (jm *JobManager) UpdateJobStatus(jobId string, status JobStatus, exitCode *
 
 	if jm.callbackClient != nil {
 		go func() {
-			if err := jm.callbackClient.NotifyJobStatusUpdate(jobId, string(status), exitCode, errorMessage, nodeId); err != nil {
-				log.Printf("ERROR: Failed to notify site about Job %s status update: %v", jobId, err)
-			}
-
+			// For terminal states, archive logs FIRST before notifying status change
+			// This ensures logs are available when frontend receives status update
 			if isTerminal {
 				jm.archiveJobLogs(jobId)
+			}
+
+			if err := jm.callbackClient.NotifyJobStatusUpdate(jobId, string(status), exitCode, errorMessage, nodeId); err != nil {
+				log.Printf("ERROR: Failed to notify site about Job %s status update: %v", jobId, err)
 			}
 		}()
 	}
@@ -165,17 +167,34 @@ func (jm *JobManager) archiveJobLogs(jobId string) {
 		return
 	}
 
-	logs, err := jm.GetJobLogs(jobId)
-	if err != nil {
-		log.Printf("WARNING: Failed to get logs for Job %s archival: %v", jobId, err)
-		return
-	}
-	defer logs.Close()
+	const maxRetries = 3
+	var logsBytes []byte
 
-	logsBytes, err := io.ReadAll(logs)
-	if err != nil {
-		log.Printf("WARNING: Failed to read logs for Job %s archival: %v", jobId, err)
-		return
+	// Retry getting logs with exponential backoff
+	for attempt := 0; attempt < maxRetries; attempt++ {
+		logs, err := jm.GetJobLogs(jobId)
+		if err != nil {
+			if attempt < maxRetries-1 {
+				time.Sleep(time.Duration(1<<attempt) * time.Second)
+				continue
+			}
+			log.Printf("WARNING: Failed to get logs for Job %s archival after %d attempts: %v", jobId, maxRetries, err)
+			return
+		}
+
+		logsBytes, err = io.ReadAll(logs)
+		logs.Close()
+		if err != nil {
+			if attempt < maxRetries-1 {
+				time.Sleep(time.Duration(1<<attempt) * time.Second)
+				continue
+			}
+			log.Printf("WARNING: Failed to read logs for Job %s archival after %d attempts: %v", jobId, maxRetries, err)
+			return
+		}
+
+		// Success
+		break
 	}
 
 	if len(logsBytes) == 0 {
@@ -183,8 +202,19 @@ func (jm *JobManager) archiveJobLogs(jobId string) {
 		return
 	}
 
-	if err := jm.callbackClient.UploadJobLogs(jobId, string(logsBytes)); err != nil {
-		log.Printf("WARNING: Failed to upload logs for Job %s: %v", jobId, err)
+	// Retry uploading logs with exponential backoff
+	for attempt := 0; attempt < maxRetries; attempt++ {
+		if err := jm.callbackClient.UploadJobLogs(jobId, string(logsBytes)); err != nil {
+			if attempt < maxRetries-1 {
+				log.Printf("WARNING: Upload attempt %d failed for Job %s logs: %v, retrying...", attempt+1, jobId, err)
+				time.Sleep(time.Duration(1<<attempt) * time.Second)
+				continue
+			}
+			log.Printf("WARNING: Failed to upload logs for Job %s after %d attempts: %v", jobId, maxRetries, err)
+			return
+		}
+		log.Printf("INFO: Successfully archived logs for Job %s", jobId)
+		return
 	}
 }
 

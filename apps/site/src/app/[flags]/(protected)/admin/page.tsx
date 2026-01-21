@@ -64,9 +64,9 @@ export default function AdminPage() {
 
     const activeVms = allVMs.filter(
       (vm) =>
-        vm.status !== "deleted" &&
-        vm.status !== "expired" &&
-        vm.status !== "failed",
+        vm.status !== "stopped" &&
+        vm.status !== "failed" &&
+        vm.status !== "offline",
     );
     const activeJobs = allJobs.filter(
       (job) =>
@@ -118,9 +118,9 @@ export default function AdminPage() {
     if (!allVMs) return [];
     return allVMs.filter(
       (vm) =>
-        vm.status !== "deleted" &&
-        vm.status !== "expired" &&
-        vm.status !== "failed",
+        vm.status !== "stopped" &&
+        vm.status !== "failed" &&
+        vm.status !== "offline",
     );
   }, [allVMs]);
 

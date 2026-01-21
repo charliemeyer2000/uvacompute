@@ -16,10 +16,8 @@ func (m *MockVMProvider) CreateVM(vmId string, cpus, ram, disk, gpus int, sshPub
 	m.LastSSHKeys = sshPublicKeys
 	m.mu.Unlock()
 
-	statusCallback(VM_STATUS_INITIALIZING)
-	statusCallback(VM_STATUS_STARTING)
-	statusCallback(VM_STATUS_WAITING_FOR_AGENT)
-	statusCallback(VM_STATUS_CONFIGURING)
+	statusCallback(VM_STATUS_BOOTING)
+	statusCallback(VM_STATUS_PROVISIONING)
 
 	return nil
 }
@@ -190,7 +188,7 @@ func TestCreateVMWithSSHKeys(t *testing.T) {
 		t.Fatal("vmId should not be empty")
 	}
 
-	vm.WaitForStatus(vmId, VM_STATUS_RUNNING)
+	vm.WaitForStatus(vmId, VM_STATUS_READY)
 
 	mockProvider.mu.Lock()
 	keysCount := len(mockProvider.LastSSHKeys)
@@ -229,7 +227,7 @@ func TestCreateVMWithoutSSHKeys(t *testing.T) {
 		t.Fatal("vmId should not be empty")
 	}
 
-	vm.WaitForStatus(vmId, VM_STATUS_RUNNING)
+	vm.WaitForStatus(vmId, VM_STATUS_READY)
 
 	mockProvider.mu.Lock()
 	keysCount := len(mockProvider.LastSSHKeys)
@@ -262,7 +260,7 @@ func TestCreateVMWithSingleSSHKey(t *testing.T) {
 		t.Fatal("vmId should not be empty")
 	}
 
-	vm.WaitForStatus(vmId, VM_STATUS_RUNNING)
+	vm.WaitForStatus(vmId, VM_STATUS_READY)
 
 	mockProvider.mu.Lock()
 	keysCount := len(mockProvider.LastSSHKeys)
@@ -304,7 +302,7 @@ func TestCreateVMWithSSHKeysAndCustomResources(t *testing.T) {
 		t.Fatalf("CreateVM with SSH keys and custom resources failed: %v", err)
 	}
 
-	vmState := vm.WaitForStatus(vmId, VM_STATUS_RUNNING)
+	vmState := vm.WaitForStatus(vmId, VM_STATUS_READY)
 	if vmState.Cpus != 4 {
 		t.Fatalf("expected 4 CPUs, got %d", vmState.Cpus)
 	}

@@ -1,0 +1,41 @@
+#cloud-config
+# UVACompute GPU/CUDA Configuration
+# This template is automatically injected into VMs with NVIDIA GPUs.
+# It installs the CUDA toolkit and configures the environment.
+
+runcmd:
+  - echo "UVACompute CUDA provisioning started at $(date)" >> /var/log/uvacompute-init.log
+
+  # Detect Fedora version for correct CUDA repo
+  - |
+    FEDORA_VERSION=$(rpm -E %fedora)
+    echo "Detected Fedora version: $FEDORA_VERSION" >> /var/log/uvacompute-init.log
+
+    # Add NVIDIA CUDA repository (use fedora39 repo for compatibility)
+    dnf config-manager --add-repo https://developer.download.nvidia.com/compute/cuda/repos/fedora39/x86_64/cuda-fedora39.repo
+
+    # Install CUDA toolkit
+    dnf clean all
+    dnf -y install cuda-toolkit
+
+  # Configure CUDA environment for all users
+  - |
+    cat > /etc/profile.d/cuda.sh << 'EOF'
+    export PATH=/usr/local/cuda/bin:$PATH
+    export LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH
+    EOF
+    chmod +x /etc/profile.d/cuda.sh
+
+  # Also add to root's bashrc for immediate use
+  - echo 'export PATH=/usr/local/cuda/bin:$PATH' >> /root/.bashrc
+  - echo 'export LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH' >> /root/.bashrc
+
+  # Verify CUDA installation
+  - |
+    if command -v nvcc &> /dev/null; then
+      echo "CUDA installed successfully: $(nvcc --version | head -1)" >> /var/log/uvacompute-init.log
+    else
+      echo "WARNING: CUDA installation may have failed" >> /var/log/uvacompute-init.log
+    fi
+
+  - echo "UVACompute CUDA provisioning completed at $(date)" >> /var/log/uvacompute-init.log

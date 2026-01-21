@@ -12,7 +12,10 @@ export const getClusterStatus = query({
     const drainingNodes = nodes.filter((n) => n.status === "draining");
 
     const activeVms = vms.filter(
-      (vm) => vm.status !== "deleted" && vm.status !== "expired",
+      (vm) =>
+        vm.status !== "stopped" &&
+        vm.status !== "failed" &&
+        vm.status !== "offline",
     );
     const activeJobs = jobs.filter(
       (job) =>
