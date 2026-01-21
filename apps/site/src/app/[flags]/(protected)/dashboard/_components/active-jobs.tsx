@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useQuery } from "convex/react";
 import { api } from "../../../../../../convex/_generated/api";
 import { authClient } from "@/lib/auth-client";
@@ -35,9 +36,8 @@ import {
   formatDuration,
   isJobCancellable,
 } from "@/lib/job-utils";
-import { MoreVertical, Loader2, FileText, Container } from "lucide-react";
+import { MoreVertical, Loader2, Container, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
-import JobLogViewer from "./job-log-viewer";
 
 function getStatusBorderColor(status: string): string {
   switch (status) {
@@ -77,7 +77,6 @@ function getStatusDotColor(status: string): string {
 
 function JobCard({ job }: { job: Job }) {
   const [showCancelDialog, setShowCancelDialog] = useState(false);
-  const [showLogViewer, setShowLogViewer] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
 
   const handleCancel = async () => {
@@ -110,12 +109,13 @@ function JobCard({ job }: { job: Job }) {
 
   return (
     <>
-      <div
-        className={`bg-white border border-gray-200 border-l-4 ${getStatusBorderColor(job.status)} p-5 hover:border-gray-300 transition-colors`}
+      <Link
+        href={`/jobs/${job.jobId}`}
+        className={`block bg-white border border-gray-200 border-l-4 ${getStatusBorderColor(job.status)} p-5 hover:border-gray-300 hover:shadow-sm transition-all group`}
       >
         <div className="flex justify-between items-start mb-3">
           <div className="flex-1 min-w-0">
-            <h3 className="text-sm font-semibold text-black truncate">
+            <h3 className="text-sm font-semibold text-black truncate group-hover:text-orange-accent transition-colors">
               {job.name || "unnamed job"}
             </h3>
             <p className="text-xs text-gray-400 font-mono truncate mt-0.5">
@@ -137,23 +137,26 @@ function JobCard({ job }: { job: Job }) {
                   variant="ghost"
                   size="icon-sm"
                   className="h-6 w-6 cursor-pointer"
+                  onClick={(e) => e.preventDefault()}
                 >
                   <MoreVertical className="h-4 w-4" />
                   <span className="sr-only">open menu</span>
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem
-                  onClick={() => setShowLogViewer(true)}
-                  className="cursor-pointer"
-                >
-                  <FileText className="h-4 w-4 mr-2" />
-                  view logs
+                <DropdownMenuItem asChild className="cursor-pointer">
+                  <Link href={`/jobs/${job.jobId}`}>
+                    <ExternalLink className="h-4 w-4 mr-2" />
+                    view details
+                  </Link>
                 </DropdownMenuItem>
                 {isJobCancellable(job.status) && (
                   <DropdownMenuItem
                     variant="destructive"
-                    onClick={() => setShowCancelDialog(true)}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setShowCancelDialog(true);
+                    }}
                     className="cursor-pointer"
                   >
                     cancel job
@@ -210,7 +213,7 @@ function JobCard({ job }: { job: Job }) {
             </div>
           )}
         </div>
-      </div>
+      </Link>
 
       <Dialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
         <DialogContent>
@@ -246,14 +249,6 @@ function JobCard({ job }: { job: Job }) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      <JobLogViewer
-        jobId={job.jobId}
-        jobName={job.name}
-        jobStatus={job.status}
-        open={showLogViewer}
-        onOpenChange={setShowLogViewer}
-      />
     </>
   );
 }
