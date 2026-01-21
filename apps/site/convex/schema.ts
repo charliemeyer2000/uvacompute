@@ -14,6 +14,7 @@ export const VM_STATUSES = [
   "deleted",
   "expired",
   "updating",
+  "node_offline",
 ] as const;
 
 export const JOB_STATUSES = [
@@ -24,6 +25,7 @@ export const JOB_STATUSES = [
   "completed",
   "failed",
   "cancelled",
+  "node_offline",
 ] as const;
 
 export default defineSchema({

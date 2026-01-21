@@ -129,6 +129,14 @@ If you need AWS resources (S3 buckets, etc.):
 - **Hub taint**: Taint the hub with `kubectl taint nodes <hub> node-role.kubernetes.io/control-plane=:NoSchedule` to prevent user workloads
 - **Cross-compile**: `GOOS=linux GOARCH=amd64 go build` for deploying from macOS to Linux hub
 
+**Health Monitoring (Plan 18):**
+
+- **k8s Node Conditions**: Use `client.CoreV1().Nodes().List()` and check node conditions for `Ready` type. `ConditionTrue` = healthy, anything else = unhealthy.
+- **Heartbeat timestamp**: Node conditions have `LastHeartbeatTime` which is the k8s agent's last heartbeat, not our custom field. Store this in Convex `lastHeartbeat`.
+- **Node ID from labels**: Use `uvacompute.com/node-id` label on k8s nodes to map back to our Convex node records. Falls back to k8s node name.
+- **Internal mutations**: Use `internalMutation` for functions that should only be called from other Convex functions (like `markNodeOffline`), not from the frontend.
+- **Status cascade**: When node goes offline, cascade status to VMs and jobs via internal mutations in a single `syncHealth` transaction.
+
 ### Useful Patterns
 
 - Use Python for generating HMAC signatures (easier than bash/openssl)
@@ -263,28 +271,28 @@ kubectl describe node | grep nvidia.com/gpu
 
 ## Progress Tracker
 
-| Plan                               | Status         | Branch                            | Notes                                                |
-| ---------------------------------- | -------------- | --------------------------------- | ---------------------------------------------------- |
-| 1. Remove Incus, finalize KubeVirt | ✅ Complete    |                                   | Removed all Incus code, KubeVirt-only backend        |
-| 2. Test KubeVirt on workstation    | ✅ Complete    |                                   | k3s v1.34.3 + KubeVirt v1.3.0 working                |
-| 3. k3s/KubeVirt install script     | ✅ Complete    |                                   | uva node install/uninstall/status + GPU auto-detect  |
-| 3.5. Node prepare command          | ✅ Complete    |                                   | uva node prepare for driver install + reboot flow    |
-| 4. Jobs schema + site API          | ✅ Complete    |                                   | jobs table + API endpoints                           |
-| 5. Jobs in orchestration service   | ✅ Complete    |                                   | JobAdapter + JobManager + HTTP handlers              |
-| 6. Jobs CLI commands               | ✅ Complete    |                                   | uva run, jobs, logs, cancel commands                 |
-| 7. Jobs website UI                 | ✅ Complete    |                                   | ActiveJobs, JobHistory, JobLogViewer components      |
-| 8. Log storage + streaming         | ✅ Complete    |                                   | SSE streaming + Convex File Storage archival         |
-| 9. Node management CLI             | ✅ Complete    | feat/complete-node-management-cli | pause, resume, config commands + status enhancements |
-| 10. Node config + partial sharing  | ⏸️ Paused      |                                   | Superseded by federated k3s (Plan 14-18)             |
-| 11. Multi-node SSH routing         | ✅ Complete    | feat/multi-node-ssh-routing       | nodeId tracking + SSH router + nodes table           |
-| 12. Admin commands                 | ⏸️ Paused      |                                   | Merged into Plan 17 (Admin Dashboard)                |
-| 13. Automated node onboarding      | ✅ Complete    | feat/multi-node-ssh-routing       | Token-based registration + DO VPS key sync           |
-| **FEDERATED K3S ARCHITECTURE**     |                |                                   |                                                      |
-| 14. Hub Setup (DO VPS)             | ✅ Complete    | feat/hub-setup                    | k3s server + KubeVirt + orchestration on hub         |
-| 15. Agent Installation Refactor    | ✅ Complete    | feat/federated-k3s-architecture   | Nodes run k3s agent, join hub cluster                |
-| 16. Multi-Node Scheduling          | ✅ Complete    | feat/multi-node-scheduling        | Node labels, resource scheduling, placement          |
-| 17. Admin Dashboard & APIs         | ✅ Complete    | feat/admin-dashboard-apis         | Tiered access, admin/contributor dashboards, CLI     |
-| 18. Health Monitoring & Failover   | ⬜ Not Started |                                   | Node health, workload status, recovery               |
+| Plan                               | Status      | Branch                            | Notes                                                |
+| ---------------------------------- | ----------- | --------------------------------- | ---------------------------------------------------- |
+| 1. Remove Incus, finalize KubeVirt | ✅ Complete |                                   | Removed all Incus code, KubeVirt-only backend        |
+| 2. Test KubeVirt on workstation    | ✅ Complete |                                   | k3s v1.34.3 + KubeVirt v1.3.0 working                |
+| 3. k3s/KubeVirt install script     | ✅ Complete |                                   | uva node install/uninstall/status + GPU auto-detect  |
+| 3.5. Node prepare command          | ✅ Complete |                                   | uva node prepare for driver install + reboot flow    |
+| 4. Jobs schema + site API          | ✅ Complete |                                   | jobs table + API endpoints                           |
+| 5. Jobs in orchestration service   | ✅ Complete |                                   | JobAdapter + JobManager + HTTP handlers              |
+| 6. Jobs CLI commands               | ✅ Complete |                                   | uva run, jobs, logs, cancel commands                 |
+| 7. Jobs website UI                 | ✅ Complete |                                   | ActiveJobs, JobHistory, JobLogViewer components      |
+| 8. Log storage + streaming         | ✅ Complete |                                   | SSE streaming + Convex File Storage archival         |
+| 9. Node management CLI             | ✅ Complete | feat/complete-node-management-cli | pause, resume, config commands + status enhancements |
+| 10. Node config + partial sharing  | ⏸️ Paused   |                                   | Superseded by federated k3s (Plan 14-18)             |
+| 11. Multi-node SSH routing         | ✅ Complete | feat/multi-node-ssh-routing       | nodeId tracking + SSH router + nodes table           |
+| 12. Admin commands                 | ⏸️ Paused   |                                   | Merged into Plan 17 (Admin Dashboard)                |
+| 13. Automated node onboarding      | ✅ Complete | feat/multi-node-ssh-routing       | Token-based registration + DO VPS key sync           |
+| **FEDERATED K3S ARCHITECTURE**     |             |                                   |                                                      |
+| 14. Hub Setup (DO VPS)             | ✅ Complete | feat/hub-setup                    | k3s server + KubeVirt + orchestration on hub         |
+| 15. Agent Installation Refactor    | ✅ Complete | feat/federated-k3s-architecture   | Nodes run k3s agent, join hub cluster                |
+| 16. Multi-Node Scheduling          | ✅ Complete | feat/multi-node-scheduling        | Node labels, resource scheduling, placement          |
+| 17. Admin Dashboard & APIs         | ✅ Complete | feat/admin-dashboard-apis         | Tiered access, admin/contributor dashboards, CLI     |
+| 18. Health Monitoring & Failover   | ✅ Complete | feat/health-monitoring            | Health monitor, node_offline status, admin alerts    |
 
 Status key: ⬜ Not Started | 🔄 In Progress | ✅ Complete | ❌ Blocked | ⏸️ Paused
 
@@ -1777,22 +1785,22 @@ After 5 minutes:
 
 ### Todos
 
-- [ ] **Create node health sync job** (runs on hub)
+- [x] **Create node health sync job** (runs on hub)
   - Periodically query k8s for node status
   - Update Convex nodes table with status
   - Trigger alerts for status changes
-- [ ] **Handle VM failures on node down**
+- [x] **Handle VM failures on node down**
   - VMs can't auto-migrate (stateful, use local disk)
   - Mark VM status as "node_offline" in Convex
   - Notify user via email/dashboard
-- [ ] **Handle Job failures on node down**
+- [x] **Handle Job failures on node down**
   - Jobs may be rescheduled by k8s (if restartable)
   - Track job pod restarts
   - Update Convex with new node assignment
-- [ ] **Cleanup stale data**
+- [x] **Cleanup stale data**
   - When node is removed, clean up its workloads
   - Option to force-delete VMs on dead nodes
-- [ ] **Add node status to dashboard**
+- [x] **Add node status to dashboard**
   - Show node health in real-time
   - Alert banner when nodes are unhealthy
 - [ ] **Test failure scenarios**
@@ -1802,19 +1810,27 @@ After 5 minutes:
 
 ### Files to Create/Modify
 
-| File                                          | Action | Description                   |
-| --------------------------------------------- | ------ | ----------------------------- |
-| `apps/vm-orchestration-service/lib/health.go` | Create | Node health monitoring        |
-| `apps/site/convex/nodes.ts`                   | Modify | Add node health sync mutation |
-| `apps/site/src/app/api/admin/health/route.ts` | Create | Health check endpoint         |
+| File                                                          | Action | Description                       |
+| ------------------------------------------------------------- | ------ | --------------------------------- |
+| `apps/vm-orchestration-service/lib/health.go`                 | Create | Node health monitoring goroutine  |
+| `apps/vm-orchestration-service/lib/callback.go`               | Modify | Add NotifyNodeHealth method       |
+| `apps/vm-orchestration-service/server.go`                     | Modify | Start health monitor              |
+| `apps/site/convex/schema.ts`                                  | Modify | Add node_offline status           |
+| `apps/site/convex/nodes.ts`                                   | Modify | Add syncHealth, forceCleanup      |
+| `apps/site/convex/vms.ts`                                     | Modify | Add markNodeOffline mutation      |
+| `apps/site/convex/jobs.ts`                                    | Modify | Add markNodeOffline mutation      |
+| `apps/site/src/app/api/nodes/health/route.ts`                 | Create | Health callback endpoint          |
+| `apps/site/src/app/api/admin/nodes/[nodeId]/cleanup/route.ts` | Create | Force cleanup endpoint            |
+| `apps/site/src/app/[flags]/(protected)/admin/page.tsx`        | Modify | Health alerts, last seen column   |
+| `apps/site/src/lib/email.ts`                                  | Modify | Add workload offline notification |
 
 ### Completion Criteria
 
-- [ ] Node status synced from k8s to Convex
-- [ ] Users notified when their workloads are affected
-- [ ] VMs on dead nodes marked appropriately
-- [ ] Jobs rescheduled when possible
-- [ ] Admin can see node health in dashboard
+- [x] Node status synced from k8s to Convex
+- [x] Users notified when their workloads are affected
+- [x] VMs on dead nodes marked appropriately
+- [x] Jobs rescheduled when possible
+- [x] Admin can see node health in dashboard
 
 ---
 
