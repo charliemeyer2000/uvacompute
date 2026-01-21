@@ -47,9 +47,9 @@ func NewVMManager(limits VMResourceLimits, vmProvider VMProvider, callbackClient
 
 func (vm *VMManager) CreateVM(req VMCreationRequest) (string, error) {
 	vm.mu.Lock()
-	defer vm.mu.Unlock()
 
 	if err := vm.checkResourceAvailability(req); err != nil {
+		vm.mu.Unlock()
 		return "", err
 	}
 
@@ -77,35 +77,39 @@ func (vm *VMManager) CreateVM(req VMCreationRequest) (string, error) {
 		Status:       VM_STATUS_PENDING,
 	}
 
-	go vm.createVMAsync(vmId, cpus, ram, disk, gpus, req.SSHPublicKeys, req.Hours, startupScript, cloudInitConfig)
+	// Release lock before synchronous VM creation (can take minutes)
+	vm.mu.Unlock()
+
+	// Create VM synchronously - only return success after VM actually exists
+	err := vm.createVMSync(vmId, cpus, ram, disk, gpus, req.SSHPublicKeys, req.Hours, startupScript, cloudInitConfig)
+	if err != nil {
+		// VM creation failed - remove from map and return error
+		vm.mu.Lock()
+		delete(vm.vmMap, vmId)
+		vm.mu.Unlock()
+		return "", err
+	}
 
 	return vmId, nil
 }
 
-func (vm *VMManager) createVMAsync(vmId string, cpus, ram, disk, gpus int, sshPublicKeys []string, hours int, startupScript, cloudInitConfig string) {
-	defer func() {
-		if r := recover(); r != nil {
-			log.Printf("ERROR: Panic in createVMAsync for VM %s: %v", vmId, r)
-			vm.UpdateVMStatus(vmId, VM_STATUS_FAILED, fmt.Sprintf("Internal error: %v", r))
-		}
-	}()
-
+func (vm *VMManager) createVMSync(vmId string, cpus, ram, disk, gpus int, sshPublicKeys []string, hours int, startupScript, cloudInitConfig string) error {
 	statusCallback := func(status VMStatus) {
 		vm.UpdateVMStatus(vmId, status, "")
 	}
 
-	log.Printf("Starting async VM creation for %s (cpus: %d, ram: %d, disk: %d, gpus: %d)", vmId, cpus, ram, disk, gpus)
+	log.Printf("Starting VM creation for %s (cpus: %d, ram: %d, disk: %d, gpus: %d)", vmId, cpus, ram, disk, gpus)
 
 	err := vm.vmProvider.CreateVM(vmId, cpus, ram, disk, gpus, sshPublicKeys, statusCallback, startupScript, cloudInitConfig)
 	if err != nil {
 		log.Printf("ERROR: Failed to create VM %s: %v", vmId, err)
-		vm.UpdateVMStatus(vmId, VM_STATUS_FAILED, err.Error())
-		return
+		return err
 	}
 
 	vm.UpdateVMStatus(vmId, VM_STATUS_READY, "")
 	log.Printf("VM %s successfully created and is now running", vmId)
 
+	// Set up expiration timer
 	time.AfterFunc(time.Duration(hours*3600*int(time.Second)), func() {
 		log.Printf("VM %s expired, deleting", vmId)
 
@@ -129,6 +133,8 @@ func (vm *VMManager) createVMAsync(vmId string, cpus, ram, disk, gpus int, sshPu
 		delete(vm.vmMap, vmId)
 		vm.mu.Unlock()
 	})
+
+	return nil
 }
 
 func (vm *VMManager) GetVM(vmId string) (VMState, bool) {
