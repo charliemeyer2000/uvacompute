@@ -61,6 +61,38 @@ export async function DELETE(
       },
     );
 
+    if (response.status === 404) {
+      console.log(
+        `VM ${vmId} not found in orchestration service - cleaning up orphaned DB entry`,
+      );
+      try {
+        await fetchMutation(api.vms.updateStatus, {
+          vmId,
+          status: "stopped",
+        });
+        return NextResponse.json(
+          {
+            status: "deletion_success",
+            vmId,
+            msg: "VM was not found in orchestration service (possibly failed creation). Database entry has been cleaned up.",
+          },
+          { status: 200 },
+        );
+      } catch (convexError: any) {
+        console.error(
+          "Warning: Failed to mark orphaned VM as deleted in Convex:",
+          convexError,
+        );
+        return NextResponse.json(
+          {
+            status: "deletion_failed_internal",
+            msg: "VM not found in orchestration and failed to clean up database entry",
+          },
+          { status: 500 },
+        );
+      }
+    }
+
     if (!response.ok) {
       const errorText = await response.text();
       console.error(
