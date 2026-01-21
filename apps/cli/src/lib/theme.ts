@@ -44,6 +44,7 @@ export const jobStatusColors = {
   completed: chalk.green,
   failed: chalk.red,
   cancelled: chalk.gray,
+  node_offline: chalk.red,
 } as const;
 
 export function createInfoBox(content: string): string {
