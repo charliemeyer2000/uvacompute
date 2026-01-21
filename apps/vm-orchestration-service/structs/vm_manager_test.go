@@ -5,6 +5,8 @@ import (
 	"strings"
 	"sync"
 	"testing"
+
+	"github.com/google/uuid"
 )
 
 type MockVMProvider struct {
@@ -49,6 +51,7 @@ func TestCreateVM(t *testing.T) {
 	vm := NewVMManager(limits, mockProvider, nil)
 
 	req := VMCreationRequest{
+		VMId:   uuid.New().String(),
 		Hours:  24,
 		UserId: "test-user",
 	}
@@ -85,6 +88,7 @@ func TestCreateVMWithCustomValues(t *testing.T) {
 	ram := 16
 	name := "test-vm-2"
 	req := VMCreationRequest{
+		VMId:   uuid.New().String(),
 		Hours:  12,
 		Name:   &name,
 		UserId: "test-user-2",
@@ -121,6 +125,7 @@ func TestDeleteVM(t *testing.T) {
 	vm := NewVMManager(limits, mockProvider, nil)
 
 	req := VMCreationRequest{
+		VMId:   uuid.New().String(),
 		Hours:  24,
 		UserId: "test-user",
 	}
@@ -147,18 +152,25 @@ func TestResourceLimits(t *testing.T) {
 	vm := NewVMManager(limits, mockProvider, nil)
 
 	cpus := 4
-	req := VMCreationRequest{
+	req1 := VMCreationRequest{
+		VMId:   uuid.New().String(),
 		Hours:  24,
 		UserId: "test-user",
 		Cpus:   &cpus,
 	}
 
-	_, err := vm.CreateVM(req)
+	_, err := vm.CreateVM(req1)
 	if err != nil {
 		t.Fatalf("First VM should succeed: %v", err)
 	}
 
-	_, err = vm.CreateVM(req)
+	req2 := VMCreationRequest{
+		VMId:   uuid.New().String(),
+		Hours:  24,
+		UserId: "test-user",
+		Cpus:   &cpus,
+	}
+	_, err = vm.CreateVM(req2)
 	if err == nil {
 		t.Fatal("Second VM should fail due to resource limits")
 	}
@@ -179,6 +191,7 @@ func TestCreateVMWithSSHKeys(t *testing.T) {
 	}
 
 	req := VMCreationRequest{
+		VMId:          uuid.New().String(),
 		Hours:         24,
 		UserId:        "test-user",
 		SSHPublicKeys: sshKeys,
@@ -218,6 +231,7 @@ func TestCreateVMWithoutSSHKeys(t *testing.T) {
 	vm := NewVMManager(limits, mockProvider, nil)
 
 	req := VMCreationRequest{
+		VMId:          uuid.New().String(),
 		Hours:         24,
 		UserId:        "test-user",
 		SSHPublicKeys: []string{},
@@ -251,6 +265,7 @@ func TestCreateVMWithSingleSSHKey(t *testing.T) {
 	sshKey := "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC... user@example.com"
 
 	req := VMCreationRequest{
+		VMId:          uuid.New().String(),
 		Hours:         24,
 		UserId:        "test-user",
 		SSHPublicKeys: []string{sshKey},
@@ -294,6 +309,7 @@ func TestCreateVMWithSSHKeysAndCustomResources(t *testing.T) {
 	}
 
 	req := VMCreationRequest{
+		VMId:          uuid.New().String(),
 		Hours:         24,
 		Name:          &name,
 		UserId:        "test-user",
