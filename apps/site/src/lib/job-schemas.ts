@@ -8,6 +8,7 @@ export const JobStatusEnum = z.enum([
   "completed",
   "failed",
   "cancelled",
+  "node_offline",
 ]);
 
 export type JobStatus = z.infer<typeof JobStatusEnum>;

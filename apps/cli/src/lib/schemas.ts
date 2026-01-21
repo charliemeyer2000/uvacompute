@@ -234,12 +234,13 @@ export const JobStatusEnum = z.enum([
   "completed",
   "failed",
   "cancelled",
+  "node_offline",
 ]);
 export type JobStatus = z.infer<typeof JobStatusEnum>;
 
 export const JOB_STATUS_GROUPS = {
   ACTIVE: ["pending", "scheduled", "pulling", "running"] as const,
-  TERMINAL: ["completed", "failed", "cancelled"] as const,
+  TERMINAL: ["completed", "failed", "cancelled", "node_offline"] as const,
   CANCELLABLE: ["pending", "scheduled", "pulling", "running"] as const,
 } as const;
 
