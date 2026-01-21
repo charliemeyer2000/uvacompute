@@ -2,6 +2,7 @@ package lib
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -31,6 +32,12 @@ var (
 		Group:    "kubevirt.io",
 		Version:  "v1",
 		Resource: "virtualmachineinstances",
+	}
+
+	secretGVR = schema.GroupVersionResource{
+		Group:    "",
+		Version:  "v1",
+		Resource: "secrets",
 	}
 )
 
@@ -81,13 +88,21 @@ func (k *KubeVirtAdapter) CreateVM(vmId string, cpus, ram, disk, gpus int, sshPu
 		image = k.config.VMImageGPU
 	}
 
+	// Generate cloud-init data and store in a Secret (to bypass 2048 byte limit)
 	cloudInitUserData := generateCloudInitUserData(sshPublicKeys, startupScript, cloudInitConfig, gpus > 0)
+	secretName := fmt.Sprintf("cloudinit-%s", vmId)
 
-	vm := k.buildVMObject(vmId, cpus, ram, disk, gpus, image, cloudInitUserData)
+	if err := k.createCloudInitSecret(ctx, secretName, cloudInitUserData); err != nil {
+		return fmt.Errorf("failed to create cloud-init secret: %w", err)
+	}
+
+	vm := k.buildVMObject(vmId, cpus, ram, disk, gpus, image, secretName)
 
 	statusCallback(structs.VM_STATUS_BOOTING)
 	_, err := k.client.Resource(vmGVR).Namespace(k.namespace).Create(ctx, vm, metav1.CreateOptions{})
 	if err != nil {
+		// Clean up secret on failure
+		_ = k.deleteCloudInitSecret(ctx, secretName)
 		return fmt.Errorf("failed to create VM: %w", err)
 	}
 
@@ -101,7 +116,34 @@ func (k *KubeVirtAdapter) CreateVM(vmId string, cpus, ram, disk, gpus int, sshPu
 	return nil
 }
 
-func (k *KubeVirtAdapter) buildVMObject(vmId string, cpus, ram, disk, gpus int, image, cloudInitUserData string) *unstructured.Unstructured {
+func (k *KubeVirtAdapter) createCloudInitSecret(ctx context.Context, secretName, userData string) error {
+	secret := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "v1",
+			"kind":       "Secret",
+			"metadata": map[string]interface{}{
+				"name":      secretName,
+				"namespace": k.namespace,
+				"labels": map[string]interface{}{
+					"app.kubernetes.io/managed-by": "vm-orchestration-service",
+				},
+			},
+			"type": "Opaque",
+			"data": map[string]interface{}{
+				"userdata": base64.StdEncoding.EncodeToString([]byte(userData)),
+			},
+		},
+	}
+
+	_, err := k.client.Resource(secretGVR).Namespace(k.namespace).Create(ctx, secret, metav1.CreateOptions{})
+	return err
+}
+
+func (k *KubeVirtAdapter) deleteCloudInitSecret(ctx context.Context, secretName string) error {
+	return k.client.Resource(secretGVR).Namespace(k.namespace).Delete(ctx, secretName, metav1.DeleteOptions{})
+}
+
+func (k *KubeVirtAdapter) buildVMObject(vmId string, cpus, ram, disk, gpus int, image, cloudInitSecretName string) *unstructured.Unstructured {
 	devices := map[string]interface{}{
 		"disks": []interface{}{
 			map[string]interface{}{
@@ -169,20 +211,24 @@ func (k *KubeVirtAdapter) buildVMObject(vmId string, cpus, ram, disk, gpus int, 
 			map[string]interface{}{
 				"name": "cloudinit",
 				"cloudInitNoCloud": map[string]interface{}{
-					"userData": cloudInitUserData,
+					// Use secretRef to bypass 2048 byte limit for inline userData
+					"secretRef": map[string]interface{}{
+						"name": cloudInitSecretName,
+					},
 				},
 			},
 		},
-		// Readiness probe: wait for cloud-init to complete by checking for marker file
-		// This ensures the VM's Ready condition is only true after provisioning finishes
+		// Readiness probe: check if SSH is ready (port 22)
+		// This indicates the VM has booted and basic services are up
+		// Note: exec probes require QEMU guest agent which may not be available
 		"readinessProbe": map[string]interface{}{
-			"exec": map[string]interface{}{
-				"command": []interface{}{"cat", "/var/run/uvacompute-provisioned"},
+			"tcpSocket": map[string]interface{}{
+				"port": int64(22),
 			},
 			"initialDelaySeconds": int64(30),  // Wait 30s before first check (VM needs to boot)
 			"periodSeconds":       int64(10),  // Check every 10 seconds
 			"timeoutSeconds":      int64(5),   // Timeout for each check
-			"failureThreshold":    int64(180), // Allow up to 30 minutes for provisioning (180 * 10s)
+			"failureThreshold":    int64(30),  // Allow up to 5 minutes for boot (30 * 10s)
 			"successThreshold":    int64(1),   // One success is enough
 		},
 	}
@@ -358,6 +404,10 @@ func (k *KubeVirtAdapter) DestroyVM(vmId string) error {
 	if err != nil {
 		return fmt.Errorf("failed to delete VM: %w", err)
 	}
+
+	// Clean up the associated cloud-init secret
+	secretName := fmt.Sprintf("cloudinit-%s", vmId)
+	_ = k.deleteCloudInitSecret(ctx, secretName) // Ignore error if secret doesn't exist
 
 	return nil
 }

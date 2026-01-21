@@ -1,0 +1,58 @@
+name: Deploy VM Orchestration Service
+
+env:
+  GO_VERSION: "1.24"
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "apps/vm-orchestration-service/**"
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Install dependencies
+        run: make deps
+        working-directory: ./apps/vm-orchestration-service
+
+      - name: Run tests
+        run: make test
+        working-directory: ./apps/vm-orchestration-service
+
+      - name: Build Linux binary
+        run: make build-linux
+        working-directory: ./apps/vm-orchestration-service
+
+      - name: Deploy to DO VPS
+        env:
+          VPS_HOST: ${{ secrets.DO_VPS_HOST }}
+          VPS_PASSWORD: ${{ secrets.DO_VPS_PASSWORD }}
+        run: |
+          # Install sshpass for password-based SSH
+          sudo apt-get update && sudo apt-get install -y sshpass
+
+          # Add host to known_hosts
+          mkdir -p ~/.ssh
+          ssh-keyscan -H $VPS_HOST >> ~/.ssh/known_hosts 2>/dev/null
+
+          # Stop service, deploy binary, restart service
+          sshpass -p "$VPS_PASSWORD" ssh root@$VPS_HOST "systemctl stop vm-orchestration"
+          sshpass -p "$VPS_PASSWORD" scp ./apps/vm-orchestration-service/dist/vm-orchestration-linux root@$VPS_HOST:/usr/local/bin/vm-orchestration
+          sshpass -p "$VPS_PASSWORD" ssh root@$VPS_HOST "systemctl start vm-orchestration"
+
+          # Verify deployment
+          sshpass -p "$VPS_PASSWORD" ssh root@$VPS_HOST "systemctl is-active vm-orchestration"
+          echo "✅ Deployed successfully"
