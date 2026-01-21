@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useQuery } from "convex/react";
 import { api } from "../../../../../../convex/_generated/api";
 import { authClient } from "@/lib/auth-client";
@@ -7,7 +8,6 @@ import ActiveVMs from "./active-vms";
 import VMHistory from "./vm-history";
 import ActiveJobs from "./active-jobs";
 import JobHistory from "./job-history";
-import OnboardingContent from "./onboarding-content";
 
 export default function VMList() {
   const { data: session } = authClient.useSession();
@@ -28,15 +28,17 @@ export default function VMList() {
   if (hasNoResources) {
     return (
       <div className="space-y-6">
-        <div>
+        <div className="border border-gray-200 p-8 text-center">
           <h2 className="text-xl font-semibold text-black mb-2">
-            getting started
+            welcome to uvacompute
           </h2>
-          <p className="text-sm text-gray-600">
-            follow these steps to create your first vm or run a container job
+          <p className="text-sm text-gray-600 mb-4">
+            you haven&apos;t created any vms or run any jobs yet.
           </p>
+          <Link href="/docs" className="text-orange-accent underline">
+            get started with the documentation &rarr;
+          </Link>
         </div>
-        <OnboardingContent />
       </div>
     );
   }
