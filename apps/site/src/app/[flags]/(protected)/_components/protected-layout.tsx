@@ -57,6 +57,7 @@ export default function ProtectedLayout({
   const isOnNodes = pathname?.includes("/my-nodes");
   const isOnAdmin = pathname?.includes("/admin");
   const isOnOnboarding = pathname?.includes("/onboarding");
+  const isOnDocs = pathname?.includes("/docs");
 
   return (
     <EarlyAccessProvider earlyAccessEnabled={earlyAccessEnabled}>
@@ -117,6 +118,12 @@ export default function ProtectedLayout({
                         asChild
                       >
                         <Link href="/profile">profile</Link>
+                      </Button>
+                      <Button
+                        variant={isOnDocs ? "default" : "outline"}
+                        asChild
+                      >
+                        <Link href="/docs">docs</Link>
                       </Button>
                       {hasDevAccess && (
                         <Button

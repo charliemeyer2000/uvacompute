@@ -6,7 +6,6 @@ import { api } from "../../../../../convex/_generated/api";
 import { Button } from "@/components/ui/button";
 import { useEarlyAccessEnabled } from "../_components/early-access-context";
 import { authClient } from "@/lib/auth-client";
-import OnboardingContent from "../dashboard/_components/onboarding-content";
 
 export default function OnboardingPage() {
   const { data: session } = authClient.useSession();
@@ -30,7 +29,32 @@ export default function OnboardingPage() {
         </div>
       )}
 
-      <OnboardingContent />
+      <div className="border border-gray-200 p-6 space-y-4">
+        <h2 className="text-lg font-semibold">getting started</h2>
+        <p className="text-sm text-gray-600">
+          check out our documentation to learn how to use uvacompute:
+        </p>
+        <ul className="space-y-2 text-sm">
+          <li>
+            <Link href="/docs" className="text-orange-accent underline">
+              getting started guide
+            </Link>{" "}
+            - install the cli and authenticate
+          </li>
+          <li>
+            <Link href="/docs/vms" className="text-orange-accent underline">
+              virtual machines
+            </Link>{" "}
+            - create and manage gpu-powered vms
+          </li>
+          <li>
+            <Link href="/docs/jobs" className="text-orange-accent underline">
+              container jobs
+            </Link>{" "}
+            - run docker containers on demand
+          </li>
+        </ul>
+      </div>
 
       <div className="flex gap-4">
         {hasEarlyAccess ? (
