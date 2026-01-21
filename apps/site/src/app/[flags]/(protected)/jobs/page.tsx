@@ -1,11 +1,11 @@
 "use client";
 
+import Link from "next/link";
 import { useQuery } from "convex/react";
 import { api } from "../../../../../convex/_generated/api";
 import { authClient } from "@/lib/auth-client";
 import ActiveJobs from "../dashboard/_components/active-jobs";
 import JobHistory from "../dashboard/_components/job-history";
-import OnboardingContent from "../dashboard/_components/onboarding-content";
 
 export default function JobsPage() {
   const { data: session } = authClient.useSession();
@@ -20,15 +20,15 @@ export default function JobsPage() {
   if (hasNoJobs) {
     return (
       <div className="border-t border-gray-200 pt-8 space-y-6">
-        <div>
-          <h2 className="text-xl font-semibold text-black mb-2">
-            getting started with jobs
-          </h2>
-          <p className="text-sm text-gray-600">
-            run container jobs with a single command
+        <div className="border border-gray-200 p-8 text-center">
+          <h2 className="text-xl font-semibold text-black mb-2">no jobs yet</h2>
+          <p className="text-sm text-gray-600 mb-4">
+            you haven&apos;t run any container jobs yet.
           </p>
+          <Link href="/docs/jobs" className="text-orange-accent underline">
+            learn how to run a job &rarr;
+          </Link>
         </div>
-        <OnboardingContent showOnlyJobs />
       </div>
     );
   }
