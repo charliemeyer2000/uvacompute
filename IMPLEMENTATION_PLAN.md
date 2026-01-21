@@ -1818,6 +1818,102 @@ After 5 minutes:
 
 ---
 
+## Plan 19: Navigation Refactor & Dev Tools Removal
+
+**Goal:** Simplify navigation by adding Nodes and Admin panels to the navbar, and remove the redundant Dev Tools page.
+
+### Context
+
+Currently the navigation has:
+
+- VMs, Jobs, Profile buttons in navbar
+- "Dev Tools" button (visible only to admins via `hasDevAccess`)
+- Separate "My Nodes" page at `/my-nodes` (not in navbar)
+- Separate "Admin" page at `/admin` (not in navbar)
+
+The Dev Tools page contains:
+
+1. **Seed data tools** - For testing (seedVMs, clearAllVMs, clearInactiveVMs)
+2. **Early access management** - Approve/deny user access requests
+
+Problems:
+
+- "My Nodes" isn't discoverable (not in navbar)
+- "Admin" isn't discoverable (not in navbar)
+- Dev Tools duplicates admin functionality
+- Seed data tools should be CLI commands, not UI
+
+### Changes Required
+
+#### 1. Add "nodes" link to navbar
+
+- Show for all authenticated users
+- Links to `/my-nodes` page
+- Allows contributors to see their contributed nodes
+
+#### 2. Add "admin" link to navbar
+
+- Show only for admins (same check as current Dev Tools)
+- Links to `/admin` page
+- Already has node management, workload overview
+
+#### 3. Move early access management to admin page
+
+- Add early access section to `/admin/page.tsx`
+- Include pending requests (tokens) and registered users
+
+#### 4. Remove Dev Tools entirely
+
+- Delete `/dev-tools/page.tsx`
+- Remove "dev tools" button from `protected-layout.tsx`
+- Remove `hasDevAccess` query import (keep the query for admin check)
+- Delete `convex/seed.ts` (seedVMs, clearAllVMs, clearInactiveVMs)
+- Remove seed-related imports from any files
+
+### Todos
+
+- [ ] **Update navbar in protected-layout.tsx**
+  - Add "nodes" button linking to `/my-nodes`
+  - Add "admin" button linking to `/admin` (only if `hasDevAccess`)
+  - Remove "dev tools" button
+  - Remove `isOnDevTools` path check
+- [ ] **Add early access management to admin page**
+  - Copy early access UI from dev-tools to admin page
+  - Add mutations: `grantAccess`, `revokeAccess`, `approveTokenByEmail`, `denyTokenByEmail`
+  - Add queries: `listEarlyAccessRequests`, `listPendingTokens`
+- [ ] **Delete dev-tools page**
+  - Delete `apps/site/src/app/[flags]/(protected)/dev-tools/page.tsx`
+  - Delete the entire `dev-tools/` directory
+- [ ] **Delete seed functions**
+  - Delete `apps/site/convex/seed.ts`
+  - Remove seed exports from convex API if referenced
+- [ ] **Test navigation**
+  - Verify "nodes" shows for all users
+  - Verify "admin" shows only for admins
+  - Verify early access management works in admin page
+  - Verify no broken links or imports
+
+### Files to Modify/Delete
+
+| File                                                                     | Action | Description                         |
+| ------------------------------------------------------------------------ | ------ | ----------------------------------- |
+| `apps/site/src/app/[flags]/(protected)/_components/protected-layout.tsx` | Modify | Update navbar buttons               |
+| `apps/site/src/app/[flags]/(protected)/admin/page.tsx`                   | Modify | Add early access management section |
+| `apps/site/src/app/[flags]/(protected)/dev-tools/page.tsx`               | Delete | Remove dev tools page               |
+| `apps/site/convex/seed.ts`                                               | Delete | Remove seed data functions          |
+
+### Completion Criteria
+
+- [ ] "nodes" link visible in navbar for all authenticated users
+- [ ] "admin" link visible in navbar for admins only
+- [ ] Early access management works in admin page
+- [ ] Dev tools page completely removed
+- [ ] Seed functions completely removed
+- [ ] No TypeScript/lint errors
+- [ ] No broken navigation links
+
+---
+
 ## Migration Path
 
 ### For Existing Nodes
