@@ -41,6 +41,7 @@ function getStatusBorderColor(status: string): string {
   switch (status) {
     case "ready":
       return "border-l-green-500";
+    case "creating":
     case "pending":
     case "booting":
     case "provisioning":
@@ -62,6 +63,7 @@ function getStatusDotColor(status: string): string {
   switch (status) {
     case "ready":
       return "bg-green-500";
+    case "creating":
     case "pending":
     case "booting":
     case "provisioning":
@@ -350,6 +352,7 @@ export default function ActiveVMs() {
                 key={vm._id}
                 vm={vm}
                 isActive={[
+                  "creating",
                   "pending",
                   "booting",
                   "provisioning",
