@@ -5,12 +5,25 @@ set -euo pipefail
 # Source environment
 [ -f /etc/environment ] && . /etc/environment
 
-TOKEN="${SSH_ORIGINAL_COMMAND:-$1}"
+# SSH calls shell as: /path/to/shell -c "command"
+if [[ "${1:-}" == "-c" ]]; then
+  TOKEN="$2"
+else
+  TOKEN="${SSH_ORIGINAL_COMMAND:-$1}"
+fi
+
 [[ -z "$TOKEN" ]] && { echo "No token provided" >&2; exit 1; }
 [[ -z "${VM_PROXY_SECRET:-}" ]] && { echo "Server misconfigured" >&2; exit 1; }
 
-# Decode token: base64url(userId:vmId:expires:signature)
-DECODED=$(echo "$TOKEN" | base64 -d 2>/dev/null) || { echo "Invalid token" >&2; exit 1; }
+# Convert base64url to base64 and decode
+TOKEN_B64=$(echo "$TOKEN" | tr '_-' '/+')
+MOD=$((${#TOKEN_B64} % 4))
+case $MOD in
+  2) TOKEN_B64="${TOKEN_B64}==";;
+  3) TOKEN_B64="${TOKEN_B64}=";;
+esac
+
+DECODED=$(echo "$TOKEN_B64" | base64 -d 2>/dev/null) || { echo "Invalid token" >&2; exit 1; }
 
 IFS=':' read -r USER_ID VM_ID EXPIRES SIG <<< "$DECODED"
 [[ -z "$VM_ID" || -z "$EXPIRES" || -z "$SIG" ]] && { echo "Invalid token format" >&2; exit 1; }

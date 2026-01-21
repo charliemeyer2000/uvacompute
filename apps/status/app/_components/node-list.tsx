@@ -1,6 +1,7 @@
 import type { NodeStatus, ClusterResources } from "@/types";
-import { CapabilityBadge, NodeStatusIndicator } from "./capability-badge";
+import { CapabilityBadge } from "./capability-badge";
 import { formatDistanceToNow } from "date-fns";
+import { cn } from "@/lib/utils";
 
 interface NodeListProps {
   nodes: NodeStatus[];
@@ -9,7 +10,7 @@ interface NodeListProps {
 
 function formatGPUDisplay(gpus: number, gpuType: string): string {
   if (gpus === 0 || gpuType === "none" || gpuType === "unknown") {
-    return "no gpu";
+    return "—";
   }
   const formattedType = gpuType
     .replace(/^nvidia-/, "")
@@ -18,79 +19,99 @@ function formatGPUDisplay(gpus: number, gpuType: string): string {
   return `${gpus}× ${formattedType}`;
 }
 
+const statusIndicators = {
+  online: { symbol: "●", color: "text-green-500", label: "online" },
+  draining: { symbol: "◐", color: "text-yellow-500", label: "draining" },
+  offline: { symbol: "○", color: "text-gray-300", label: "offline" },
+};
+
 export function NodeList({ nodes, nodeCounts }: NodeListProps) {
   const sortedNodes = [...nodes].sort((a, b) => {
     const statusOrder = { online: 0, draining: 1, offline: 2 };
     return statusOrder[a.status] - statusOrder[b.status];
   });
 
-  const statusSummary = [];
-  if (nodeCounts.online > 0) statusSummary.push(`${nodeCounts.online} online`);
-  if (nodeCounts.draining > 0)
-    statusSummary.push(`${nodeCounts.draining} draining`);
-  if (nodeCounts.offline > 0)
-    statusSummary.push(`${nodeCounts.offline} offline`);
-
   return (
-    <div className="border border-gray-200 p-4 sm:p-6 mb-6 sm:mb-8">
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-sm font-medium text-gray-900">nodes</h2>
-        <span className="text-xs text-gray-500 font-mono">
-          {statusSummary.join(" · ")}
-        </span>
+    <div className="border border-gray-200 p-5 sm:p-6">
+      <div className="flex items-center gap-3 mb-4">
+        <h2 className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+          nodes
+        </h2>
+        <div className="flex-1 h-px bg-gray-200" />
+        <div className="flex items-center gap-3 text-xs text-gray-400">
+          {nodeCounts.online > 0 && (
+            <span className="flex items-center gap-1">
+              <span className="text-green-500">●</span>
+              {nodeCounts.online}
+            </span>
+          )}
+          {nodeCounts.draining > 0 && (
+            <span className="flex items-center gap-1">
+              <span className="text-yellow-500">◐</span>
+              {nodeCounts.draining}
+            </span>
+          )}
+          {nodeCounts.offline > 0 && (
+            <span className="flex items-center gap-1">
+              <span className="text-gray-300">○</span>
+              {nodeCounts.offline}
+            </span>
+          )}
+        </div>
       </div>
 
       {sortedNodes.length === 0 ? (
-        <div className="text-center py-8 text-gray-500 text-sm">
+        <div className="py-8 text-center text-sm text-gray-400">
           no nodes registered
         </div>
       ) : (
-        <div className="space-y-3">
-          {sortedNodes.map((node) => (
-            <div
-              key={node.name}
-              className="border border-gray-100 p-3 hover:bg-gray-50 transition-colors"
-            >
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <NodeStatusIndicator status={node.status} />
-                  <span className="font-mono text-sm text-gray-900">
-                    {node.name}
-                  </span>
-                  <span
-                    className={`text-xs font-mono px-1.5 py-0.5 ${
-                      node.status === "online"
-                        ? "bg-blue-50 text-blue-600"
-                        : node.status === "draining"
-                          ? "bg-yellow-50 text-yellow-600"
-                          : "bg-gray-100 text-gray-500"
-                    }`}
-                  >
-                    {node.status}
-                  </span>
-                </div>
-                <div className="text-xs text-gray-500 font-mono">
-                  {node.vcpus} vcpu · {node.ram} gb ·{" "}
-                  {formatGPUDisplay(node.gpus, node.gpuType)}
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <CapabilityBadge
-                  supportsVMs={node.supportsVMs}
-                  supportsJobs={node.supportsJobs}
-                />
-                {node.status === "offline" && (
-                  <span className="text-xs text-gray-400 font-mono">
-                    last seen{" "}
-                    {formatDistanceToNow(new Date(node.lastHeartbeat), {
-                      addSuffix: true,
-                    })}
-                  </span>
+        <div className="space-y-2">
+          {sortedNodes.map((node) => {
+            const indicator = statusIndicators[node.status];
+            return (
+              <div
+                key={node.name}
+                className={cn(
+                  "border p-3 transition-colors",
+                  node.status === "offline"
+                    ? "border-gray-100 bg-gray-50"
+                    : "border-gray-200 hover:border-black",
                 )}
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className={cn("text-sm", indicator.color)}>
+                      {indicator.symbol}
+                    </span>
+                    <span className="font-medium text-sm text-black truncate">
+                      {node.name}
+                    </span>
+                  </div>
+                  <div className="text-xs text-gray-400 text-right shrink-0">
+                    <div>
+                      {node.vcpus} cpu · {node.ram} gb
+                    </div>
+                    <div>{formatGPUDisplay(node.gpus, node.gpuType)}</div>
+                  </div>
+                </div>
+
+                <div className="mt-2 flex items-center justify-between">
+                  <CapabilityBadge
+                    supportsVMs={node.supportsVMs}
+                    supportsJobs={node.supportsJobs}
+                  />
+                  {node.status === "offline" && (
+                    <span className="text-xs text-gray-400">
+                      last seen{" "}
+                      {formatDistanceToNow(new Date(node.lastHeartbeat), {
+                        addSuffix: true,
+                      })}
+                    </span>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
