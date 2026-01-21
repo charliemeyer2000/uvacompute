@@ -128,6 +128,21 @@ func main() {
 		fmt.Printf("Warning: Failed to sync state from backend: %v\n", err)
 	}
 
+	// Sync with Convex to recover VMs that may have been lost during restart
+	if err := lib.SyncFromConvex(app.VMManager, vmAdapter, callbackClient); err != nil {
+		fmt.Printf("Warning: Failed to sync from Convex: %v\n", err)
+	}
+
+	// Start the periodic reconciler
+	reconciler := lib.NewReconciler(lib.ReconcilerConfig{
+		VMManager:      app.VMManager,
+		VMProvider:     vmAdapter,
+		CallbackClient: callbackClient,
+		Interval:       5 * time.Minute,
+	})
+	go reconciler.Start(context.Background())
+	fmt.Println("Reconciler started")
+
 	app.Router.Use(middleware.Logger)
 	app.Router.Use(middleware.RequestID)
 	app.Router.Use(middleware.RealIP)
