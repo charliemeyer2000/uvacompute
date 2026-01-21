@@ -13,6 +13,7 @@ import { homedir } from "os";
 import { join } from "path";
 import { select, confirm } from "@inquirer/prompts";
 import { getBaseUrl, loadToken, checkServiceStatus } from "./lib/utils";
+import { ensureSSHKeysConfigured, getRegisteredKeys } from "./lib/ssh-utils";
 import {
   theme,
   statusColors,
@@ -26,7 +27,6 @@ import {
   VMDeletionResponseSchema,
   VMStatusResponseSchema,
   VMListResponseSchema,
-  SSHKeyListResponseSchema,
   VM_STATUS_GROUPS,
 } from "./lib/schemas";
 import {
@@ -249,35 +249,23 @@ async function createVM(options: {
       process.exit(1);
     }
 
-    const keysResponse = await fetch(`${BASE_URL}/api/ssh-keys`, {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
+    const keysResult = await getRegisteredKeys(token);
+    if (!keysResult.success) {
+      console.log(theme.error("Failed to check SSH keys. Please try again."));
+      console.log(theme.muted(`Error: ${keysResult.error}`));
+      process.exit(1);
+    }
 
-    if (keysResponse.ok) {
-      const keysData = SSHKeyListResponseSchema.parse(
-        await keysResponse.json(),
-      );
-      if (keysData.keys.length === 0) {
+    if (keysResult.keys.length === 0) {
+      const configured = await ensureSSHKeysConfigured(token);
+      if (!configured) {
         console.log(
-          theme.error(
-            "No SSH keys configured. You must add an SSH key before creating a VM.",
-          ),
-        );
-        console.log(theme.muted("\nAdd an SSH key with:"));
-        console.log(
-          formatCommand(
-            "uva ssh-key add ~/.ssh/id_ed25519.pub --name 'My Key'",
+          theme.warning(
+            "Continuing without SSH access. You won't be able to SSH into this VM.",
           ),
         );
         console.log();
-        process.exit(1);
       }
-    } else {
-      console.log(theme.error("Failed to check SSH keys. Please try again."));
-      process.exit(1);
     }
 
     if (options.name) {
@@ -514,37 +502,29 @@ async function createVM(options: {
         console.log(formatDetail("GPU Type", options.gpuType));
       console.log();
 
-      const keysResponse = await fetch(`${BASE_URL}/api/ssh-keys`, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      if (keysResponse.ok) {
-        const keysData = SSHKeyListResponseSchema.parse(
-          await keysResponse.json(),
+      const postCreationKeysResult = await getRegisteredKeys(token);
+      if (!postCreationKeysResult.success) {
+        console.log(theme.error("Failed to check SSH keys. Please try again."));
+        console.log(theme.muted(`Error: ${postCreationKeysResult.error}`));
+        console.log();
+      } else if (postCreationKeysResult.keys.length > 0) {
+        console.log(theme.success("SSH access configured"));
+        console.log(theme.muted("\nTo connect:"));
+        const identifier = options.name || data.vmId || "vm-id";
+        console.log(formatCommand(`uva vm ssh ${identifier}`));
+        console.log();
+      } else {
+        console.log(
+          theme.warning(
+            "No SSH keys configured. Add one to enable SSH access:",
+          ),
         );
-
-        if (keysData.keys.length === 0) {
-          console.log(
-            theme.warning(
-              "No SSH keys configured. Add one to enable SSH access:",
-            ),
-          );
-          console.log(
-            formatCommand(
-              "uva ssh-key add ~/.ssh/id_ed25519.pub --name 'Some Key Name'",
-            ),
-          );
-          console.log();
-        } else {
-          console.log(theme.success("SSH access configured"));
-          console.log(theme.muted("\nTo connect:"));
-          const identifier = options.name || data.vmId || "vm-id";
-          console.log(formatCommand(`uva vm ssh ${identifier}`));
-          console.log();
-        }
+        console.log(
+          formatCommand(
+            "uva ssh-key add ~/.ssh/id_ed25519.pub --name 'My Key'",
+          ),
+        );
+        console.log();
       }
     } else {
       spinner.fail(`VM creation failed: ${data.msg}`);
@@ -906,29 +886,32 @@ async function sshToVM(nameOrVmId: string): Promise<void> {
       process.exit(1);
     }
 
-    const keysResponse = await fetch(`${BASE_URL}/api/ssh-keys`, {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
+    const sshKeysResult = await getRegisteredKeys(token);
+    if (!sshKeysResult.success) {
+      spinner.fail("Failed to check SSH keys. Please try again.");
+      console.log(theme.muted(`Error: ${sshKeysResult.error}`));
+      process.exit(1);
+    }
 
-    if (keysResponse.ok) {
-      const keysData = SSHKeyListResponseSchema.parse(
-        await keysResponse.json(),
+    if (sshKeysResult.keys.length === 0) {
+      spinner.stop();
+      console.log(
+        theme.warning("\nNo SSH keys configured. Cannot connect to VM."),
       );
-
-      if (keysData.keys.length === 0) {
-        spinner.warn(theme.warning("No SSH keys configured"));
-        console.log(theme.muted("\nAdd an SSH key to enable access:"));
-        console.log(
-          formatCommand(
-            "uva ssh-key add ~/.ssh/id_ed25519.pub --name 'My Key'",
-          ),
-        );
-        console.log();
+      const configured = await ensureSSHKeysConfigured(token);
+      if (!configured) {
         process.exit(1);
       }
+      console.log(
+        theme.muted(
+          "Note: The VM was created before this key was added. SSH may not work.",
+        ),
+      );
+      console.log(
+        theme.muted("You may need to create a new VM for SSH access to work."),
+      );
+      console.log();
+      spinner.start("Connecting to VM...");
     }
 
     spinner.text = "Getting connection info...";
@@ -975,7 +958,11 @@ async function sshToVM(nameOrVmId: string): Promise<void> {
     // The proxy validates the token and runs virtctl to connect to the VM
     const proxyCommand = `ssh -i ${proxyKeyPath} -p ${port} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${user}@${host} ${accessToken}`;
 
+    const uvaKeyPath = join(homedir(), ".ssh", "id_ed25519_uvacompute");
     const sshArgs = [
+      ...(existsSync(uvaKeyPath)
+        ? ["-i", uvaKeyPath, "-o", "IdentitiesOnly=yes"]
+        : []),
       "-o",
       `ProxyCommand=${proxyCommand}`,
       "-o",
