@@ -14,6 +14,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 
@@ -42,9 +43,10 @@ var (
 )
 
 type KubeVirtAdapter struct {
-	client    dynamic.Interface
-	namespace string
-	config    KubeVirtConfig
+	client      dynamic.Interface
+	typedClient kubernetes.Interface
+	namespace   string
+	config      KubeVirtConfig
 }
 
 func NewKubeVirtAdapter(config KubeVirtConfig) (*KubeVirtAdapter, error) {
@@ -71,10 +73,16 @@ func NewKubeVirtAdapter(config KubeVirtConfig) (*KubeVirtAdapter, error) {
 		return nil, fmt.Errorf("failed to create dynamic client: %w", err)
 	}
 
+	typedClient, err := kubernetes.NewForConfig(restConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create typed client: %w", err)
+	}
+
 	return &KubeVirtAdapter{
-		client:    client,
-		namespace: config.Namespace,
-		config:    config,
+		client:      client,
+		typedClient: typedClient,
+		namespace:   config.Namespace,
+		config:      config,
 	}, nil
 }
 
@@ -233,10 +241,10 @@ func (k *KubeVirtAdapter) buildVMObject(vmId string, cpus, ram, disk, gpus int, 
 		},
 	}
 
-	// Add nodeSelector for GPU VMs to ensure they land on GPU nodes
+	// Add nodeSelector for GPU VMs to ensure they land on nodes with GPU in vfio mode
 	if gpus > 0 {
 		templateSpec["nodeSelector"] = map[string]interface{}{
-			"uvacompute.com/has-gpu": "true",
+			"uvacompute.com/gpu-mode": "vfio",
 		}
 	}
 
@@ -589,6 +597,16 @@ func (k *KubeVirtAdapter) Ping() error {
 	ctx := context.Background()
 	_, err := k.client.Resource(vmGVR).Namespace(k.namespace).List(ctx, metav1.ListOptions{Limit: 1})
 	return err
+}
+
+func (k *KubeVirtAdapter) HasVfioCapableNode(ctx context.Context) (bool, error) {
+	nodes, err := k.typedClient.CoreV1().Nodes().List(ctx, metav1.ListOptions{
+		LabelSelector: "uvacompute.com/gpu-mode=vfio",
+	})
+	if err != nil {
+		return false, fmt.Errorf("failed to list nodes: %w", err)
+	}
+	return len(nodes.Items) > 0, nil
 }
 
 func (k *KubeVirtAdapter) EnsureNamespace() error {

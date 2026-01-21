@@ -1,6 +1,7 @@
 package structs
 
 import (
+	"context"
 	"strings"
 	"sync"
 	"testing"
@@ -36,6 +37,10 @@ func (m *MockVMProvider) GetVMInfo(vmId string) (*VMInfo, error) {
 
 func (m *MockVMProvider) ListVMs() ([]ListVM, error) {
 	return []ListVM{}, nil
+}
+
+func (m *MockVMProvider) HasVfioCapableNode(ctx context.Context) (bool, error) {
+	return true, nil // Mock always returns true for tests
 }
 
 func TestCreateVM(t *testing.T) {
