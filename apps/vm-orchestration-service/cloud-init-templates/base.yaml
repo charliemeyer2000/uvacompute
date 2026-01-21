@@ -1,51 +1,53 @@
 #cloud-config
 # UVACompute Base VM Configuration
-# This template is automatically injected into all VMs to provide common development tools.
 
 package_update: true
+package_upgrade: false
+
+# Configure external DNS to bypass cluster DNS issues
+# (Cluster DNS requires overlay networking which may not work across nodes)
+manage_resolv_conf: true
+resolv_conf:
+  nameservers:
+    - 8.8.8.8
+    - 8.8.4.4
+  searchdomains: []
+  options:
+    timeout: 2
+    attempts: 3
 
 packages:
-  # Essential utilities
   - curl
   - wget
   - git
   - vim
   - htop
   - jq
-  - unzip
-  - tar
-  - ca-certificates
-  - openssh-server
-  # Build essentials
-  - gcc
-  - g++
-  - make
-  # Python (system)
   - python3
   - python3-pip
   - python3-venv
+  - build-essential
+  - gcc
+  - g++
+  - make
 
 runcmd:
-  # Log provisioning start
-  - echo "UVACompute VM provisioning started at $(date)" >> /var/log/uvacompute-init.log
+  # Start SSH immediately (Ubuntu cloud image has it installed but not always enabled)
+  - systemctl enable ssh || systemctl enable sshd || true
+  - systemctl start ssh || systemctl start sshd || true
+  - echo "SSH started at $(date)" >> /var/log/uvacompute-init.log
 
-  # Install uv (fast Python package manager from Astral)
+  # Install uv (Python package manager)
   - curl -LsSf https://astral.sh/uv/install.sh | sh
   - echo 'export PATH="$HOME/.local/bin:$PATH"' >> /root/.bashrc
 
-  # Install Node.js via nvm (Node Version Manager)
-  - |
-    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
-    export NVM_DIR="$HOME/.nvm"
-    [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-    nvm install --lts
-    nvm use --lts
-    nvm alias default lts/*
+  # Install nvm and Node.js
+  - curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
+  - export NVM_DIR="/root/.nvm" && . "$NVM_DIR/nvm.sh" && nvm install 22 && nvm use 22 && nvm alias default 22
 
-  # Install ruff (fast Python linter) via uv
-  - /root/.local/bin/uv tool install ruff
+  # Install ruff (Python linter)
+  - /root/.local/bin/uv tool install ruff || true
 
-  # Log provisioning complete
-  - echo "UVACompute VM provisioning completed at $(date)" >> /var/log/uvacompute-init.log
+  - echo "UVACompute initialization complete at $(date)" >> /var/log/uvacompute-init.log
 
 final_message: "UVACompute VM ready after $UPTIME seconds"
