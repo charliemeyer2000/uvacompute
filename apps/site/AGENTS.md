@@ -729,12 +729,157 @@ export const updateVM = mutation({
 - Use indexes instead of `.filter()` for queries
 - Prefix internal functions with `internal` from `./_generated/server`
 
+### Real-Time Data Patterns
+
+Convex provides real-time sync via WebSocket. **Always prefer `useQuery` and `useMutation` over `fetch()` for Convex data** to leverage automatic sync.
+
+#### ✅ Use `useQuery` for Reading Data
+
+```tsx
+import { useQuery } from "convex/react";
+import { api } from "../convex/_generated/api";
+
+// Real-time: UI updates automatically when data changes
+const nodes = useQuery(api.nodes.listAll);
+const vms = useQuery(api.vms.listActiveByUser, { userId: session.user.id });
+```
+
+**Benefits:**
+
+- Automatic real-time updates via WebSocket
+- Optimistic UI updates
+- No manual refetching needed
+- All connected clients see changes instantly
+
+#### ✅ Use `useMutation` for Writing Data
+
+```tsx
+import { useMutation } from "convex/react";
+import { api } from "../convex/_generated/api";
+
+const setNodeStatus = useMutation(api.nodes.setStatusAsOwner);
+
+async function handlePause(nodeId: string) {
+  try {
+    await setNodeStatus({ nodeId, status: "draining" });
+    // No need to refetch - useQuery subscriptions update automatically
+  } catch (err) {
+    alert(err instanceof Error ? err.message : "Failed");
+  }
+}
+```
+
+**Benefits:**
+
+- Transactional guarantees
+- Automatic sync with all `useQuery` subscriptions
+- Changes propagate to all connected clients instantly
+- No manual state updates needed
+
+#### ❌ Avoid `fetch()` for Pure Convex Operations
+
+```tsx
+// ❌ Bad: Using fetch for Convex-only operations
+async function handlePause(nodeId: string) {
+  const res = await fetch(`/api/nodes/${nodeId}/pause`, { method: "POST" });
+  // Requires manual refetch or state update
+  // Other clients don't see the change until they refresh
+}
+
+// ✅ Good: Direct mutation
+const setStatus = useMutation(api.nodes.setStatusAsOwner);
+await setStatus({ nodeId, status: "draining" });
+// All useQuery subscriptions update automatically
+```
+
+#### When `fetch()` IS Appropriate
+
+Use `fetch()` + API routes when you need to:
+
+1. **Coordinate with external services** (VM orchestration, job scheduler):
+
+   ```tsx
+   // Must call orchestration service first, then update Convex
+   async function handleDeleteVM(vmId: string) {
+     const res = await fetch(`/api/vms/${vmId}`, { method: "DELETE" });
+     // API route calls orchestration service, then updates Convex
+   }
+   ```
+
+2. **Fetch data from external storage** (logs from R2/S3):
+
+   ```tsx
+   // Logs stored externally, not in Convex
+   const res = await fetch(`/api/jobs/${jobId}/logs`);
+   ```
+
+3. **Handle server-only secrets** (API keys that can't be exposed):
+   ```tsx
+   // Requires server-side auth headers
+   const res = await fetch(`/api/vms/${vmId}/connection`);
+   ```
+
+#### Pattern Summary
+
+| Operation                        | Pattern               | Example                          |
+| -------------------------------- | --------------------- | -------------------------------- |
+| Read Convex data                 | `useQuery`            | Node list, VM list, user profile |
+| Write Convex data only           | `useMutation`         | Pause node, update settings      |
+| Write requiring external service | `fetch()` + API route | Delete VM, cancel job            |
+| Read from external storage       | `fetch()` + API route | Job logs, connection info        |
+
+#### Secure Mutations with Auth
+
+When creating mutations callable from the frontend, validate authorization:
+
+```tsx
+// convex/nodes.ts
+import { authComponent } from "./auth";
+
+export const setStatusAsOwner = mutation({
+  args: {
+    nodeId: v.string(),
+    status: v.union(v.literal("online"), v.literal("draining")),
+  },
+  handler: async (ctx, args) => {
+    const user = await authComponent.getAuthUser(ctx);
+    if (!user) throw new Error("Not authenticated");
+
+    const node = await ctx.db
+      .query("nodes")
+      .withIndex("by_nodeId", (q) => q.eq("nodeId", args.nodeId))
+      .first();
+
+    if (!node) throw new Error("Node not found");
+    if (node.ownerId !== user._id) throw new Error("You do not own this node");
+
+    await ctx.db.patch(node._id, { status: args.status });
+  },
+});
+
+export const setStatusAsAdmin = mutation({
+  args: { nodeId: v.string(), status: v.string() },
+  handler: async (ctx, args) => {
+    const user = await authComponent.getAuthUser(ctx);
+    if (!user?.email) throw new Error("Not authenticated");
+
+    const adminUsers =
+      process.env.ADMIN_USERS?.split(",").map((e) => e.trim()) || [];
+    if (!adminUsers.includes(user.email))
+      throw new Error("Admin access required");
+
+    // ... update logic
+  },
+});
+```
+
 ## Common Anti-Patterns to Avoid
 
 ### ❌ Don't
 
 - Use `useEffect` for redirects (handle in callbacks)
 - Use `useEffect` for data fetching (use Suspense)
+- Use `fetch()` for Convex-only operations (use `useQuery`/`useMutation`)
 - Use `alert()` or `confirm()` (use toast)
 - Create custom implementations (reuse components)
 - Show inline error messages (use toast + aria-invalid)
@@ -747,6 +892,8 @@ export const updateVM = mutation({
 
 - Handle redirects in callbacks
 - Use Suspense for loading states
+- Use `useQuery` for real-time data from Convex
+- Use `useMutation` for Convex writes (not `fetch()`)
 - Use toast for all notifications
 - Reuse Button, Input, Field, Skeleton, Link
 - Show errors via toast + red borders
