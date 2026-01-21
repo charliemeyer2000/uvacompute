@@ -41,13 +41,15 @@ export default function JobsDocsPage() {
               run your first job
             </h3>
           </div>
-          <p className="text-sm text-gray-600 ml-8 mb-3">
-            execute a command in any docker image:
-          </p>
-          <div className="ml-8 bg-gray-50 border border-gray-200 p-4 space-y-2">
-            <code className="text-sm text-black block">
-              uva run alpine echo &quot;hello world&quot;
-            </code>
+          <div className="pl-9">
+            <p className="text-sm text-gray-600 mb-3">
+              execute a command in any docker image:
+            </p>
+            <div className="bg-gray-50 border border-gray-200 p-4 space-y-2">
+              <code className="text-sm text-black block">
+                uva run alpine echo &quot;hello world&quot;
+              </code>
+            </div>
           </div>
         </div>
 
@@ -58,16 +60,19 @@ export default function JobsDocsPage() {
               use any docker image
             </h3>
           </div>
-          <p className="text-sm text-gray-600 ml-8 mb-3">
-            run python, node, or any container image from docker hub:
-          </p>
-          <div className="ml-8 bg-gray-50 border border-gray-200 p-4 space-y-2">
-            <code className="text-sm text-black block">
-              uva run python:3.11 python -c &quot;print(1+1)&quot;
-            </code>
-            <code className="text-sm text-gray-500 block">
-              uva run node:20 node -e &quot;console.log(&apos;hello&apos;)&quot;
-            </code>
+          <div className="pl-9">
+            <p className="text-sm text-gray-600 mb-3">
+              run python, node, or any container image from docker hub:
+            </p>
+            <div className="bg-gray-50 border border-gray-200 p-4 space-y-2">
+              <code className="text-sm text-black block">
+                uva run python:3.11 python -c &quot;print(1+1)&quot;
+              </code>
+              <code className="text-sm text-gray-500 block">
+                uva run node:20 node -e
+                &quot;console.log(&apos;hello&apos;)&quot;
+              </code>
+            </div>
           </div>
         </div>
       </section>
