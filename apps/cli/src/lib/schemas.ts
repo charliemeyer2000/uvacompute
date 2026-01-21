@@ -318,3 +318,37 @@ export const JobInfoSchema = z.object({
 export const JobListResponseSchema = z.object({
   jobs: z.array(JobInfoSchema),
 });
+
+// Node schemas
+
+export const NodeStatusEnum = z.enum(["online", "offline", "draining"]);
+export type NodeStatus = z.infer<typeof NodeStatusEnum>;
+
+export const NODE_STATUS_GROUPS = {
+  PAUSABLE: ["online", "offline"] as const,
+  RESUMABLE: ["draining"] as const,
+  ALL: ["online", "offline", "draining"] as const,
+} as const;
+
+export function isNodeStatusInGroup(
+  status: NodeStatus,
+  group: readonly string[],
+): boolean {
+  return group.includes(status);
+}
+
+export const NodeInfoSchema = z.object({
+  _id: z.string(),
+  nodeId: z.string(),
+  name: z.string().optional(),
+  status: NodeStatusEnum,
+  cpus: z.number().optional(),
+  ram: z.number().optional(),
+  gpus: z.number().optional(),
+  lastHeartbeat: z.number(),
+  registeredAt: z.number(),
+});
+
+export const NodeListResponseSchema = z.object({
+  nodes: z.array(NodeInfoSchema),
+});
