@@ -1,4 +1,5 @@
 import { Metadata } from "next";
+import Script from "next/script";
 import "./globals.css";
 import { ConvexClientProvider } from "../providers/convexClientProvider";
 import { Analytics } from "@vercel/analytics/next";
@@ -40,6 +41,21 @@ export default function RootLayout({
   const shouldInjectToolbar = !process.env.VERCEL;
   return (
     <html lang="en" className="overflow-y-scroll">
+      <head>
+        {process.env.NODE_ENV === "development" && (
+          <Script
+            src="//unpkg.com/react-grab/dist/index.global.js"
+            crossOrigin="anonymous"
+            strategy="beforeInteractive"
+          />
+        )}
+        {process.env.NODE_ENV === "development" && (
+          <Script
+            src="//unpkg.com/@react-grab/claude-code/dist/client.global.js"
+            strategy="lazyOnload"
+          />
+        )}
+      </head>
       <body className={`${ibmPlexMono.variable} font-mono`}>
         <ConvexClientProvider>{children}</ConvexClientProvider>
         <Analytics />

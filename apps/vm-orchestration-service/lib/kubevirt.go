@@ -16,6 +16,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 
+	templates "vm-orchestration-service/cloud-init-templates"
 	"vm-orchestration-service/structs"
 )
 
@@ -73,24 +74,24 @@ func NewKubeVirtAdapter(config KubeVirtConfig) (*KubeVirtAdapter, error) {
 func (k *KubeVirtAdapter) CreateVM(vmId string, cpus, ram, disk, gpus int, sshPublicKeys []string, statusCallback structs.StatusCallback, startupScript, cloudInitConfig string) error {
 	ctx := context.Background()
 
-	statusCallback(structs.VM_STATUS_INITIALIZING)
+	statusCallback(structs.VM_STATUS_BOOTING)
 
 	image := k.config.VMImageCPU
 	if gpus > 0 {
 		image = k.config.VMImageGPU
 	}
 
-	cloudInitUserData := generateCloudInitUserData(sshPublicKeys, startupScript, cloudInitConfig)
+	cloudInitUserData := generateCloudInitUserData(sshPublicKeys, startupScript, cloudInitConfig, gpus > 0)
 
 	vm := k.buildVMObject(vmId, cpus, ram, disk, gpus, image, cloudInitUserData)
 
-	statusCallback(structs.VM_STATUS_STARTING)
+	statusCallback(structs.VM_STATUS_BOOTING)
 	_, err := k.client.Resource(vmGVR).Namespace(k.namespace).Create(ctx, vm, metav1.CreateOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to create VM: %w", err)
 	}
 
-	statusCallback(structs.VM_STATUS_WAITING_FOR_AGENT)
+	statusCallback(structs.VM_STATUS_BOOTING)
 	err = k.waitForVMReady(ctx, vmId, statusCallback)
 	if err != nil {
 		_ = k.DestroyVM(vmId)
@@ -172,6 +173,18 @@ func (k *KubeVirtAdapter) buildVMObject(vmId string, cpus, ram, disk, gpus int, 
 				},
 			},
 		},
+		// Readiness probe: wait for cloud-init to complete by checking for marker file
+		// This ensures the VM's Ready condition is only true after provisioning finishes
+		"readinessProbe": map[string]interface{}{
+			"exec": map[string]interface{}{
+				"command": []interface{}{"cat", "/var/run/uvacompute-provisioned"},
+			},
+			"initialDelaySeconds": int64(30),  // Wait 30s before first check (VM needs to boot)
+			"periodSeconds":       int64(10),  // Check every 10 seconds
+			"timeoutSeconds":      int64(5),   // Timeout for each check
+			"failureThreshold":    int64(180), // Allow up to 30 minutes for provisioning (180 * 10s)
+			"successThreshold":    int64(1),   // One success is enough
+		},
 	}
 
 	// Add nodeSelector for GPU VMs to ensure they land on GPU nodes
@@ -213,6 +226,21 @@ func (k *KubeVirtAdapter) buildVMObject(vmId string, cpus, ram, disk, gpus int, 
 }
 
 func (k *KubeVirtAdapter) waitForVMReady(ctx context.Context, vmId string, statusCallback structs.StatusCallback) error {
+	// Phase 1: Wait for VM to boot and guest agent to connect (up to 5 minutes)
+	if err := k.waitForVMBooted(ctx, vmId, statusCallback); err != nil {
+		return err
+	}
+
+	// Phase 2: Wait for cloud-init to complete (readinessProbe passes, up to 30 minutes)
+	statusCallback(structs.VM_STATUS_PROVISIONING)
+	if err := k.waitForCloudInitComplete(ctx, vmId); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (k *KubeVirtAdapter) waitForVMBooted(ctx context.Context, vmId string, statusCallback structs.StatusCallback) error {
 	timeout := time.After(5 * time.Minute)
 	ticker := time.NewTicker(2 * time.Second)
 	defer ticker.Stop()
@@ -220,7 +248,7 @@ func (k *KubeVirtAdapter) waitForVMReady(ctx context.Context, vmId string, statu
 	for {
 		select {
 		case <-timeout:
-			return fmt.Errorf("timeout waiting for VM to be ready")
+			return fmt.Errorf("timeout waiting for VM to boot")
 		case <-ticker.C:
 			vmi, err := k.client.Resource(vmiGVR).Namespace(k.namespace).Get(ctx, vmId, metav1.GetOptions{})
 			if err != nil {
@@ -232,18 +260,72 @@ func (k *KubeVirtAdapter) waitForVMReady(ctx context.Context, vmId string, statu
 			switch phase {
 			case "Running":
 				if k.isGuestAgentReady(vmi) {
-					statusCallback(structs.VM_STATUS_CONFIGURING)
 					return nil
 				}
 			case "Failed":
 				return fmt.Errorf("VM failed to start")
 			case "Scheduling":
-				statusCallback(structs.VM_STATUS_INITIALIZING)
+				statusCallback(structs.VM_STATUS_BOOTING)
 			case "Scheduled":
-				statusCallback(structs.VM_STATUS_STARTING)
+				statusCallback(structs.VM_STATUS_BOOTING)
 			}
 		}
 	}
+}
+
+func (k *KubeVirtAdapter) waitForCloudInitComplete(ctx context.Context, vmId string) error {
+	// Allow up to 30 minutes for cloud-init (CUDA install can take 15+ minutes)
+	timeout := time.After(30 * time.Minute)
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
+
+	log.Printf("Waiting for cloud-init to complete on VM %s...", vmId)
+
+	for {
+		select {
+		case <-timeout:
+			return fmt.Errorf("timeout waiting for cloud-init to complete (30 minutes)")
+		case <-ticker.C:
+			vmi, err := k.client.Resource(vmiGVR).Namespace(k.namespace).Get(ctx, vmId, metav1.GetOptions{})
+			if err != nil {
+				continue
+			}
+
+			// Check if the VM is still running
+			phase, _, _ := unstructured.NestedString(vmi.Object, "status", "phase")
+			if phase == "Failed" {
+				return fmt.Errorf("VM failed during provisioning")
+			}
+
+			// Check the Ready condition (set by readinessProbe)
+			if k.isVMReady(vmi) {
+				log.Printf("Cloud-init complete on VM %s", vmId)
+				return nil
+			}
+		}
+	}
+}
+
+func (k *KubeVirtAdapter) isVMReady(vmi *unstructured.Unstructured) bool {
+	conditions, found, _ := unstructured.NestedSlice(vmi.Object, "status", "conditions")
+	if !found {
+		return false
+	}
+
+	for _, cond := range conditions {
+		condMap, ok := cond.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		condType, _ := condMap["type"].(string)
+		condStatus, _ := condMap["status"].(string)
+		// KubeVirt sets the "Ready" condition based on readinessProbe
+		if condType == "Ready" && condStatus == "True" {
+			return true
+		}
+	}
+
+	return false
 }
 
 func (k *KubeVirtAdapter) isGuestAgentReady(vmi *unstructured.Unstructured) bool {
@@ -500,14 +582,11 @@ func prettyPrint(v interface{}) string {
 	return string(b)
 }
 
-func generateCloudInitUserData(sshPublicKeys []string, startupScript, cloudInitConfig string) string {
+func generateCloudInitUserData(sshPublicKeys []string, startupScript, cloudInitConfig string, hasGPU bool) string {
 	sshConfig := generateSSHKeysConfig(sshPublicKeys)
 
-	if startupScript == "" && cloudInitConfig == "" {
-		return sshConfig
-	}
-
-	return generateMIMEMultipart(sshConfig, startupScript, cloudInitConfig)
+	// Always use MIME multipart to inject base templates
+	return generateMIMEMultipart(sshConfig, startupScript, cloudInitConfig, hasGPU)
 }
 
 func generateSSHKeysConfig(sshPublicKeys []string) string {
@@ -525,21 +604,49 @@ ssh_pwauth: false
 disable_root: false`, strings.Join(userLevelKeys, "\n"))
 }
 
-func generateMIMEMultipart(sshConfig, startupScript, cloudInitConfig string) string {
+func generateMIMEMultipart(sshConfig, startupScript, cloudInitConfig string, hasGPU bool) string {
 	boundary := "==CLOUDCONFIG_BOUNDARY=="
 	parts := []string{
 		"Content-Type: multipart/mixed; boundary=\"" + boundary + "\"",
 		"MIME-Version: 1.0",
 		"",
+		// Part 1: SSH configuration
 		"--" + boundary,
 		"Content-Type: text/cloud-config; charset=\"us-ascii\"",
 		"MIME-Version: 1.0",
 		"Content-Transfer-Encoding: 7bit",
-		"Content-Disposition: attachment; filename=\"base-config.cfg\"",
+		"Content-Disposition: attachment; filename=\"ssh-config.cfg\"",
 		"",
 		sshConfig,
 	}
 
+	// Part 2: Base template (always injected - includes python, node, uv, git, etc.)
+	parts = append(parts,
+		"--"+boundary,
+		"Content-Type: text/cloud-config; charset=\"us-ascii\"",
+		"MIME-Version: 1.0",
+		"Content-Transfer-Encoding: 7bit",
+		"Content-Disposition: attachment; filename=\"uvacompute-base.cfg\"",
+		"Merge-Type: list(append)+dict(no_replace,recurse_list)+str()",
+		"",
+		templates.Base,
+	)
+
+	// Part 3: CUDA template (injected for GPU VMs)
+	if hasGPU {
+		parts = append(parts,
+			"--"+boundary,
+			"Content-Type: text/cloud-config; charset=\"us-ascii\"",
+			"MIME-Version: 1.0",
+			"Content-Transfer-Encoding: 7bit",
+			"Content-Disposition: attachment; filename=\"uvacompute-cuda.cfg\"",
+			"Merge-Type: list(append)+dict(no_replace,recurse_list)+str()",
+			"",
+			templates.CUDA,
+		)
+	}
+
+	// Part 4: User's startup script (if provided)
 	if startupScript != "" {
 		wrappedScript := `#!/bin/bash
 export HOME=/root
@@ -561,6 +668,7 @@ cd /root
 		)
 	}
 
+	// Part 5: User's cloud-init config (if provided)
 	if cloudInitConfig != "" {
 		parts = append(parts,
 			"--"+boundary,
@@ -573,6 +681,24 @@ cd /root
 			cloudInitConfig,
 		)
 	}
+
+	// Part 6: Completion marker (always last - signals cloud-init finished)
+	// This creates a marker file that the readinessProbe checks for
+	completionMarker := `#cloud-config
+runcmd:
+  - touch /var/run/uvacompute-provisioned
+  - echo "UVACompute provisioning complete at $(date)" >> /var/log/uvacompute-init.log`
+
+	parts = append(parts,
+		"--"+boundary,
+		"Content-Type: text/cloud-config; charset=\"us-ascii\"",
+		"MIME-Version: 1.0",
+		"Content-Transfer-Encoding: 7bit",
+		"Content-Disposition: attachment; filename=\"completion-marker.cfg\"",
+		"Merge-Type: list(append)+dict(no_replace,recurse_list)+str()",
+		"",
+		completionMarker,
+	)
 
 	parts = append(parts, "--"+boundary+"--", "")
 

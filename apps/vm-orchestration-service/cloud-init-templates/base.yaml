@@ -1,0 +1,51 @@
+#cloud-config
+# UVACompute Base VM Configuration
+# This template is automatically injected into all VMs to provide common development tools.
+
+package_update: true
+
+packages:
+  # Essential utilities
+  - curl
+  - wget
+  - git
+  - vim
+  - htop
+  - jq
+  - unzip
+  - tar
+  - ca-certificates
+  - openssh-server
+  # Build essentials
+  - gcc
+  - g++
+  - make
+  # Python (system)
+  - python3
+  - python3-pip
+  - python3-venv
+
+runcmd:
+  # Log provisioning start
+  - echo "UVACompute VM provisioning started at $(date)" >> /var/log/uvacompute-init.log
+
+  # Install uv (fast Python package manager from Astral)
+  - curl -LsSf https://astral.sh/uv/install.sh | sh
+  - echo 'export PATH="$HOME/.local/bin:$PATH"' >> /root/.bashrc
+
+  # Install Node.js via nvm (Node Version Manager)
+  - |
+    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
+    export NVM_DIR="$HOME/.nvm"
+    [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+    nvm install --lts
+    nvm use --lts
+    nvm alias default lts/*
+
+  # Install ruff (fast Python linter) via uv
+  - /root/.local/bin/uv tool install ruff
+
+  # Log provisioning complete
+  - echo "UVACompute VM provisioning completed at $(date)" >> /var/log/uvacompute-init.log
+
+final_message: "UVACompute VM ready after $UPTIME seconds"

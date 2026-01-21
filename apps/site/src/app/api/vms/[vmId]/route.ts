@@ -82,7 +82,7 @@ export async function DELETE(
       try {
         await fetchMutation(api.vms.updateStatus, {
           vmId,
-          status: "deleted",
+          status: "stopped",
         });
       } catch (convexError: any) {
         console.error(
