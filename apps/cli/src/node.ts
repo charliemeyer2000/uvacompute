@@ -862,6 +862,7 @@ async function nodeUninstall(): Promise<void> {
     console.log(chalk.yellow("  • k3s server and all Kubernetes resources"));
     console.log(chalk.yellow("  • KubeVirt"));
   }
+  console.log(chalk.yellow("  • All container images"));
   console.log(chalk.yellow("  • NVIDIA container toolkit configuration"));
   console.log(chalk.yellow("  • GPU mode switching scripts"));
   console.log();
@@ -923,6 +924,27 @@ async function nodeUninstall(): Promise<void> {
     await runCommand("systemctl", ["daemon-reload"], { sudo: true }).catch(
       () => {},
     );
+
+    // Clean up container images before removing k3s (crictl needs containerd running)
+    spinner.text = "Cleaning up container images...";
+    try {
+      // Get list of all images
+      const imagesResult = await runCommand("crictl", ["images", "-q"], {
+        sudo: true,
+        silent: true,
+      });
+      if (imagesResult.exitCode === 0 && imagesResult.stdout.trim()) {
+        const imageIds = imagesResult.stdout.trim().split("\n").filter(Boolean);
+        for (const imageId of imageIds) {
+          await runCommand("crictl", ["rmi", imageId], {
+            sudo: true,
+            silent: true,
+          }).catch(() => {});
+        }
+      }
+    } catch {
+      // Image cleanup is best-effort, continue if it fails
+    }
 
     // Remove k3s (agent or server)
     spinner.text = "Removing k3s...";
