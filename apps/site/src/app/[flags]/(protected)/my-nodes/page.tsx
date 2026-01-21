@@ -1,19 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useQuery } from "convex/react";
+import { api } from "../../../../../convex/_generated/api";
 import { authClient } from "@/lib/auth-client";
-
-interface Node {
-  _id: string;
-  nodeId: string;
-  name?: string;
-  status: "online" | "offline" | "draining";
-  cpus?: number;
-  ram?: number;
-  gpus?: number;
-  lastHeartbeat: number;
-  registeredAt: number;
-}
 
 interface VM {
   _id: string;
@@ -38,38 +28,19 @@ interface Job {
   status: string;
 }
 
-interface NodeWithWorkloads extends Node {
-  workloads?: { vms: VM[]; jobs: Job[] };
-  loadingWorkloads?: boolean;
-}
-
 export default function MyNodesPage() {
   const { data: session, isPending } = authClient.useSession();
-  const [nodes, setNodes] = useState<NodeWithWorkloads[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [expandedNode, setExpandedNode] = useState<string | null>(null);
 
-  useEffect(() => {
-    async function fetchNodes() {
-      if (!session?.user) return;
+  const nodes = useQuery(
+    api.nodes.listByOwner,
+    session?.user?.id ? { ownerId: session.user.id } : "skip",
+  );
 
-      try {
-        const res = await fetch("/api/contributor/nodes");
-        if (!res.ok) throw new Error("Failed to fetch nodes");
-        const data = await res.json();
-        setNodes(data.nodes);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "An error occurred");
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    if (!isPending) {
-      fetchNodes();
-    }
-  }, [session, isPending]);
+  const workloads = useQuery(
+    api.nodes.getWorkloadsOnNode,
+    expandedNode ? { nodeId: expandedNode } : "skip",
+  );
 
   async function handlePause(nodeId: string) {
     try {
@@ -77,11 +48,6 @@ export default function MyNodesPage() {
         method: "POST",
       });
       if (!res.ok) throw new Error("Failed to pause node");
-      setNodes((prev) =>
-        prev.map((n) =>
-          n.nodeId === nodeId ? { ...n, status: "draining" } : n,
-        ),
-      );
     } catch (err) {
       alert(err instanceof Error ? err.message : "Failed to pause node");
     }
@@ -93,38 +59,8 @@ export default function MyNodesPage() {
         method: "POST",
       });
       if (!res.ok) throw new Error("Failed to resume node");
-      setNodes((prev) =>
-        prev.map((n) => (n.nodeId === nodeId ? { ...n, status: "online" } : n)),
-      );
     } catch (err) {
       alert(err instanceof Error ? err.message : "Failed to resume node");
-    }
-  }
-
-  async function loadWorkloads(nodeId: string) {
-    setNodes((prev) =>
-      prev.map((n) =>
-        n.nodeId === nodeId ? { ...n, loadingWorkloads: true } : n,
-      ),
-    );
-
-    try {
-      const res = await fetch(`/api/contributor/nodes/${nodeId}/workloads`);
-      if (!res.ok) throw new Error("Failed to fetch workloads");
-      const workloads = await res.json();
-      setNodes((prev) =>
-        prev.map((n) =>
-          n.nodeId === nodeId
-            ? { ...n, workloads, loadingWorkloads: false }
-            : n,
-        ),
-      );
-    } catch (err) {
-      setNodes((prev) =>
-        prev.map((n) =>
-          n.nodeId === nodeId ? { ...n, loadingWorkloads: false } : n,
-        ),
-      );
     }
   }
 
@@ -133,30 +69,15 @@ export default function MyNodesPage() {
       setExpandedNode(null);
     } else {
       setExpandedNode(nodeId);
-      const node = nodes.find((n) => n.nodeId === nodeId);
-      if (node && !node.workloads) {
-        loadWorkloads(nodeId);
-      }
     }
   }
 
-  if (isPending || loading) {
+  if (isPending || nodes === undefined) {
     return (
       <div className="p-6">
         <div className="animate-pulse space-y-4">
           <div className="h-8 bg-gray-200 rounded w-1/4"></div>
           <div className="h-48 bg-gray-200 rounded"></div>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="p-6">
-        <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
-          <h2 className="text-xl font-semibold text-red-800 mb-2">Error</h2>
-          <p className="text-red-600">{error}</p>
         </div>
       </div>
     );
@@ -214,7 +135,7 @@ export default function MyNodesPage() {
                     <span
                       className={`text-lg ${node.status === "online" ? "text-green-500" : node.status === "draining" ? "text-yellow-500" : "text-red-500"}`}
                     >
-                      {statusIcons[node.status]}
+                      {statusIcons[node.status as keyof typeof statusIcons]}
                     </span>
                     <div>
                       <h3 className="font-semibold">
@@ -228,7 +149,7 @@ export default function MyNodesPage() {
                   </div>
                   <div className="flex items-center gap-4">
                     <span
-                      className={`px-2 py-1 text-xs font-medium rounded-full ${statusColors[node.status]}`}
+                      className={`px-2 py-1 text-xs font-medium rounded-full ${statusColors[node.status as keyof typeof statusColors]}`}
                     >
                       {node.status}
                     </span>
@@ -270,57 +191,53 @@ export default function MyNodesPage() {
                     <h4 className="font-medium text-sm text-gray-700 mb-2">
                       Active Workloads
                     </h4>
-                    {node.loadingWorkloads ? (
+                    {workloads === undefined ? (
                       <p className="text-sm text-gray-500">Loading...</p>
-                    ) : node.workloads ? (
+                    ) : workloads.vms.length === 0 &&
+                      workloads.jobs.length === 0 ? (
+                      <p className="text-sm text-gray-500">
+                        No active workloads on this node
+                      </p>
+                    ) : (
                       <div className="space-y-2">
-                        {node.workloads.vms.length === 0 &&
-                        node.workloads.jobs.length === 0 ? (
-                          <p className="text-sm text-gray-500">
-                            No active workloads on this node
-                          </p>
-                        ) : (
-                          <>
-                            {node.workloads.vms.map((vm) => (
-                              <div
-                                key={vm._id}
-                                className="flex items-center justify-between bg-white p-2 rounded border text-sm"
-                              >
-                                <div className="flex items-center gap-2">
-                                  <span className="px-1.5 py-0.5 text-xs bg-blue-100 text-blue-800 rounded">
-                                    VM
-                                  </span>
-                                  <span className="font-mono">
-                                    {vm.name || vm.vmId.slice(0, 8)}
-                                  </span>
-                                </div>
-                                <span className="text-gray-500">
-                                  {vm.cpus}CPU, {vm.ram}GB, {vm.gpus}GPU
-                                </span>
-                              </div>
-                            ))}
-                            {node.workloads.jobs.map((job) => (
-                              <div
-                                key={job._id}
-                                className="flex items-center justify-between bg-white p-2 rounded border text-sm"
-                              >
-                                <div className="flex items-center gap-2">
-                                  <span className="px-1.5 py-0.5 text-xs bg-purple-100 text-purple-800 rounded">
-                                    Job
-                                  </span>
-                                  <span className="font-mono">
-                                    {job.name || job.jobId.slice(0, 8)}
-                                  </span>
-                                </div>
-                                <span className="text-gray-500">
-                                  {job.cpus}CPU, {job.ram}GB, {job.gpus}GPU
-                                </span>
-                              </div>
-                            ))}
-                          </>
-                        )}
+                        {workloads.vms.map((vm: VM) => (
+                          <div
+                            key={vm._id}
+                            className="flex items-center justify-between bg-white p-2 rounded border text-sm"
+                          >
+                            <div className="flex items-center gap-2">
+                              <span className="px-1.5 py-0.5 text-xs bg-blue-100 text-blue-800 rounded">
+                                VM
+                              </span>
+                              <span className="font-mono">
+                                {vm.name || vm.vmId.slice(0, 8)}
+                              </span>
+                            </div>
+                            <span className="text-gray-500">
+                              {vm.cpus}CPU, {vm.ram}GB, {vm.gpus}GPU
+                            </span>
+                          </div>
+                        ))}
+                        {workloads.jobs.map((job: Job) => (
+                          <div
+                            key={job._id}
+                            className="flex items-center justify-between bg-white p-2 rounded border text-sm"
+                          >
+                            <div className="flex items-center gap-2">
+                              <span className="px-1.5 py-0.5 text-xs bg-purple-100 text-purple-800 rounded">
+                                Job
+                              </span>
+                              <span className="font-mono">
+                                {job.name || job.jobId.slice(0, 8)}
+                              </span>
+                            </div>
+                            <span className="text-gray-500">
+                              {job.cpus}CPU, {job.ram}GB, {job.gpus}GPU
+                            </span>
+                          </div>
+                        ))}
                       </div>
-                    ) : null}
+                    )}
                   </div>
 
                   <div className="mt-4 pt-4 border-t text-xs text-gray-500">
