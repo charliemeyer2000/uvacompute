@@ -73,7 +73,7 @@ func CreateVMHandler(app *structs.App, w http.ResponseWriter, r *http.Request) {
 		status := structs.VM_CREATION_FAILED_INTERNAL
 		statusCode := http.StatusInternalServerError
 
-		if strings.Contains(err.Error(), "insufficient") {
+		if strings.Contains(err.Error(), "insufficient") || strings.Contains(err.Error(), "no GPU nodes available") {
 			status = structs.VM_CREATION_FAILED_RESOURCES_UNAVAILABLE
 			statusCode = http.StatusConflict
 		}
