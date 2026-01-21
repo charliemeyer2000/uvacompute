@@ -1,7 +1,6 @@
 package lib
 
 import (
-	"strings"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -164,13 +163,9 @@ func TestBuildVMObjectWithCloudInit(t *testing.T) {
 		config:    config,
 	}
 
-	cloudInit := `#cloud-config
-users:
-  - name: root
-    ssh_authorized_keys:
-      - ssh-rsa AAAAB3... user@example.com`
+	secretName := "cloudinit-test-vm"
 
-	vm := adapter.buildVMObject("test-vm", 2, 8, 64, 0, "test-image", cloudInit)
+	vm := adapter.buildVMObject("test-vm", 2, 8, 64, 0, "test-image", secretName)
 
 	spec, _, _ := unstructured.NestedMap(vm.Object, "spec")
 	template, _, _ := unstructured.NestedMap(spec, "template")
@@ -186,16 +181,20 @@ users:
 		if volMap["name"] == "cloudinit" {
 			cloudInitNoCloud, found, _ := unstructured.NestedMap(volMap, "cloudInitNoCloud")
 			if found {
-				userData, found, _ := unstructured.NestedString(cloudInitNoCloud, "userData")
-				if found && strings.Contains(userData, "#cloud-config") {
-					foundCloudInit = true
+				// Check for secretRef (references k8s secret with cloud-init)
+				secretRef, found, _ := unstructured.NestedMap(cloudInitNoCloud, "secretRef")
+				if found {
+					name, _, _ := unstructured.NestedString(secretRef, "name")
+					if name == secretName {
+						foundCloudInit = true
+					}
 				}
 			}
 		}
 	}
 
 	if !foundCloudInit {
-		t.Error("Expected cloudinit volume with userData")
+		t.Error("Expected cloudinit volume with secretRef")
 	}
 }
 
@@ -206,7 +205,7 @@ func TestBuildVMObjectGPUDevices(t *testing.T) {
 		config:    config,
 	}
 
-	vm := adapter.buildVMObject("test-vm", 4, 16, 64, 2, "gpu-image", "#cloud-config")
+	vm := adapter.buildVMObject("test-vm", 4, 16, 64, 2, "gpu-image", "cloudinit-test-vm")
 
 	spec, _, _ := unstructured.NestedMap(vm.Object, "spec")
 	template, _, _ := unstructured.NestedMap(spec, "template")
