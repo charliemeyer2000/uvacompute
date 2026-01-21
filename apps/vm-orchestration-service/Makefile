@@ -1,5 +1,6 @@
 .PHONY: run dev prod build build-linux fmt clean test test-integration lint check-types deps install uninstall \
-       install-k3s install-kubevirt install-kubevirt-stack install-gpu-operator convert-images deploy-hub
+       install-k3s install-kubevirt install-kubevirt-stack install-gpu-operator convert-images deploy-hub \
+       install-cdi install-local-path configure-local-path
 
 run:
 	ENV=development go run .
@@ -151,3 +152,49 @@ deploy-hub: build-linux
 	ssh root@***REDACTED_IP*** "systemctl daemon-reload && systemctl enable vm-orchestration && systemctl restart vm-orchestration"
 	@echo "✅ Deployed to hub"
 	@echo "Check status: ssh root@***REDACTED_IP*** 'systemctl status vm-orchestration'"
+
+# CDI and Storage Provisioner
+CDI_VERSION ?= v1.59.0
+
+install-cdi:
+	@echo "Installing CDI (Containerized Data Importer) ${CDI_VERSION}..."
+	@export KUBECONFIG=/etc/rancher/k3s/k3s.yaml && \
+		kubectl apply -f https://github.com/kubevirt/containerized-data-importer/releases/download/${CDI_VERSION}/cdi-operator.yaml && \
+		kubectl wait --for=condition=available --timeout=300s deployment/cdi-operator -n cdi && \
+		kubectl apply -f https://github.com/kubevirt/containerized-data-importer/releases/download/${CDI_VERSION}/cdi-cr.yaml && \
+		kubectl wait --for=condition=Available --timeout=600s cdi/cdi -n cdi
+	@echo "✅ CDI installed"
+
+install-local-path:
+	@echo "Installing local-path-provisioner..."
+	@export KUBECONFIG=/etc/rancher/k3s/k3s.yaml && \
+		kubectl apply -f https://raw.githubusercontent.com/rancher/local-path-provisioner/v0.0.26/deploy/local-path-storage.yaml && \
+		kubectl patch storageclass local-path -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"true"}}}'
+	@echo "✅ local-path-provisioner installed"
+
+configure-local-path:
+	@echo "Configuring local-path-provisioner for UVACompute storage..."
+	@export KUBECONFIG=/etc/rancher/k3s/k3s.yaml && \
+		kubectl patch configmap local-path-config -n local-path-storage --type=merge -p '{ \
+			"data": { \
+				"config.json": "{\"nodePathMap\":[{\"node\":\"DEFAULT_PATH_FOR_NON_LISTED_NODES\",\"paths\":[\"/var/lib/uvacompute/storage\"]}]}" \
+			} \
+		}'
+	@echo "✅ local-path-provisioner configured"
+
+install-storage-stack: install-cdi install-local-path configure-local-path
+	@echo "✅ Full storage stack installed (CDI + local-path-provisioner)"
+
+# Show storage status
+storage-status:
+	@export KUBECONFIG=/etc/rancher/k3s/k3s.yaml && \
+		echo "=== CDI Status ===" && \
+		kubectl get cdi -n cdi && \
+		echo "" && \
+		kubectl get pods -n cdi && \
+		echo "" && \
+		echo "=== Storage Classes ===" && \
+		kubectl get sc && \
+		echo "" && \
+		echo "=== local-path-provisioner ===" && \
+		kubectl get pods -n local-path-storage
