@@ -1,4 +1,4 @@
-import { mutation, query } from "./_generated/server";
+import { mutation, query, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
 import { VM_STATUSES } from "./schema";
 
@@ -153,6 +153,7 @@ export const listInactiveByUser = query({
       "expired",
       "not_found",
       "deleting",
+      "node_offline",
     ];
 
     return allVms.filter((vm) => inactiveStatuses.includes(vm.status));
@@ -177,5 +178,39 @@ export const listAll = query({
   args: {},
   handler: async (ctx) => {
     return await ctx.db.query("vms").order("desc").collect();
+  },
+});
+
+export const markNodeOffline = internalMutation({
+  args: {
+    nodeId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const vms = await ctx.db
+      .query("vms")
+      .withIndex("by_nodeId", (q) => q.eq("nodeId", args.nodeId))
+      .collect();
+
+    const activeStatuses = [
+      "creating",
+      "initializing",
+      "starting",
+      "waiting_for_agent",
+      "configuring",
+      "running",
+      "updating",
+    ];
+
+    let count = 0;
+    for (const vm of vms) {
+      if (activeStatuses.includes(vm.status)) {
+        await ctx.db.patch(vm._id, {
+          status: "node_offline",
+        });
+        count++;
+      }
+    }
+
+    return count;
   },
 });

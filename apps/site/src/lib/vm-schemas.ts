@@ -13,6 +13,7 @@ export const VMStatusEnum = z.enum([
   "deleted",
   "expired",
   "updating",
+  "node_offline",
 ]);
 
 export type VMStatus = z.infer<typeof VMStatusEnum>;
