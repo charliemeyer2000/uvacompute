@@ -79,6 +79,11 @@ func SyncFromConvex(vmManager *structs.VMManager, vmProvider structs.VMProvider,
 
 		vmManager.AddVMFromExternal(cvm.VMId, vmState)
 
+		// Start expiration timer for READY VMs
+		if status == structs.VM_STATUS_READY && cvm.ExpiresAt > 0 {
+			vmManager.StartExpirationTimer(cvm.VMId, cvm.ExpiresAt)
+		}
+
 		if string(status) != cvm.Status {
 			log.Printf("VM %s status mismatch (Convex: %s, actual: %s) - updating", cvm.VMId, cvm.Status, status)
 			if notifyErr := callbackClient.NotifyVMStatusUpdate(cvm.VMId, string(status), nodeId); notifyErr != nil {
