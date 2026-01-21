@@ -92,6 +92,7 @@ async function runJob(
     gpu?: boolean;
     cpu?: string;
     ram?: string;
+    disk?: string;
     env?: string[];
     name?: string;
     follow?: boolean;
