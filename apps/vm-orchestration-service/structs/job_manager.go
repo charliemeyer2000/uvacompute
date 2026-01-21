@@ -13,7 +13,7 @@ import (
 type JobStatusCallback func(status JobStatus, exitCode *int, errorMsg string, nodeId string)
 
 type JobProvider interface {
-	CreateJob(jobId string, image string, command []string, env map[string]string, cpus, ram, gpus int, statusCallback JobStatusCallback) error
+	CreateJob(jobId string, image string, command []string, env map[string]string, cpus, ram, gpus, disk int, statusCallback JobStatusCallback) error
 	DeleteJob(jobId string) error
 	GetJobStatus(jobId string) (JobStatus, error)
 	GetJobLogs(jobId string) (io.ReadCloser, error)
@@ -51,6 +51,7 @@ func (jm *JobManager) CreateJob(req JobCreationRequest) (string, error) {
 	cpus := IntOrDefault(req.Cpus, DefaultJobCpus)
 	ram := IntOrDefault(req.Ram, DefaultJobRam)
 	gpus := IntOrDefault(req.Gpus, DefaultJobGpus)
+	disk := IntOrDefault(req.Disk, DefaultJobDisk)
 	name := StringOrDefault(req.Name, "")
 
 	jm.jobMap[jobId] = JobState{
@@ -64,15 +65,16 @@ func (jm *JobManager) CreateJob(req JobCreationRequest) (string, error) {
 		Cpus:         cpus,
 		Ram:          ram,
 		Gpus:         gpus,
+		Disk:         disk,
 		Status:       JOB_STATUS_PENDING,
 	}
 
-	go jm.createJobAsync(jobId, req.Image, req.Command, req.Env, cpus, ram, gpus)
+	go jm.createJobAsync(jobId, req.Image, req.Command, req.Env, cpus, ram, gpus, disk)
 
 	return jobId, nil
 }
 
-func (jm *JobManager) createJobAsync(jobId string, image string, command []string, env map[string]string, cpus, ram, gpus int) {
+func (jm *JobManager) createJobAsync(jobId string, image string, command []string, env map[string]string, cpus, ram, gpus, disk int) {
 	defer func() {
 		if r := recover(); r != nil {
 			log.Printf("ERROR: Panic in createJobAsync for Job %s: %v", jobId, r)
@@ -84,9 +86,9 @@ func (jm *JobManager) createJobAsync(jobId string, image string, command []strin
 		jm.UpdateJobStatus(jobId, status, exitCode, errorMsg, nodeId)
 	}
 
-	log.Printf("Starting async job creation for %s (image: %s, cpus: %d, ram: %d, gpus: %d)", jobId, image, cpus, ram, gpus)
+	log.Printf("Starting async job creation for %s (image: %s, cpus: %d, ram: %d, gpus: %d, disk: %d)", jobId, image, cpus, ram, gpus, disk)
 
-	err := jm.jobProvider.CreateJob(jobId, image, command, env, cpus, ram, gpus, statusCallback)
+	err := jm.jobProvider.CreateJob(jobId, image, command, env, cpus, ram, gpus, disk, statusCallback)
 	if err != nil {
 		log.Printf("ERROR: Failed to create Job %s: %v", jobId, err)
 		jm.UpdateJobStatus(jobId, JOB_STATUS_FAILED, nil, err.Error(), "")

@@ -12,6 +12,7 @@ export interface Job {
   cpus: number;
   ram: number;
   gpus: number;
+  disk?: number;
   status: JobStatus;
   exitCode?: number;
   errorMessage?: string;

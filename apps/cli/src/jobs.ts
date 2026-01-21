@@ -144,6 +144,15 @@ async function runJob(
       requestBody.gpus = 1;
     }
 
+    if (options.disk) {
+      const disk = parseInt(options.disk, 10);
+      if (isNaN(disk)) {
+        spinner.fail("Invalid disk value. Must be a number.");
+        process.exit(1);
+      }
+      requestBody.disk = disk;
+    }
+
     if (options.env && options.env.length > 0) {
       const envMap: Record<string, string> = {};
       for (const e of options.env) {
@@ -376,7 +385,7 @@ async function listJobs(options: {
       console.log(theme.muted(`  Image: ${job.image}`));
       console.log(
         theme.muted(
-          `  Resources: ${job.cpus} vCPU | ${job.ram}GB RAM${job.gpus > 0 ? ` | ${job.gpus} GPU` : ""}`,
+          `  Resources: ${job.cpus} vCPU | ${job.ram}GB RAM${job.gpus > 0 ? ` | ${job.gpus} GPU` : ""}${job.disk ? ` | ${job.disk}GB scratch` : ""}`,
         ),
       );
       console.log(
@@ -660,6 +669,10 @@ export function registerJobCommands(program: Command) {
     .option("-c, --cpu <cpus>", "Number of CPUs (default: 1)")
     .option("-r, --ram <ram>", "RAM in GB (default: 4)")
     .option(
+      "-d, --disk <disk>",
+      "Scratch disk in GB (default: 0, mounted at /scratch)",
+    )
+    .option(
       "-e, --env <KEY=VALUE>",
       "Environment variable (can be used multiple times)",
       (value: string, previous: string[]) => [...previous, value],
@@ -675,6 +688,7 @@ export function registerJobCommands(program: Command) {
           gpu?: boolean;
           cpu?: string;
           ram?: string;
+          disk?: string;
           env?: string[];
           name?: string;
           follow?: boolean;

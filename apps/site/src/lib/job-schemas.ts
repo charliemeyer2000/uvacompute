@@ -39,6 +39,7 @@ export const JobCreationRequestSchema = z.object({
   cpus: z.number().int().min(1).max(16).optional().default(1),
   ram: z.number().int().min(1).max(64).optional().default(4),
   gpus: z.number().int().min(0).max(1).optional().default(0),
+  disk: z.number().int().min(0).max(100).optional().default(0),
 });
 
 export type JobCreationRequest = z.infer<typeof JobCreationRequestSchema>;

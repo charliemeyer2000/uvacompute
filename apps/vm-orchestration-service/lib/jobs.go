@@ -59,12 +59,12 @@ func NewJobAdapter(config JobAdapterConfig) (*JobAdapter, error) {
 	}, nil
 }
 
-func (j *JobAdapter) CreateJob(jobId string, image string, command []string, env map[string]string, cpus, ram, gpus int, statusCallback structs.JobStatusCallback) error {
+func (j *JobAdapter) CreateJob(jobId string, image string, command []string, env map[string]string, cpus, ram, gpus, disk int, statusCallback structs.JobStatusCallback) error {
 	ctx := context.Background()
 
 	statusCallback(structs.JOB_STATUS_PENDING, nil, "", "")
 
-	job := j.buildJobObject(jobId, image, command, env, cpus, ram, gpus)
+	job := j.buildJobObject(jobId, image, command, env, cpus, ram, gpus, disk)
 
 	statusCallback(structs.JOB_STATUS_SCHEDULED, nil, "", "")
 	_, err := j.client.BatchV1().Jobs(j.namespace).Create(ctx, job, metav1.CreateOptions{})
@@ -77,7 +77,7 @@ func (j *JobAdapter) CreateJob(jobId string, image string, command []string, env
 	return nil
 }
 
-func (j *JobAdapter) buildJobObject(jobId string, image string, command []string, env map[string]string, cpus, ram, gpus int) *batchv1.Job {
+func (j *JobAdapter) buildJobObject(jobId string, image string, command []string, env map[string]string, cpus, ram, gpus, disk int) *batchv1.Job {
 	var backoffLimit int32 = 0
 	var ttlSeconds int32 = 3600
 
@@ -115,9 +115,34 @@ func (j *JobAdapter) buildJobObject(jobId string, image string, command []string
 		container.Command = command
 	}
 
+	// Add scratch volume mount if disk > 0
+	if disk > 0 {
+		container.VolumeMounts = []corev1.VolumeMount{
+			{
+				Name:      "scratch",
+				MountPath: "/scratch",
+			},
+		}
+	}
+
 	podSpec := corev1.PodSpec{
 		RestartPolicy: corev1.RestartPolicyNever,
 		Containers:    []corev1.Container{container},
+	}
+
+	// Add scratch volume if disk > 0
+	if disk > 0 {
+		diskQuantity := resource.MustParse(fmt.Sprintf("%dGi", disk))
+		podSpec.Volumes = []corev1.Volume{
+			{
+				Name: "scratch",
+				VolumeSource: corev1.VolumeSource{
+					EmptyDir: &corev1.EmptyDirVolumeSource{
+						SizeLimit: &diskQuantity,
+					},
+				},
+			},
+		}
 	}
 
 	// Add nodeSelector and RuntimeClass for GPU jobs
