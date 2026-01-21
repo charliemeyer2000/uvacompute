@@ -228,6 +228,45 @@ export const getWorkloadsOnNode = query({
   },
 });
 
+export const getWorkloadCountsForNodes = query({
+  args: {
+    nodeIds: v.array(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const results: Record<string, { vmCount: number; jobCount: number }> = {};
+
+    for (const nodeId of args.nodeIds) {
+      const vms = await ctx.db
+        .query("vms")
+        .withIndex("by_nodeId", (q) => q.eq("nodeId", nodeId))
+        .collect();
+
+      const jobs = await ctx.db
+        .query("jobs")
+        .withIndex("by_nodeId", (q) => q.eq("nodeId", nodeId))
+        .collect();
+
+      const vmCount = vms.filter(
+        (vm) =>
+          vm.status !== "stopped" &&
+          vm.status !== "failed" &&
+          vm.status !== "offline",
+      ).length;
+
+      const jobCount = jobs.filter(
+        (job) =>
+          job.status !== "completed" &&
+          job.status !== "failed" &&
+          job.status !== "cancelled",
+      ).length;
+
+      results[nodeId] = { vmCount, jobCount };
+    }
+
+    return results;
+  },
+});
+
 export const verifyOwnership = query({
   args: {
     nodeId: v.string(),

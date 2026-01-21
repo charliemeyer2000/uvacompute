@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useQuery } from "convex/react";
 import { api } from "../../../../../../convex/_generated/api";
 import { authClient } from "@/lib/auth-client";
@@ -26,8 +27,7 @@ import {
   formatJobStatus,
   formatDuration,
 } from "@/lib/job-utils";
-import { MoreVertical, FileText, Archive } from "lucide-react";
-import JobLogViewer from "./job-log-viewer";
+import { MoreVertical, ExternalLink, Archive } from "lucide-react";
 
 function getStatusBorderColor(status: string): string {
   switch (status) {
@@ -54,139 +54,126 @@ function getStatusDotColor(status: string): string {
 }
 
 function JobCard({ job }: { job: Job }) {
-  const [showLogViewer, setShowLogViewer] = useState(false);
-
   return (
-    <>
-      <div
-        className={`bg-white border border-gray-200 border-l-4 ${getStatusBorderColor(job.status)} p-5 hover:border-gray-300 transition-colors`}
-      >
-        <div className="flex justify-between items-start mb-3">
-          <div className="flex-1 min-w-0">
-            <h3 className="text-sm font-semibold text-black truncate">
-              {job.name || "unnamed job"}
-            </h3>
-            <p className="text-xs text-gray-400 font-mono truncate mt-0.5">
-              {job.jobId}
-            </p>
-          </div>
-          <div className="flex items-center gap-2 flex-shrink-0 ml-3">
-            <div className="flex items-center gap-1.5">
-              <span
-                className={`w-2 h-2 rounded-full ${getStatusDotColor(job.status)}`}
-              />
-              <span className="text-xs text-gray-600">
-                {formatJobStatus(job.status)}
-              </span>
-            </div>
-            <DropdownMenu modal={false}>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  className="h-6 w-6 cursor-pointer"
-                >
-                  <MoreVertical className="h-4 w-4" />
-                  <span className="sr-only">open menu</span>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem
-                  onClick={() => setShowLogViewer(true)}
-                  className="cursor-pointer"
-                >
-                  <FileText className="h-4 w-4 mr-2" />
-                  view logs
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        </div>
-
-        <div className="mb-3">
-          <p className="text-gray-400 uppercase tracking-wide text-[10px]">
-            image
-          </p>
-          <p className="font-medium text-black text-xs font-mono truncate">
-            {job.image}
+    <Link
+      href={`/jobs/${job.jobId}`}
+      className={`block bg-white border border-gray-200 border-l-4 ${getStatusBorderColor(job.status)} p-5 hover:border-gray-300 hover:shadow-sm transition-all group`}
+    >
+      <div className="flex justify-between items-start mb-3">
+        <div className="flex-1 min-w-0">
+          <h3 className="text-sm font-semibold text-black truncate group-hover:text-orange-accent transition-colors">
+            {job.name || "unnamed job"}
+          </h3>
+          <p className="text-xs text-gray-400 font-mono truncate mt-0.5">
+            {job.jobId}
           </p>
         </div>
-
-        <div className="grid grid-cols-3 gap-3 mb-4 text-xs">
-          <div>
-            <p className="text-gray-400 uppercase tracking-wide text-[10px]">
-              cpu
-            </p>
-            <p className="font-medium text-black">{job.cpus} vCPU</p>
+        <div className="flex items-center gap-2 flex-shrink-0 ml-3">
+          <div className="flex items-center gap-1.5">
+            <span
+              className={`w-2 h-2 rounded-full ${getStatusDotColor(job.status)}`}
+            />
+            <span className="text-xs text-gray-600">
+              {formatJobStatus(job.status)}
+            </span>
           </div>
-          <div>
-            <p className="text-gray-400 uppercase tracking-wide text-[10px]">
-              ram
-            </p>
-            <p className="font-medium text-black">{job.ram} GB</p>
-          </div>
-          <div>
-            <p className="text-gray-400 uppercase tracking-wide text-[10px]">
-              gpu
-            </p>
-            <p className="font-medium text-black">
-              {job.gpus > 0 ? `${job.gpus}x` : "—"}
-            </p>
-          </div>
-        </div>
-
-        <div className="border-t border-gray-100 pt-3 space-y-1.5 text-xs">
-          <div className="flex justify-between">
-            <span className="text-gray-400">created</span>
-            <span className="text-gray-600">{formatDate(job.createdAt)}</span>
-          </div>
-          {job.completedAt && (
-            <div className="flex justify-between">
-              <span className="text-gray-400">completed</span>
-              <span className="text-gray-600">
-                {formatDate(job.completedAt)}
-              </span>
-            </div>
-          )}
-          {job.startedAt && job.completedAt && (
-            <div className="flex justify-between">
-              <span className="text-gray-400">duration</span>
-              <span className="text-black font-medium">
-                {formatDuration(job.startedAt, job.completedAt)}
-              </span>
-            </div>
-          )}
-          {job.exitCode !== undefined && (
-            <div className="flex justify-between">
-              <span className="text-gray-400">exit code</span>
-              <span
-                className={`font-medium ${job.exitCode === 0 ? "text-green-600" : "text-red-600"}`}
+          <DropdownMenu modal={false}>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                className="h-6 w-6 cursor-pointer"
+                onClick={(e) => e.preventDefault()}
               >
-                {job.exitCode}
-              </span>
-            </div>
-          )}
-          {job.errorMessage && (
-            <div className="mt-2 pt-2 border-t border-gray-100">
-              <p className="text-gray-400 text-[10px] uppercase tracking-wide mb-1">
-                error
-              </p>
-              <p className="text-red-600 text-xs break-words line-clamp-2">
-                {job.errorMessage}
-              </p>
-            </div>
-          )}
+                <MoreVertical className="h-4 w-4" />
+                <span className="sr-only">open menu</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem asChild className="cursor-pointer">
+                <Link href={`/jobs/${job.jobId}`}>
+                  <ExternalLink className="h-4 w-4 mr-2" />
+                  view details
+                </Link>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
-      <JobLogViewer
-        jobId={job.jobId}
-        jobName={job.name}
-        jobStatus={job.status}
-        open={showLogViewer}
-        onOpenChange={setShowLogViewer}
-      />
-    </>
+      <div className="mb-3">
+        <p className="text-gray-400 uppercase tracking-wide text-[10px]">
+          image
+        </p>
+        <p className="font-medium text-black text-xs font-mono truncate">
+          {job.image}
+        </p>
+      </div>
+
+      <div className="grid grid-cols-3 gap-3 mb-4 text-xs">
+        <div>
+          <p className="text-gray-400 uppercase tracking-wide text-[10px]">
+            cpu
+          </p>
+          <p className="font-medium text-black">{job.cpus} vCPU</p>
+        </div>
+        <div>
+          <p className="text-gray-400 uppercase tracking-wide text-[10px]">
+            ram
+          </p>
+          <p className="font-medium text-black">{job.ram} GB</p>
+        </div>
+        <div>
+          <p className="text-gray-400 uppercase tracking-wide text-[10px]">
+            gpu
+          </p>
+          <p className="font-medium text-black">
+            {job.gpus > 0 ? `${job.gpus}x` : "—"}
+          </p>
+        </div>
+      </div>
+
+      <div className="border-t border-gray-100 pt-3 space-y-1.5 text-xs">
+        <div className="flex justify-between">
+          <span className="text-gray-400">created</span>
+          <span className="text-gray-600">{formatDate(job.createdAt)}</span>
+        </div>
+        {job.completedAt && (
+          <div className="flex justify-between">
+            <span className="text-gray-400">completed</span>
+            <span className="text-gray-600">{formatDate(job.completedAt)}</span>
+          </div>
+        )}
+        {job.startedAt && job.completedAt && (
+          <div className="flex justify-between">
+            <span className="text-gray-400">duration</span>
+            <span className="text-black font-medium">
+              {formatDuration(job.startedAt, job.completedAt)}
+            </span>
+          </div>
+        )}
+        {job.exitCode !== undefined && (
+          <div className="flex justify-between">
+            <span className="text-gray-400">exit code</span>
+            <span
+              className={`font-medium ${job.exitCode === 0 ? "text-green-600" : "text-red-600"}`}
+            >
+              {job.exitCode}
+            </span>
+          </div>
+        )}
+        {job.errorMessage && (
+          <div className="mt-2 pt-2 border-t border-gray-100">
+            <p className="text-gray-400 text-[10px] uppercase tracking-wide mb-1">
+              error
+            </p>
+            <p className="text-red-600 text-xs break-words line-clamp-2">
+              {job.errorMessage}
+            </p>
+          </div>
+        )}
+      </div>
+    </Link>
   );
 }
 
