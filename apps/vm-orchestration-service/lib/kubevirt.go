@@ -235,11 +235,11 @@ func (k *KubeVirtAdapter) buildVMObject(vmId string, cpus, ram, disk, gpus int, 
 			"tcpSocket": map[string]interface{}{
 				"port": int64(22),
 			},
-			"initialDelaySeconds": int64(30),  // Wait 30s before first check (VM needs to boot)
-			"periodSeconds":       int64(10),  // Check every 10 seconds
-			"timeoutSeconds":      int64(5),   // Timeout for each check
-			"failureThreshold":    int64(30),  // Allow up to 5 minutes for boot (30 * 10s)
-			"successThreshold":    int64(1),   // One success is enough
+			"initialDelaySeconds": int64(30), // Wait 30s before first check (VM needs to boot)
+			"periodSeconds":       int64(10), // Check every 10 seconds
+			"timeoutSeconds":      int64(5),  // Timeout for each check
+			"failureThreshold":    int64(30), // Allow up to 5 minutes for boot (30 * 10s)
+			"successThreshold":    int64(1),  // One success is enough
 		},
 	}
 
