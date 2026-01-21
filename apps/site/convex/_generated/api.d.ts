@@ -22,7 +22,6 @@ import type * as jobs from "../jobs.js";
 import type * as logs from "../logs.js";
 import type * as nodeTokens from "../nodeTokens.js";
 import type * as nodes from "../nodes.js";
-import type * as seed from "../seed.js";
 import type * as sshKeys from "../sshKeys.js";
 import type * as vms from "../vms.js";
 
@@ -55,7 +54,6 @@ declare const fullApi: ApiFromModules<{
   logs: typeof logs;
   nodeTokens: typeof nodeTokens;
   nodes: typeof nodes;
-  seed: typeof seed;
   sshKeys: typeof sshKeys;
   vms: typeof vms;
 }>;
