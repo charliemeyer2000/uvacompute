@@ -1,4 +1,4 @@
-import { execFileSync, execSync } from "child_process";
+import { execFileSync } from "child_process";
 import { createHash } from "crypto";
 import {
   chmodSync,
@@ -55,16 +55,24 @@ export function generateSSHKey(passphrase: string): string {
   }
 
   if (existsSync(UVACOMPUTE_KEY_PATH)) {
-    const publicKey = execSync(`ssh-keygen -y -f "${UVACOMPUTE_KEY_PATH}"`, {
-      stdio: "pipe",
-    })
-      .toString()
-      .trim();
-    if (!publicKey) {
-      throw new Error("Failed to derive public key");
+    try {
+      const publicKey = execFileSync(
+        "ssh-keygen",
+        ["-y", "-f", UVACOMPUTE_KEY_PATH],
+        { stdio: ["inherit", "pipe", "inherit"] },
+      )
+        .toString()
+        .trim();
+      if (!publicKey) {
+        throw new Error("Failed to derive public key");
+      }
+      writeFileSync(publicKeyPath, `${publicKey}\n`, { mode: 0o644 });
+      return publicKeyPath;
+    } catch {
+      throw new Error(
+        "Failed to derive public key. If the key is passphrase-protected, run ssh-keygen -y -f ~/.ssh/id_ed25519_uvacompute to recreate the .pub file.",
+      );
     }
-    writeFileSync(publicKeyPath, `${publicKey}\n`, { mode: 0o644 });
-    return publicKeyPath;
   }
 
   const sshDir = join(homedir(), ".ssh");
