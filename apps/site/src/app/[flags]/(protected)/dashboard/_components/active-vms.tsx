@@ -88,20 +88,14 @@ function VMCard({ vm, isActive }: { vm: VM; isActive: boolean }) {
     if (sshCopied) return;
 
     try {
-      const response = await fetch(`/api/vms/${vm.vmId}/connection`);
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "failed to fetch connection info");
-      }
-
-      const connectionInfo = await response.json();
-      const sshCommand = `ssh -p ${connectionInfo.sshPort} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${connectionInfo.user}@${vm.vmId}@${connectionInfo.sshHost}`;
+      // Use the CLI command which handles all the SSH proxy complexity
+      const sshCommand = `uva vm ssh ${vm.name || vm.vmId}`;
 
       await navigator.clipboard.writeText(sshCommand);
       setSSHCopied(true);
 
       toast.success("ssh command copied", {
-        description: "paste it into your terminal or VSCode live share!",
+        description: "paste it into your terminal to connect!",
       });
 
       setTimeout(() => setSSHCopied(false), 2000);

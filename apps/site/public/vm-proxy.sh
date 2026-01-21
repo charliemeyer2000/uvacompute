@@ -1,8 +1,14 @@
 #!/bin/bash
-# VM Proxy - validates token and proxies SSH to VM
+# VM Proxy - validates token and proxies SSH to VM via worker node tunnel
+#
+# This script runs on the hub when users SSH to their VMs. It:
+# 1. Validates the SSH token
+# 2. Looks up which node the VM is running on
+# 3. Gets the tunnel port from the node's annotation
+# 4. Proxies the SSH connection through the tunnel to the VM
+#
 set -euo pipefail
 
-# Source environment
 [ -f /etc/environment ] && . /etc/environment
 
 # SSH calls shell as: /path/to/shell -c "command"
@@ -24,7 +30,6 @@ case $MOD in
 esac
 
 DECODED=$(echo "$TOKEN_B64" | base64 -d 2>/dev/null) || { echo "Invalid token" >&2; exit 1; }
-
 IFS=':' read -r USER_ID VM_ID EXPIRES SIG <<< "$DECODED"
 [[ -z "$VM_ID" || -z "$EXPIRES" || -z "$SIG" ]] && { echo "Invalid token format" >&2; exit 1; }
 
@@ -40,4 +45,21 @@ NOW=$(date +%s)
 # Validate VM ID format
 [[ ! "$VM_ID" =~ ^[a-f0-9-]{36}$ ]] && { echo "Invalid VM ID" >&2; exit 1; }
 
-exec virtctl port-forward --stdio=true --namespace=uvacompute "vmi/$VM_ID" 22
+# Use vmproxy user's kubeconfig
+export KUBECONFIG="${HOME}/.kube/config"
+
+# Get the node name where the VM is running
+NODE_NAME=$(kubectl get vmi "$VM_ID" -n uvacompute -o jsonpath='{.status.nodeName}' 2>/dev/null) || { echo "VM not found" >&2; exit 1; }
+
+# Get VM's pod IP - the worker can reach it directly since they're on the same node
+VM_IP=$(kubectl get vmi "$VM_ID" -n uvacompute -o jsonpath='{.status.interfaces[0].ipAddress}' 2>/dev/null) || { echo "VM IP not found" >&2; exit 1; }
+
+# Get tunnel port from node annotation
+TUNNEL_PORT=$(kubectl get node "$NODE_NAME" -o jsonpath='{.metadata.annotations.uvacompute\.io/tunnel-port}' 2>/dev/null)
+[[ -z "$TUNNEL_PORT" ]] && { echo "No tunnel port configured for node: $NODE_NAME" >&2; exit 1; }
+
+# Use SSH -W to proxy directly to the VM's SSH port via the worker
+# The worker can reach the VM IP directly since they're on the same node's pod network
+exec ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR \
+    -p "$TUNNEL_PORT" root@localhost \
+    -W "${VM_IP}:22"
