@@ -31,8 +31,22 @@ export default function AdminPage() {
   const nodes = useQuery(api.nodes.listAll, isAdmin ? {} : "skip");
   const allVMs = useQuery(api.vms.listAll, isAdmin ? {} : "skip");
   const allJobs = useQuery(api.jobs.listAll, isAdmin ? {} : "skip");
+  const earlyAccessRequests = useQuery(
+    api.earlyAccess.listEarlyAccessRequests,
+    isAdmin ? {} : "skip",
+  );
+  const pendingTokens = useQuery(
+    api.earlyAccess.listPendingTokens,
+    isAdmin ? {} : "skip",
+  );
 
   const forceCleanup = useMutation(api.nodes.forceCleanup);
+  const grantAccess = useMutation(api.earlyAccess.grantAccess);
+  const revokeAccess = useMutation(api.earlyAccess.revokeAccess);
+  const approveTokenByEmail = useMutation(
+    api.earlyAccessTokens.approveTokenByEmail,
+  );
+  const denyTokenByEmail = useMutation(api.earlyAccessTokens.denyTokenByEmail);
 
   const offlineNodes = useMemo(() => {
     if (!nodes) return [];
@@ -153,6 +167,42 @@ export default function AdminPage() {
       );
     } catch (err) {
       alert(err instanceof Error ? err.message : "Failed to cleanup node");
+    }
+  }
+
+  async function handleGrantAccess(userId: string, email: string) {
+    try {
+      await grantAccess({ userId });
+      alert(`Access granted to ${email}`);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to grant access");
+    }
+  }
+
+  async function handleRevokeAccess(userId: string, email: string) {
+    try {
+      await revokeAccess({ userId });
+      alert(`Access revoked from ${email}`);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to revoke access");
+    }
+  }
+
+  async function handleApproveToken(email: string) {
+    try {
+      await approveTokenByEmail({ email });
+      alert(`Token approved for ${email}`);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to approve token");
+    }
+  }
+
+  async function handleDenyToken(email: string) {
+    try {
+      await denyTokenByEmail({ email });
+      alert(`Token denied for ${email}`);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to deny token");
     }
   }
 
@@ -450,6 +500,171 @@ export default function AdminPage() {
               )}
             </tbody>
           </table>
+        </div>
+      </div>
+
+      {/* Early Access Management */}
+      <div className="bg-white border rounded-lg">
+        <div className="p-4 border-b">
+          <h2 className="text-lg font-semibold">Early Access Management</h2>
+          <p className="text-sm text-gray-500 mt-1">
+            Manage user access to the platform
+          </p>
+        </div>
+
+        {/* Pending Requests */}
+        <div className="p-4 border-b">
+          <h3 className="text-base font-medium mb-2">
+            Pending Requests (not signed up)
+          </h3>
+          <p className="text-xs text-gray-500 mb-4">
+            Users who requested access but haven't created an account yet
+          </p>
+          {pendingTokens === undefined ? (
+            <div className="text-center py-4">
+              <p className="text-sm text-gray-500">Loading...</p>
+            </div>
+          ) : pendingTokens.length === 0 ? (
+            <div className="text-center py-4 border border-gray-200 rounded">
+              <p className="text-sm text-gray-500">No pending requests</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {pendingTokens.map((token) => (
+                <div
+                  key={token._id}
+                  className="border border-gray-200 p-3 rounded flex items-start justify-between"
+                >
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-medium">{token.email}</p>
+                      {token.approved ? (
+                        <span className="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded">
+                          pre-approved
+                        </span>
+                      ) : (
+                        <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded">
+                          awaiting decision
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">{token.reason}</p>
+                    <p className="text-xs text-gray-400 mt-1">
+                      requested {new Date(token.createdAt).toLocaleDateString()}
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    {token.approved ? (
+                      <button
+                        onClick={() => handleDenyToken(token.email)}
+                        className="px-3 py-1 text-sm text-red-600 border border-red-200 rounded hover:bg-red-50"
+                      >
+                        Deny
+                      </button>
+                    ) : (
+                      <>
+                        <button
+                          onClick={() => handleApproveToken(token.email)}
+                          className="px-3 py-1 text-sm text-green-600 border border-green-200 rounded hover:bg-green-50"
+                        >
+                          Approve
+                        </button>
+                        <button
+                          onClick={() => handleDenyToken(token.email)}
+                          className="px-3 py-1 text-sm text-red-600 border border-red-200 rounded hover:bg-red-50"
+                        >
+                          Deny
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Registered Users */}
+        <div className="p-4">
+          <h3 className="text-base font-medium mb-2">Registered Users</h3>
+          <p className="text-xs text-gray-500 mb-4">
+            Users who have created accounts
+          </p>
+          {earlyAccessRequests === undefined ? (
+            <div className="text-center py-4">
+              <p className="text-sm text-gray-500">Loading...</p>
+            </div>
+          ) : earlyAccessRequests.length === 0 ? (
+            <div className="text-center py-4 border border-gray-200 rounded">
+              <p className="text-sm text-gray-500">No users found</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {earlyAccessRequests.map(
+                (user: {
+                  _id: string;
+                  name: string;
+                  email: string;
+                  hasEarlyAccess: boolean;
+                  emailVerified: boolean;
+                  createdAt: number;
+                  hasApprovedToken: boolean;
+                }) => (
+                  <div
+                    key={user._id}
+                    className="border border-gray-200 p-3 rounded flex items-center justify-between"
+                  >
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-medium">{user.name}</p>
+                        {user.hasEarlyAccess && (
+                          <span className="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded">
+                            approved
+                          </span>
+                        )}
+                        {!user.hasEarlyAccess && (
+                          <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded">
+                            pending
+                          </span>
+                        )}
+                        {!user.emailVerified && (
+                          <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded">
+                            unverified
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-gray-500">{user.email}</p>
+                      <p className="text-xs text-gray-400">
+                        signed up{" "}
+                        {new Date(user.createdAt).toLocaleDateString()}
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      {user.hasEarlyAccess ? (
+                        <button
+                          onClick={() =>
+                            handleRevokeAccess(user._id, user.email)
+                          }
+                          className="px-3 py-1 text-sm text-red-600 border border-red-200 rounded hover:bg-red-50"
+                        >
+                          Revoke
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() =>
+                            handleGrantAccess(user._id, user.email)
+                          }
+                          className="px-3 py-1 text-sm text-green-600 border border-green-200 rounded hover:bg-green-50"
+                        >
+                          Approve
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ),
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>
