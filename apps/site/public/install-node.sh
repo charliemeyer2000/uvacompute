@@ -16,6 +16,14 @@ SITE_URL="${SITE_URL:-https://uvacompute.com}"
 SERVICE_DIR="/opt/uvacompute"
 SSH_KEY_PATH="/root/.ssh/id_ed25519_uvacompute"
 REGISTRATION_TOKEN=""
+NONINTERACTIVE="${NONINTERACTIVE:-false}"
+
+# Storage configuration
+STORAGE_PATH="/var/lib/uvacompute/storage"
+STORAGE_SIZE_GB=0
+STORAGE_TYPE="unknown"
+STORAGE_DEVICE=""
+STORAGE_ALLOCATION_GB=0
 
 # These are set after registration
 K3S_URL=""
@@ -191,6 +199,8 @@ register_node() {
             \"ram\": ${ram},
             \"gpus\": ${gpus},
             \"gpuType\": \"${gpu_type}\",
+            \"storage\": ${STORAGE_ALLOCATION_GB},
+            \"storageType\": \"${STORAGE_TYPE}\",
             \"supportsVMs\": true,
             \"supportsJobs\": true
         }" 2>&1) || {
@@ -333,13 +343,15 @@ label_node() {
     log_info "  uvacompute.com/ram=${ram}"
     log_info "  uvacompute.com/gpu=${gpu_label}"
     log_info "  uvacompute.com/has-gpu=${has_gpu}"
+    log_info "  uvacompute.com/storage=${STORAGE_ALLOCATION_GB}"
+    log_info "  uvacompute.com/storage-type=${STORAGE_TYPE}"
     if [[ "${has_gpu}" == "true" ]]; then
         log_info "  uvacompute.com/gpu-mode=${gpu_mode}"
     fi
 
     # We need to use the hub's kubectl, so we'll create a script that runs on the hub
     # via SSH tunnel. For now, we'll create a label script that can be run from the hub.
-    
+
     # Save label info for hub to apply
     cat > "${SERVICE_DIR}/node-labels.yaml" <<EOF
 nodeId: ${node_id}
@@ -349,22 +361,24 @@ labels:
   uvacompute.com/gpu: "${gpu_label}"
   uvacompute.com/has-gpu: "${has_gpu}"
   uvacompute.com/gpu-mode: "${gpu_mode}"
+  uvacompute.com/storage: "${STORAGE_ALLOCATION_GB}"
+  uvacompute.com/storage-type: "${STORAGE_TYPE}"
 EOF
 
     log_success "Node labels saved to ${SERVICE_DIR}/node-labels.yaml"
     log_info "Labels will be applied when the node joins the cluster"
-    
+
     # Try to apply labels via the hub (if we can reach it)
     # The hub's kubectl can label the node once it appears
     log_info "Waiting for node to appear in cluster..."
     local retries=60
     local labeled=false
-    
+
     while [[ $retries -gt 0 ]]; do
         # Try to SSH to hub and label the node
         if ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -i "${SSH_KEY_PATH}" \
             "root@${TUNNEL_HOST}" \
-            "kubectl get node ${node_id} &>/dev/null && kubectl label node ${node_id} uvacompute.com/cpus=${cpus} uvacompute.com/ram=${ram} uvacompute.com/gpu=${gpu_label} uvacompute.com/has-gpu=${has_gpu} uvacompute.com/gpu-mode=${gpu_mode} --overwrite" 2>/dev/null; then
+            "kubectl get node ${node_id} &>/dev/null && kubectl label node ${node_id} uvacompute.com/cpus=${cpus} uvacompute.com/ram=${ram} uvacompute.com/gpu=${gpu_label} uvacompute.com/has-gpu=${has_gpu} uvacompute.com/gpu-mode=${gpu_mode} uvacompute.com/storage=${STORAGE_ALLOCATION_GB} uvacompute.com/storage-type=${STORAGE_TYPE} --overwrite" 2>/dev/null; then
             labeled=true
             break
         fi
@@ -376,7 +390,7 @@ EOF
         log_success "Node labels applied successfully"
     else
         log_warn "Could not apply labels automatically. Run this on the hub:"
-        log_warn "  kubectl label node ${node_id} uvacompute.com/cpus=${cpus} uvacompute.com/ram=${ram} uvacompute.com/gpu=${gpu_label} uvacompute.com/has-gpu=${has_gpu} uvacompute.com/gpu-mode=${gpu_mode} --overwrite"
+        log_warn "  kubectl label node ${node_id} uvacompute.com/cpus=${cpus} uvacompute.com/ram=${ram} uvacompute.com/gpu=${gpu_label} uvacompute.com/has-gpu=${has_gpu} uvacompute.com/gpu-mode=${gpu_mode} uvacompute.com/storage=${STORAGE_ALLOCATION_GB} uvacompute.com/storage-type=${STORAGE_TYPE} --overwrite"
     fi
 }
 
@@ -413,6 +427,113 @@ detect_gpu() {
     if [[ -n "${GPU_AUDIO_PCI:-}" ]]; then
         log_info "  Audio PCI: ${GPU_AUDIO_PCI}"
     fi
+}
+
+# Storage detection and configuration
+detect_storage() {
+    log_step "Detecting storage devices"
+
+    # Find best storage device (prefer NVMe > SSD > HDD)
+    # Look for NVMe first
+    if lsblk -d -o NAME,TYPE,ROTA 2>/dev/null | grep -q "nvme.*disk.*0"; then
+        STORAGE_TYPE="nvme"
+        STORAGE_DEVICE=$(lsblk -d -o NAME,TYPE,ROTA | grep "nvme.*disk.*0" | awk '{print $1}' | head -1)
+    # Then SSD (ROTA=0 means no rotation = SSD)
+    elif lsblk -d -o NAME,TYPE,ROTA 2>/dev/null | grep -E "^sd[a-z]+\s+disk\s+0$" | head -1 >/dev/null 2>&1; then
+        STORAGE_TYPE="ssd"
+        STORAGE_DEVICE=$(lsblk -d -o NAME,TYPE,ROTA | grep -E "^sd[a-z]+\s+disk\s+0$" | awk '{print $1}' | head -1)
+    # Fall back to HDD
+    elif lsblk -d -o NAME,TYPE,ROTA 2>/dev/null | grep -E "^sd[a-z]+\s+disk\s+1$" | head -1 >/dev/null 2>&1; then
+        STORAGE_TYPE="hdd"
+        STORAGE_DEVICE=$(lsblk -d -o NAME,TYPE,ROTA | grep -E "^sd[a-z]+\s+disk\s+1$" | awk '{print $1}' | head -1)
+    fi
+
+    if [[ -n "${STORAGE_DEVICE}" ]]; then
+        # Get available space on the device's main partition
+        local mount_point
+        mount_point=$(lsblk -no MOUNTPOINT "/dev/${STORAGE_DEVICE}" 2>/dev/null | grep -v "^$" | head -1)
+        if [[ -z "${mount_point}" ]]; then
+            # Device might have partitions, check first partition
+            mount_point=$(lsblk -no MOUNTPOINT "/dev/${STORAGE_DEVICE}1" 2>/dev/null | head -1)
+        fi
+        if [[ -z "${mount_point}" ]]; then
+            mount_point="/"  # Fall back to root
+        fi
+
+        # Get available space in GB
+        local avail_gb
+        avail_gb=$(df -BG "${mount_point}" | awk 'NR==2 {gsub("G",""); print $4}')
+        STORAGE_SIZE_GB=${avail_gb:-0}
+
+        log_success "Detected storage: ${STORAGE_TYPE} (${STORAGE_DEVICE}) with ${STORAGE_SIZE_GB}GB available"
+    else
+        log_warn "No dedicated storage device detected, using root filesystem"
+        STORAGE_TYPE="root"
+        STORAGE_SIZE_GB=$(df -BG / | awk 'NR==2 {gsub("G",""); print $4}')
+        log_info "Root filesystem has ${STORAGE_SIZE_GB}GB available"
+    fi
+}
+
+prompt_storage_allocation() {
+    if [[ "${NONINTERACTIVE}" == "true" ]]; then
+        # Default to 50% of available space, minimum 50GB, max 500GB
+        local default_alloc=$((STORAGE_SIZE_GB / 2))
+        [[ ${default_alloc} -lt 50 ]] && default_alloc=50
+        [[ ${default_alloc} -gt 500 ]] && default_alloc=500
+        [[ ${default_alloc} -gt ${STORAGE_SIZE_GB} ]] && default_alloc=$((STORAGE_SIZE_GB - 10))
+        STORAGE_ALLOCATION_GB=${default_alloc}
+        log_info "Non-interactive mode: allocating ${STORAGE_ALLOCATION_GB}GB for VM storage"
+        return
+    fi
+
+    echo ""
+    echo "╔══════════════════════════════════════════════════════════════╗"
+    echo "║                   STORAGE ALLOCATION                        ║"
+    echo "╠══════════════════════════════════════════════════════════════╣"
+    echo "║ Storage type: ${STORAGE_TYPE}"
+    echo "║ Available: ${STORAGE_SIZE_GB}GB"
+    echo "║"
+    echo "║ How much storage to allocate for VM disks?"
+    echo "║ (Remaining space stays available for other uses)"
+    echo "╚══════════════════════════════════════════════════════════════╝"
+    echo ""
+
+    local default_alloc=$((STORAGE_SIZE_GB / 2))
+    [[ ${default_alloc} -lt 50 ]] && default_alloc=50
+    [[ ${default_alloc} -gt ${STORAGE_SIZE_GB} ]] && default_alloc=$((STORAGE_SIZE_GB - 10))
+
+    read -rp "Storage allocation in GB [${default_alloc}]: " input_storage
+    STORAGE_ALLOCATION_GB=${input_storage:-${default_alloc}}
+
+    # Validate
+    if [[ ${STORAGE_ALLOCATION_GB} -gt ${STORAGE_SIZE_GB} ]]; then
+        log_error "Cannot allocate more than available (${STORAGE_SIZE_GB}GB)"
+        exit 1
+    fi
+    if [[ ${STORAGE_ALLOCATION_GB} -lt 20 ]]; then
+        log_error "Minimum allocation is 20GB"
+        exit 1
+    fi
+
+    log_success "Will allocate ${STORAGE_ALLOCATION_GB}GB for VM storage"
+}
+
+setup_storage_directory() {
+    log_step "Setting up storage directory"
+
+    mkdir -p "${STORAGE_PATH}"
+    chmod 755 "${STORAGE_PATH}"
+
+    # Store storage config
+    cat > "${SERVICE_DIR}/storage-config.yaml" <<EOF
+storagePath: ${STORAGE_PATH}
+storageType: ${STORAGE_TYPE}
+storageDevice: ${STORAGE_DEVICE}
+allocationGB: ${STORAGE_ALLOCATION_GB}
+configuredAt: $(date -Iseconds)
+EOF
+
+    log_success "Storage configured: ${STORAGE_ALLOCATION_GB}GB at ${STORAGE_PATH}"
 }
 
 # Install NVIDIA container toolkit
@@ -936,6 +1057,15 @@ EOF
         echo "gpu_detected: false" >> "${config_dir}/install-state.yaml"
     fi
 
+    # Add storage info
+    cat >> "${config_dir}/install-state.yaml" <<EOF
+storage:
+  path: ${STORAGE_PATH}
+  type: ${STORAGE_TYPE}
+  device: ${STORAGE_DEVICE:-root}
+  allocation_gb: ${STORAGE_ALLOCATION_GB}
+EOF
+
     # Fix ownership
     if [[ -n "${SUDO_USER:-}" ]]; then
         chown -R "${SUDO_USER}:${SUDO_USER}" "${actual_home}/.uvacompute"
@@ -954,6 +1084,7 @@ print_summary() {
     echo -e "${BOLD}Installed components:${NC}"
     echo "  • k3s agent (joined hub cluster)"
     echo "  • SSH tunnel to hub"
+    echo "  • VM storage (${STORAGE_ALLOCATION_GB}GB at ${STORAGE_PATH})"
     if [[ "${GPU_DETECTED}" == "true" ]]; then
         echo "  • nvidia-container-toolkit"
         echo "  • GPU mode switching scripts"
@@ -963,6 +1094,7 @@ print_summary() {
     echo "  • Node ID: $(hostname)"
     echo "  • Hub URL: ${K3S_URL}"
     echo "  • Tunnel Port: ${TUNNEL_PORT}"
+    echo "  • Storage: ${STORAGE_ALLOCATION_GB}GB (${STORAGE_TYPE})"
     echo
     echo -e "${BOLD}Useful commands:${NC}"
     echo "  • Check tunnel: sudo systemctl status uvacompute-tunnel"
@@ -977,8 +1109,76 @@ print_summary() {
     echo
 }
 
+# Uninstall node
+uninstall_node() {
+    log_step "Uninstalling UVACompute node"
+
+    # Stop services
+    log_info "Stopping services..."
+    systemctl stop uvacompute-tunnel 2>/dev/null || true
+    systemctl disable uvacompute-tunnel 2>/dev/null || true
+
+    # Uninstall k3s agent
+    if [[ -f /usr/local/bin/k3s-agent-uninstall.sh ]]; then
+        log_info "Uninstalling k3s agent..."
+        /usr/local/bin/k3s-agent-uninstall.sh
+    fi
+
+    # Clean up storage
+    if [[ -f "${SERVICE_DIR}/storage-config.yaml" ]]; then
+        local storage_path
+        storage_path=$(grep "storagePath:" "${SERVICE_DIR}/storage-config.yaml" 2>/dev/null | awk '{print $2}')
+        if [[ -n "${storage_path}" && -d "${storage_path}" ]]; then
+            log_info "Cleaning up storage at ${storage_path}..."
+            rm -rf "${storage_path}"
+        fi
+    fi
+
+    # Remove GPU scripts
+    log_info "Removing GPU scripts..."
+    rm -f /usr/local/bin/gpu-mode-nvidia
+    rm -f /usr/local/bin/gpu-mode-vfio
+    rm -f /usr/local/bin/gpu-mode-status
+
+    # Remove virtctl
+    rm -f /usr/local/bin/virtctl
+
+    # Remove SSH tunnel service
+    rm -f /etc/systemd/system/uvacompute-tunnel.service
+    systemctl daemon-reload
+
+    # Remove config directories
+    log_info "Removing configuration directories..."
+    rm -rf "${SERVICE_DIR}"
+    rm -rf ~/.uvacompute/node/
+
+    # Remove SSH key (generated by this script)
+    rm -f /root/.ssh/id_ed25519_uvacompute
+    rm -f /root/.ssh/id_ed25519_uvacompute.pub
+
+    # Remove authorized key entry (vmproxy)
+    if [[ -f /root/.ssh/authorized_keys ]]; then
+        log_info "Removing vmproxy SSH key..."
+        sed -i '/vmproxy@/d' /root/.ssh/authorized_keys
+    fi
+
+    # Remove kubeconfig
+    rm -f /root/.kube/config
+
+    log_success "Node uninstalled successfully"
+    log_warn "Note: Node entry may still exist in cluster. Use admin cleanup if needed."
+    log_info "To re-register: curl -fsSL https://uvacompute.com/install-node.sh | sudo bash -s -- --token YOUR_TOKEN"
+}
+
 # Parse arguments
 parse_args() {
+    # Check for uninstall command first
+    if [[ "${1:-}" == "uninstall" ]]; then
+        check_root
+        uninstall_node
+        exit 0
+    fi
+
     while [[ $# -gt 0 ]]; do
         case $1 in
             --token)
@@ -989,15 +1189,35 @@ parse_args() {
                 REGISTRATION_TOKEN="${1#*=}"
                 shift
                 ;;
+            --noninteractive|-y)
+                NONINTERACTIVE=true
+                shift
+                ;;
+            --storage)
+                STORAGE_ALLOCATION_GB="$2"
+                shift 2
+                ;;
+            --storage=*)
+                STORAGE_ALLOCATION_GB="${1#*=}"
+                shift
+                ;;
             --help|-h)
-                echo "Usage: $0 [OPTIONS]"
+                echo "Usage: $0 [COMMAND] [OPTIONS]"
+                echo ""
+                echo "Commands:"
+                echo "  (none)           Install the node (default)"
+                echo "  uninstall        Remove uvacompute node installation"
                 echo ""
                 echo "Options:"
                 echo "  --token TOKEN    Registration token for platform enrollment (required)"
+                echo "  --noninteractive, -y  Non-interactive mode (use defaults)"
+                echo "  --storage GB     Storage allocation in GB (default: auto)"
                 echo "  --help, -h       Show this help message"
                 echo ""
-                echo "Example:"
+                echo "Examples:"
                 echo "  curl -fsSL https://uvacompute.com/install-node.sh | sudo bash -s -- --token abc123"
+                echo "  curl -fsSL https://uvacompute.com/install-node.sh | sudo bash -s -- --token abc123 --noninteractive"
+                echo "  curl -fsSL https://uvacompute.com/install-node.sh | sudo bash -s uninstall"
                 exit 0
                 ;;
             *)
@@ -1026,10 +1246,13 @@ main() {
     check_root
     detect_os
     check_prerequisites
+    detect_gpu
+    detect_storage
+    prompt_storage_allocation
+    setup_storage_directory
     generate_ssh_key
     register_node
     install_k3s_agent
-    detect_gpu
     install_nvidia_toolkit
     configure_nvidia_k3s
     generate_gpu_scripts
