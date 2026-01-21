@@ -5,11 +5,13 @@ import {
   getRecentChecks,
   getHistoricalData,
 } from "@/lib/redis";
+import { fetchClusterStatus } from "@/lib/cluster";
 import type {
   StatusData,
   DayAggregate,
   HistoricalData,
   StatusCheck,
+  ClusterStatus,
 } from "@/types";
 
 export async function getStatus(): Promise<StatusData> {
@@ -112,4 +114,8 @@ export async function getStatusHistory(
     aggregated: aggregated.sort((a, b) => a.date.localeCompare(b.date)),
     totalChecks: checks.length,
   };
+}
+
+export async function getClusterStatus(): Promise<ClusterStatus | null> {
+  return await fetchClusterStatus();
 }
