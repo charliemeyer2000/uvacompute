@@ -223,10 +223,35 @@ func (j *JobAdapter) checkJobStatus(ctx context.Context, jobId string) (structs.
 		for _, containerStatus := range pod.Status.ContainerStatuses {
 			if containerStatus.State.Waiting != nil {
 				reason := containerStatus.State.Waiting.Reason
-				if reason == "ImagePullBackOff" || reason == "ErrImagePull" || reason == "Pulling" {
+				message := containerStatus.State.Waiting.Message
+
+				// Error states that indicate permanent failures
+				switch reason {
+				case "CrashLoopBackOff":
+					exitCode := 1
+					return structs.JOB_STATUS_FAILED, &exitCode, "Container crashed: " + message, nodeId, true
+				case "CreateContainerConfigError", "CreateContainerError":
+					exitCode := 1
+					return structs.JOB_STATUS_FAILED, &exitCode, "Container creation error: " + message, nodeId, true
+				case "InvalidImageName":
+					exitCode := 1
+					return structs.JOB_STATUS_FAILED, &exitCode, "Invalid image name: " + message, nodeId, true
+				}
+
+				// Pulling/initialization states
+				// ContainerCreating: image pull or container setup in progress
+				// Pulling: explicit image pull
+				// ImagePullBackOff/ErrImagePull: pull failures (transient, will retry)
+				// PodInitializing: init containers running
+				if reason == "ContainerCreating" || reason == "Pulling" || reason == "ImagePullBackOff" || reason == "ErrImagePull" || reason == "PodInitializing" {
 					return structs.JOB_STATUS_PULLING, nil, "", nodeId, false
 				}
 			}
+		}
+		// If pod is pending but no container status yet, check if it's been scheduled to a node
+		// If scheduled, it's likely waiting for image pull to start
+		if nodeId != "" {
+			return structs.JOB_STATUS_PULLING, nil, "", nodeId, false
 		}
 		return structs.JOB_STATUS_SCHEDULED, nil, "", nodeId, false
 	case corev1.PodRunning:
