@@ -52,9 +52,10 @@ export default function ProtectedLayout({
 
   const firstName = user?.name ? user.name.split(" ")[0].toLowerCase() : "";
   const isOnProfile = pathname?.includes("/profile");
-  const isOnDevTools = pathname?.includes("/dev-tools");
   const isOnVMs = pathname?.includes("/vms");
   const isOnJobs = pathname?.includes("/jobs");
+  const isOnNodes = pathname?.includes("/my-nodes");
+  const isOnAdmin = pathname?.includes("/admin");
   const isOnOnboarding = pathname?.includes("/onboarding");
 
   return (
@@ -106,6 +107,12 @@ export default function ProtectedLayout({
                         <Link href="/jobs">jobs</Link>
                       </Button>
                       <Button
+                        variant={isOnNodes ? "default" : "outline"}
+                        asChild
+                      >
+                        <Link href="/my-nodes">nodes</Link>
+                      </Button>
+                      <Button
                         variant={isOnProfile ? "default" : "outline"}
                         asChild
                       >
@@ -113,10 +120,10 @@ export default function ProtectedLayout({
                       </Button>
                       {hasDevAccess && (
                         <Button
-                          variant={isOnDevTools ? "default" : "outline"}
+                          variant={isOnAdmin ? "default" : "outline"}
                           asChild
                         >
-                          <Link href="/dev-tools">dev tools</Link>
+                          <Link href="/admin">admin</Link>
                         </Button>
                       )}
                     </>
