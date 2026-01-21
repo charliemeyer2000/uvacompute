@@ -54,7 +54,7 @@ type VMCreationRequest struct {
 	Name            *string  `json:"name,omitempty" validate:"omitempty,max=255"`
 	Cpus            *int     `json:"cpus,omitempty" validate:"omitempty,min=1,max=16"`
 	Ram             *int     `json:"ram,omitempty" validate:"omitempty,min=1,max=64"`
-	Disk            *int     `json:"disk,omitempty" validate:"omitempty,min=64,max=1000"`
+	Disk            *int     `json:"disk,omitempty" validate:"omitempty,min=10,max=500"`
 	Gpus            *int     `json:"gpus,omitempty" validate:"omitempty,min=0,max=1"`
 	GpuType         *GPUType `json:"gpu-type,omitempty" validate:"omitempty,oneof='5090'"`
 	SSHPublicKeys   []string `json:"sshPublicKeys,omitempty"`
@@ -65,7 +65,7 @@ type VMCreationRequest struct {
 const (
 	DefaultCpus    = 1
 	DefaultRam     = 8
-	DefaultDisk    = 64
+	DefaultDisk    = 20 // 20GB default, using DataVolumeTemplates for actual storage
 	DefaultGpus    = 0
 	DefaultGpuType = GPU_5090
 )
@@ -240,6 +240,7 @@ type JobCreationRequest struct {
 	Cpus    *int              `json:"cpus,omitempty" validate:"omitempty,min=1,max=16"`
 	Ram     *int              `json:"ram,omitempty" validate:"omitempty,min=1,max=64"`
 	Gpus    *int              `json:"gpus,omitempty" validate:"omitempty,min=0,max=1"`
+	Disk    *int              `json:"disk,omitempty" validate:"omitempty,min=0,max=100"`
 }
 
 type JobCreationResponse struct {
@@ -274,6 +275,7 @@ type JobState struct {
 	Cpus    int               `json:"cpus"`
 	Ram     int               `json:"ram"`
 	Gpus    int               `json:"gpus"`
+	Disk    int               `json:"disk"`
 
 	Status       JobStatus `json:"status"`
 	ExitCode     *int      `json:"exitCode,omitempty"`
@@ -291,4 +293,5 @@ const (
 	DefaultJobCpus = 1
 	DefaultJobRam  = 4
 	DefaultJobGpus = 0
+	DefaultJobDisk = 0
 )

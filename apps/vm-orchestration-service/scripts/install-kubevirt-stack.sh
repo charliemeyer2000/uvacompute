@@ -4,12 +4,16 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 KUBEVIRT_VERSION="${KUBEVIRT_VERSION:-v1.3.0}"
+CDI_VERSION="${CDI_VERSION:-v1.59.0}"
 K3S_VERSION="${K3S_VERSION:-}"
 GPU_OPERATOR_VERSION="${GPU_OPERATOR_VERSION:-v24.6.0}"
 NAMESPACE="${NAMESPACE:-uvacompute}"
+STORAGE_PATH="${STORAGE_PATH:-/var/lib/uvacompute/storage}"
 
 INSTALL_K3S="${INSTALL_K3S:-true}"
 INSTALL_KUBEVIRT="${INSTALL_KUBEVIRT:-true}"
+INSTALL_CDI="${INSTALL_CDI:-true}"
+INSTALL_LOCAL_PATH="${INSTALL_LOCAL_PATH:-true}"
 INSTALL_GPU_OPERATOR="${INSTALL_GPU_OPERATOR:-false}"
 CLUSTER_INIT="${CLUSTER_INIT:-false}"
 
@@ -125,6 +129,46 @@ configure_kubevirt_features() {
     log "KubeVirt features configured"
 }
 
+install_cdi() {
+    log "Installing CDI (Containerized Data Importer) ${CDI_VERSION}..."
+
+    kubectl apply -f "https://github.com/kubevirt/containerized-data-importer/releases/download/${CDI_VERSION}/cdi-operator.yaml"
+
+    log "Waiting for CDI operator..."
+    kubectl wait --for=condition=available --timeout=300s deployment/cdi-operator -n cdi
+
+    kubectl apply -f "https://github.com/kubevirt/containerized-data-importer/releases/download/${CDI_VERSION}/cdi-cr.yaml"
+
+    log "Waiting for CDI to be ready..."
+    kubectl wait --for=condition=Available --timeout=600s cdi/cdi -n cdi
+
+    log "CDI installed successfully"
+    kubectl get cdi -n cdi
+}
+
+install_local_path_provisioner() {
+    log "Installing local-path-provisioner..."
+
+    kubectl apply -f https://raw.githubusercontent.com/rancher/local-path-provisioner/v0.0.26/deploy/local-path-storage.yaml
+
+    log "Waiting for local-path-provisioner..."
+    sleep 10
+    kubectl wait --for=condition=ready pod -l app=local-path-provisioner -n local-path-storage --timeout=120s || true
+
+    # Set as default storage class
+    kubectl patch storageclass local-path -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"true"}}}'
+
+    # Configure to use UVACompute storage path
+    kubectl patch configmap local-path-config -n local-path-storage --type=merge -p "{
+        \"data\": {
+            \"config.json\": \"{\\\"nodePathMap\\\":[{\\\"node\\\":\\\"DEFAULT_PATH_FOR_NON_LISTED_NODES\\\",\\\"paths\\\":[\\\"${STORAGE_PATH}\\\"]}]}\"
+        }
+    }"
+
+    log "local-path-provisioner installed and configured"
+    kubectl get sc
+}
+
 install_gpu_operator() {
     log "Installing NVIDIA GPU Operator ${GPU_OPERATOR_VERSION}..."
 
@@ -231,6 +275,12 @@ print_summary() {
     echo ""
     echo "k3s installed: $(kubectl version --short 2>/dev/null | head -1 || echo 'Yes')"
     echo "KubeVirt version: $KUBEVIRT_VERSION"
+    if [[ "$INSTALL_CDI" == "true" ]]; then
+        echo "CDI version: $CDI_VERSION"
+    fi
+    if [[ "$INSTALL_LOCAL_PATH" == "true" ]]; then
+        echo "Storage path: $STORAGE_PATH"
+    fi
     echo "Namespace: $NAMESPACE"
     echo ""
     echo "Kubeconfig: /etc/rancher/k3s/k3s.yaml"
@@ -242,6 +292,18 @@ print_summary() {
     echo "  kubectl get kubevirt -n kubevirt"
     echo "  kubectl get pods -n kubevirt"
     echo ""
+    if [[ "$INSTALL_CDI" == "true" ]]; then
+        echo "To check CDI status:"
+        echo "  kubectl get cdi -n cdi"
+        echo "  kubectl get pods -n cdi"
+        echo ""
+    fi
+    if [[ "$INSTALL_LOCAL_PATH" == "true" ]]; then
+        echo "To check storage:"
+        echo "  kubectl get sc"
+        echo "  kubectl get pvc -n $NAMESPACE"
+        echo ""
+    fi
     echo "To start the VM orchestration service:"
     echo "  VM_BACKEND=kubevirt KUBECONFIG=/etc/rancher/k3s/k3s.yaml ./vm-orchestration-service"
     echo ""
@@ -262,20 +324,25 @@ Usage: $0 [options]
 
 Options:
     --kubevirt-version <version>   KubeVirt version (default: $KUBEVIRT_VERSION)
+    --cdi-version <version>        CDI version (default: $CDI_VERSION)
     --k3s-version <version>        k3s version (default: latest)
     --namespace <name>             Namespace for VMs (default: $NAMESPACE)
+    --storage-path <path>          Storage path for VM disks (default: $STORAGE_PATH)
     --cluster-init                 Initialize cluster for multi-node support
     --with-gpu                     Install NVIDIA GPU Operator
     --skip-k3s                     Skip k3s installation
     --skip-kubevirt                Skip KubeVirt installation
+    --skip-cdi                     Skip CDI installation
+    --skip-local-path              Skip local-path-provisioner installation
     --with-registry                Setup local container registry
     -h, --help                     Show this help
 
 Examples:
-    $0                             # Basic installation
+    $0                             # Basic installation (includes CDI + local-path)
     $0 --cluster-init              # Multi-node ready installation
     $0 --with-gpu --cluster-init   # With GPU support
     $0 --skip-k3s                  # Install KubeVirt on existing cluster
+    $0 --storage-path /mnt/ssd     # Use custom storage path
 EOF
     exit 0
 }
@@ -288,12 +355,20 @@ while [[ $# -gt 0 ]]; do
             KUBEVIRT_VERSION="$2"
             shift 2
             ;;
+        --cdi-version)
+            CDI_VERSION="$2"
+            shift 2
+            ;;
         --k3s-version)
             K3S_VERSION="$2"
             shift 2
             ;;
         --namespace)
             NAMESPACE="$2"
+            shift 2
+            ;;
+        --storage-path)
+            STORAGE_PATH="$2"
             shift 2
             ;;
         --cluster-init)
@@ -310,6 +385,14 @@ while [[ $# -gt 0 ]]; do
             ;;
         --skip-kubevirt)
             INSTALL_KUBEVIRT=false
+            shift
+            ;;
+        --skip-cdi)
+            INSTALL_CDI=false
+            shift
+            ;;
+        --skip-local-path)
+            INSTALL_LOCAL_PATH=false
             shift
             ;;
         --with-registry)
@@ -337,6 +420,14 @@ main() {
         install_kubevirt
         configure_kubevirt_features
         install_virtctl
+    fi
+
+    if [[ "$INSTALL_CDI" == "true" ]]; then
+        install_cdi
+    fi
+
+    if [[ "$INSTALL_LOCAL_PATH" == "true" ]]; then
+        install_local_path_provisioner
     fi
 
     if [[ "$INSTALL_GPU_OPERATOR" == "true" ]]; then
