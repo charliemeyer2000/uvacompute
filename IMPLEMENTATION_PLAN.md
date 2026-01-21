@@ -137,6 +137,12 @@ If you need AWS resources (S3 buckets, etc.):
 - **Internal mutations**: Use `internalMutation` for functions that should only be called from other Convex functions (like `markNodeOffline`), not from the frontend.
 - **Status cascade**: When node goes offline, cascade status to VMs and jobs via internal mutations in a single `syncHealth` transaction.
 
+**Navigation Refactor (Plan 19):**
+
+- **Next.js build cache**: After deleting pages, the `.next` cache may still reference old files. Clear with `rm -rf .next` before rebuilding.
+- **Seed functions removal**: Mock data seed functions (seedVMs, clearAllVMs) should be CLI commands or removed entirely, not in the UI.
+- **Consolidating admin features**: Keep admin functionality in one place (`/admin`) rather than splitting between dev-tools and admin pages.
+
 ### Useful Patterns
 
 - Use Python for generating HMAC signatures (easier than bash/openssl)
@@ -271,28 +277,30 @@ kubectl describe node | grep nvidia.com/gpu
 
 ## Progress Tracker
 
-| Plan                               | Status      | Branch                            | Notes                                                |
-| ---------------------------------- | ----------- | --------------------------------- | ---------------------------------------------------- |
-| 1. Remove Incus, finalize KubeVirt | ✅ Complete |                                   | Removed all Incus code, KubeVirt-only backend        |
-| 2. Test KubeVirt on workstation    | ✅ Complete |                                   | k3s v1.34.3 + KubeVirt v1.3.0 working                |
-| 3. k3s/KubeVirt install script     | ✅ Complete |                                   | uva node install/uninstall/status + GPU auto-detect  |
-| 3.5. Node prepare command          | ✅ Complete |                                   | uva node prepare for driver install + reboot flow    |
-| 4. Jobs schema + site API          | ✅ Complete |                                   | jobs table + API endpoints                           |
-| 5. Jobs in orchestration service   | ✅ Complete |                                   | JobAdapter + JobManager + HTTP handlers              |
-| 6. Jobs CLI commands               | ✅ Complete |                                   | uva run, jobs, logs, cancel commands                 |
-| 7. Jobs website UI                 | ✅ Complete |                                   | ActiveJobs, JobHistory, JobLogViewer components      |
-| 8. Log storage + streaming         | ✅ Complete |                                   | SSE streaming + Convex File Storage archival         |
-| 9. Node management CLI             | ✅ Complete | feat/complete-node-management-cli | pause, resume, config commands + status enhancements |
-| 10. Node config + partial sharing  | ⏸️ Paused   |                                   | Superseded by federated k3s (Plan 14-18)             |
-| 11. Multi-node SSH routing         | ✅ Complete | feat/multi-node-ssh-routing       | nodeId tracking + SSH router + nodes table           |
-| 12. Admin commands                 | ⏸️ Paused   |                                   | Merged into Plan 17 (Admin Dashboard)                |
-| 13. Automated node onboarding      | ✅ Complete | feat/multi-node-ssh-routing       | Token-based registration + DO VPS key sync           |
-| **FEDERATED K3S ARCHITECTURE**     |             |                                   |                                                      |
-| 14. Hub Setup (DO VPS)             | ✅ Complete | feat/hub-setup                    | k3s server + KubeVirt + orchestration on hub         |
-| 15. Agent Installation Refactor    | ✅ Complete | feat/federated-k3s-architecture   | Nodes run k3s agent, join hub cluster                |
-| 16. Multi-Node Scheduling          | ✅ Complete | feat/multi-node-scheduling        | Node labels, resource scheduling, placement          |
-| 17. Admin Dashboard & APIs         | ✅ Complete | feat/admin-dashboard-apis         | Tiered access, admin/contributor dashboards, CLI     |
-| 18. Health Monitoring & Failover   | ✅ Complete | feat/health-monitoring            | Health monitor, node_offline status, admin alerts    |
+| Plan                               | Status         | Branch                            | Notes                                                |
+| ---------------------------------- | -------------- | --------------------------------- | ---------------------------------------------------- |
+| 1. Remove Incus, finalize KubeVirt | ✅ Complete    |                                   | Removed all Incus code, KubeVirt-only backend        |
+| 2. Test KubeVirt on workstation    | ✅ Complete    |                                   | k3s v1.34.3 + KubeVirt v1.3.0 working                |
+| 3. k3s/KubeVirt install script     | ✅ Complete    |                                   | uva node install/uninstall/status + GPU auto-detect  |
+| 3.5. Node prepare command          | ✅ Complete    |                                   | uva node prepare for driver install + reboot flow    |
+| 4. Jobs schema + site API          | ✅ Complete    |                                   | jobs table + API endpoints                           |
+| 5. Jobs in orchestration service   | ✅ Complete    |                                   | JobAdapter + JobManager + HTTP handlers              |
+| 6. Jobs CLI commands               | ✅ Complete    |                                   | uva run, jobs, logs, cancel commands                 |
+| 7. Jobs website UI                 | ✅ Complete    |                                   | ActiveJobs, JobHistory, JobLogViewer components      |
+| 8. Log storage + streaming         | ✅ Complete    |                                   | SSE streaming + Convex File Storage archival         |
+| 9. Node management CLI             | ✅ Complete    | feat/complete-node-management-cli | pause, resume, config commands + status enhancements |
+| 10. Node config + partial sharing  | ⏸️ Paused      |                                   | Superseded by federated k3s (Plan 14-18)             |
+| 11. Multi-node SSH routing         | ✅ Complete    | feat/multi-node-ssh-routing       | nodeId tracking + SSH router + nodes table           |
+| 12. Admin commands                 | ⏸️ Paused      |                                   | Merged into Plan 17 (Admin Dashboard)                |
+| 13. Automated node onboarding      | ✅ Complete    | feat/multi-node-ssh-routing       | Token-based registration + DO VPS key sync           |
+| **FEDERATED K3S ARCHITECTURE**     |                |                                   |                                                      |
+| 14. Hub Setup (DO VPS)             | ✅ Complete    | feat/hub-setup                    | k3s server + KubeVirt + orchestration on hub         |
+| 15. Agent Installation Refactor    | ✅ Complete    | feat/federated-k3s-architecture   | Nodes run k3s agent, join hub cluster                |
+| 16. Multi-Node Scheduling          | ✅ Complete    | feat/multi-node-scheduling        | Node labels, resource scheduling, placement          |
+| 17. Admin Dashboard & APIs         | ✅ Complete    | feat/admin-dashboard-apis         | Tiered access, admin/contributor dashboards, CLI     |
+| 18. Health Monitoring & Failover   | ✅ Complete    | feat/health-monitoring            | Health monitor, node_offline status, admin alerts    |
+| 19. Navigation Refactor            | ✅ Complete    | feat/nav-refactor                 | Navbar updates, dev tools + seed.ts removal          |
+| 20. Status Page Refactor           | ⬜ Not Started |                                   | Per-node status, resources, GPU breakdown            |
 
 Status key: ⬜ Not Started | 🔄 In Progress | ✅ Complete | ❌ Blocked | ⏸️ Paused
 
@@ -1888,22 +1896,22 @@ Problems:
 
 ### Todos
 
-- [ ] **Update navbar in protected-layout.tsx**
+- [x] **Update navbar in protected-layout.tsx**
   - Add "nodes" button linking to `/my-nodes`
   - Add "admin" button linking to `/admin` (only if `hasDevAccess`)
   - Remove "dev tools" button
   - Remove `isOnDevTools` path check
-- [ ] **Add early access management to admin page**
+- [x] **Add early access management to admin page**
   - Copy early access UI from dev-tools to admin page
   - Add mutations: `grantAccess`, `revokeAccess`, `approveTokenByEmail`, `denyTokenByEmail`
   - Add queries: `listEarlyAccessRequests`, `listPendingTokens`
-- [ ] **Delete dev-tools page**
+- [x] **Delete dev-tools page**
   - Delete `apps/site/src/app/[flags]/(protected)/dev-tools/page.tsx`
   - Delete the entire `dev-tools/` directory
-- [ ] **Delete seed functions**
+- [x] **Delete seed functions**
   - Delete `apps/site/convex/seed.ts`
   - Remove seed exports from convex API if referenced
-- [ ] **Test navigation**
+- [x] **Test navigation**
   - Verify "nodes" shows for all users
   - Verify "admin" shows only for admins
   - Verify early access management works in admin page
@@ -1920,13 +1928,331 @@ Problems:
 
 ### Completion Criteria
 
-- [ ] "nodes" link visible in navbar for all authenticated users
-- [ ] "admin" link visible in navbar for admins only
-- [ ] Early access management works in admin page
-- [ ] Dev tools page completely removed
-- [ ] Seed functions completely removed
-- [ ] No TypeScript/lint errors
-- [ ] No broken navigation links
+- [x] "nodes" link visible in navbar for all authenticated users
+- [x] "admin" link visible in navbar for admins only
+- [x] Early access management works in admin page
+- [x] Dev tools page completely removed
+- [x] Seed functions completely removed
+- [x] No TypeScript/lint errors
+- [x] No broken navigation links
+
+---
+
+## Plan 20: Status Page Refactor - Per-Node Status & Resources
+
+**Goal:** Transform the status page from a simple orchestration service health check into a comprehensive cluster-wide dashboard showing per-node status, resources, and capabilities.
+
+### Context
+
+The current status page (`apps/status/`) only shows:
+
+- Whether the vm-orchestration-service is up/down/degraded
+- 30-day historical uptime chart
+- Simple operational/partial outage/service unavailable badge
+
+For a federated cluster with multiple contributor nodes, users need to see:
+
+1. **Overall cluster status** - Is the platform operational?
+2. **Per-node status** - Which nodes are online/offline/draining?
+3. **Per-node resources** - What resources does each node contribute?
+4. **Cluster resource totals** - Aggregate vCPU, RAM, GPU counts with GPU type breakdown
+5. **Workload capabilities** - Which nodes support VMs vs Jobs
+
+### Current Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                          Current Status Page                                     │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                 │
+│   status.uvacompute.com                                                         │
+│   ─────────────────────                                                         │
+│                                                                                 │
+│   ┌─────────────────────────────────────────────────────────────────────────┐  │
+│   │  ✓ All Systems Operational                                              │  │
+│   │                                                                         │  │
+│   │  VM Orchestration Service  [operational]  25ms                         │  │
+│   │  ██████████████████████████████████ (30-day uptime chart)              │  │
+│   └─────────────────────────────────────────────────────────────────────────┘  │
+│                                                                                 │
+│   Data Source: Health check to VM_ORCHESTRATION_URL (hub)                      │
+│   Storage: Redis (uptime history)                                              │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Target Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                          New Status Page                                         │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                 │
+│   status.uvacompute.com                                                         │
+│   ─────────────────────                                                         │
+│                                                                                 │
+│   ┌─────────────────────────────────────────────────────────────────────────┐  │
+│   │  ✓ All Systems Operational                     Last updated: 10:32:45   │  │
+│   └─────────────────────────────────────────────────────────────────────────┘  │
+│                                                                                 │
+│   ┌─────────────────────────────────────────────────────────────────────────┐  │
+│   │  Cluster Resources (from online nodes)                                  │  │
+│   │  ──────────────────────────────────────────────────────────────────── │  │
+│   │                                                                         │  │
+│   │   vCPUs           RAM             GPUs                                  │  │
+│   │   ─────           ───             ────                                  │  │
+│   │   48 total        192 GB          3 total                               │  │
+│   │   12 used         64 GB used      2 used                                │  │
+│   │                                                                         │  │
+│   │   GPU Breakdown:  2× RTX 5090  •  1× RTX 4090                          │  │
+│   └─────────────────────────────────────────────────────────────────────────┘  │
+│                                                                                 │
+│   ┌─────────────────────────────────────────────────────────────────────────┐  │
+│   │  Nodes (3 online, 1 offline)                                            │  │
+│   │  ──────────────────────────────────────────────────────────────────── │  │
+│   │                                                                         │  │
+│   │   ● workstation       [online]     32 vCPU • 128GB • 1× RTX 5090       │  │
+│   │     └─ Supports: VMs, Jobs                                              │  │
+│   │                                                                         │  │
+│   │   ● gpu-server-1      [online]     16 vCPU •  64GB • 1× RTX 4090       │  │
+│   │     └─ Supports: VMs, Jobs                                              │  │
+│   │                                                                         │  │
+│   │   ● dev-node          [draining]    8 vCPU •  32GB • 1× RTX 5090       │  │
+│   │     └─ Supports: Jobs only                                              │  │
+│   │                                                                         │  │
+│   │   ○ backup-node       [offline]     4 vCPU •  16GB • No GPU            │  │
+│   │     └─ Last seen: 2h ago                                                │  │
+│   │                                                                         │  │
+│   └─────────────────────────────────────────────────────────────────────────┘  │
+│                                                                                 │
+│   ┌─────────────────────────────────────────────────────────────────────────┐  │
+│   │  Services                                                               │  │
+│   │  ──────────────────────────────────────────────────────────────────── │  │
+│   │                                                                         │  │
+│   │  VM Orchestration Service  [operational]  25ms                         │  │
+│   │  ██████████████████████████████████ (30-day uptime)                    │  │
+│   │                                                                         │  │
+│   │  Control Plane (k3s)       [operational]                               │  │
+│   │  ██████████████████████████████████ (30-day uptime)                    │  │
+│   └─────────────────────────────────────────────────────────────────────────┘  │
+│                                                                                 │
+│   Data Sources:                                                                │
+│   - Convex (nodes table - real-time via API)                                   │
+│   - Redis (uptime history - existing)                                          │
+│   - Hub orchestration service (service health)                                 │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+```
+
+### VMs vs Jobs Capability
+
+Some nodes may only support one type of workload:
+
+| Capability    | Requirements                         | Examples                       |
+| ------------- | ------------------------------------ | ------------------------------ |
+| **VMs only**  | KubeVirt + sufficient resources      | Bare-metal servers with VFIO   |
+| **Jobs only** | Container runtime only (no KubeVirt) | Lightweight nodes, ARM devices |
+| **Both**      | KubeVirt + container runtime         | Full workstation setup         |
+
+**Why this matters:**
+
+- Users requesting VMs should see if VM-capable nodes are available
+- Container jobs have different requirements than VMs
+- Node operators may choose to disable VM support to avoid nested virtualization overhead
+
+### Schema Updates
+
+Add new fields to the `nodes` table in Convex:
+
+```typescript
+nodes: defineTable({
+  // ... existing fields ...
+
+  // NEW: GPU type (e.g., "nvidia-rtx-5090", "nvidia-rtx-4090", "none")
+  gpuType: v.optional(v.string()),
+
+  // NEW: Workload capabilities
+  supportsVMs: v.optional(v.boolean()), // Default: true if KubeVirt detected
+  supportsJobs: v.optional(v.boolean()), // Default: true (container runtime)
+});
+```
+
+These fields should be populated by the install-node.sh script based on:
+
+- `gpuType`: Auto-detected from GPU model during installation
+- `supportsVMs`: True if KubeVirt is functional on the node
+- `supportsJobs`: True if container runtime is functional (usually always true)
+
+### API Design
+
+**New public API endpoint for status page:**
+
+```
+GET /api/public/cluster-status
+```
+
+Returns (no auth required - this is public status info):
+
+```json
+{
+  "timestamp": 1706000000000,
+  "overall": "operational",
+  "resources": {
+    "nodes": { "total": 4, "online": 3, "offline": 1, "draining": 0 },
+    "vcpus": { "total": 60, "available": 48 },
+    "ram": { "total": 240, "available": 176 },
+    "gpus": {
+      "total": 3,
+      "available": 1,
+      "byType": {
+        "nvidia-rtx-5090": { "total": 2, "available": 1 },
+        "nvidia-rtx-4090": { "total": 1, "available": 0 }
+      }
+    }
+  },
+  "nodes": [
+    {
+      "name": "workstation",
+      "status": "online",
+      "vcpus": 32,
+      "ram": 128,
+      "gpus": 1,
+      "gpuType": "nvidia-rtx-5090",
+      "supportsVMs": true,
+      "supportsJobs": true,
+      "lastHeartbeat": 1706000000000
+    }
+    // ... more nodes
+  ],
+  "services": {
+    "orchestration": { "status": "operational", "responseTime": 25 },
+    "controlPlane": { "status": "operational" }
+  }
+}
+```
+
+**Note:** Node names are shown but not nodeIds or other sensitive info. This is meant to give users visibility into cluster health without exposing internal details.
+
+### Implementation Todos
+
+**Schema updates:**
+
+- [ ] Add `gpuType` field to nodes schema (optional string)
+- [ ] Add `supportsVMs` field to nodes schema (optional boolean, default true)
+- [ ] Add `supportsJobs` field to nodes schema (optional boolean, default true)
+- [ ] Update install-node.sh to detect and set `gpuType`
+- [ ] Update install-node.sh to set capability flags
+
+**New Convex queries:**
+
+- [ ] Create `apps/site/convex/publicStatus.ts` with public queries:
+  - `getClusterStatus` - returns aggregated cluster status (no auth required)
+  - Called via HTTP action to avoid exposing Convex directly
+
+**New API endpoints in site:**
+
+- [ ] Create `apps/site/src/app/api/public/cluster-status/route.ts`
+  - Returns cluster resources, node status, service health
+  - No authentication required (public status page)
+  - Rate limited to prevent abuse
+
+**Status page refactor:**
+
+- [ ] Update `apps/status/types/index.ts` with new types:
+  - `NodeStatus` - individual node status
+  - `ClusterResources` - aggregate resources with GPU breakdown
+  - `ClusterStatus` - full response type
+
+- [ ] Create `apps/status/lib/cluster.ts`:
+  - `fetchClusterStatus()` - fetch from site's public API
+
+- [ ] Update `apps/status/app/actions/status-actions.ts`:
+  - Add `getClusterStatus()` server action
+
+- [ ] Create new components in `apps/status/app/_components/`:
+  - `cluster-resources.tsx` - Resource summary cards
+  - `node-list.tsx` - Per-node status list
+  - `gpu-breakdown.tsx` - GPU type breakdown
+  - `capability-badge.tsx` - VMs/Jobs capability indicator
+
+- [ ] Update `apps/status/app/_components/status-content.tsx`:
+  - Add cluster resources section
+  - Add node list section
+  - Keep existing service uptime chart
+
+- [ ] Update `apps/status/app/page.tsx`:
+  - Fetch cluster status alongside existing status
+  - Pass to StatusContent component
+
+**Install script updates:**
+
+- [ ] Update `apps/site/public/install-node.sh`:
+  - Detect GPU model and format as `gpuType` (e.g., "nvidia-rtx-5090")
+  - Detect KubeVirt availability for `supportsVMs`
+  - Set `supportsJobs` based on container runtime
+  - Include new fields in bootstrap API call
+
+**Testing:**
+
+- [ ] Test status page with multiple nodes (online, offline, draining)
+- [ ] Test GPU type detection on workstation
+- [ ] Test capability flags on various node configs
+- [ ] Test public API rate limiting
+- [ ] Test status page styling matches design system
+
+### Files to Create/Modify
+
+| File                                                   | Action | Description                                     |
+| ------------------------------------------------------ | ------ | ----------------------------------------------- |
+| `apps/site/convex/schema.ts`                           | Modify | Add gpuType, supportsVMs, supportsJobs to nodes |
+| `apps/site/convex/publicStatus.ts`                     | Create | Public query for cluster status                 |
+| `apps/site/src/app/api/public/cluster-status/route.ts` | Create | Public API endpoint                             |
+| `apps/site/public/install-node.sh`                     | Modify | Detect GPU type, capabilities                   |
+| `apps/status/types/index.ts`                           | Modify | Add new status types                            |
+| `apps/status/lib/cluster.ts`                           | Create | Cluster status fetching                         |
+| `apps/status/app/actions/status-actions.ts`            | Modify | Add cluster status action                       |
+| `apps/status/app/_components/cluster-resources.tsx`    | Create | Resource summary component                      |
+| `apps/status/app/_components/node-list.tsx`            | Create | Node status list component                      |
+| `apps/status/app/_components/gpu-breakdown.tsx`        | Create | GPU type breakdown                              |
+| `apps/status/app/_components/capability-badge.tsx`     | Create | VMs/Jobs capability badge                       |
+| `apps/status/app/_components/status-content.tsx`       | Modify | Integrate new components                        |
+| `apps/status/app/page.tsx`                             | Modify | Fetch and pass cluster status                   |
+
+### Design Notes
+
+The status page should follow the existing uvacompute design language:
+
+- **Minimalist aesthetic** - Clean, simple, functional
+- **Monospace typography** - All text uses `font-mono`
+- **Lowercase preferred** - UI text lowercase
+- **Sharp edges** - No rounded corners
+- **Limited color palette** - Black, white, gray, blue (operational), yellow (degraded), red (down)
+
+**Status indicators:**
+
+- `●` (filled circle) - online
+- `◐` (half circle) - draining
+- `○` (empty circle) - offline
+
+**Color coding:**
+
+- Green/blue: operational/online
+- Yellow: degraded/draining
+- Red: down/offline
+- Gray: no data/unknown
+
+### Completion Criteria
+
+- [ ] Status page shows overall cluster status
+- [ ] Status page shows per-node breakdown with resources
+- [ ] GPU types displayed correctly (e.g., "2× RTX 5090")
+- [ ] VMs/Jobs capabilities shown per node
+- [ ] Offline nodes clearly indicated with last seen time
+- [ ] Public API works without authentication
+- [ ] Existing 30-day uptime chart still functional
+- [ ] Styling matches uvacompute design system
+- [ ] All TypeScript/lint errors resolved
+- [ ] Tested with real nodes (workstation at minimum)
 
 ---
 
