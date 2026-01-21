@@ -1,4 +1,4 @@
-import { execSync } from "child_process";
+import { execFileSync, execSync } from "child_process";
 import { createHash } from "crypto";
 import {
   chmodSync,
@@ -9,7 +9,7 @@ import {
 } from "fs";
 import { homedir } from "os";
 import { join } from "path";
-import { select } from "@inquirer/prompts";
+import { confirm, password, select } from "@inquirer/prompts";
 import { SSHKeyAddResponseSchema, SSHKeyListResponseSchema } from "./schemas";
 import { theme } from "./theme";
 import { getBaseUrl } from "./utils";
@@ -47,7 +47,7 @@ export function getKeyFingerprint(keyPath: string): string {
   }
 }
 
-export function generateSSHKey(): string {
+export function generateSSHKey(passphrase: string): string {
   const publicKeyPath = `${UVACOMPUTE_KEY_PATH}.pub`;
 
   if (existsSync(publicKeyPath)) {
@@ -73,11 +73,19 @@ export function generateSSHKey(): string {
     chmodSync(sshDir, 0o700);
   }
 
-  execSync(
-    `ssh-keygen -t ed25519 -f "${UVACOMPUTE_KEY_PATH}" -N "" -C "uvacompute"`,
-    {
-      stdio: "pipe",
-    },
+  execFileSync(
+    "ssh-keygen",
+    [
+      "-t",
+      "ed25519",
+      "-f",
+      UVACOMPUTE_KEY_PATH,
+      "-N",
+      passphrase,
+      "-C",
+      "uvacompute",
+    ],
+    { stdio: "pipe" },
   );
 
   return publicKeyPath;
@@ -210,13 +218,65 @@ export async function ensureSSHKeysConfigured(token: string): Promise<boolean> {
   let keyName: string;
 
   if (selection === "generate") {
-    console.log();
-    console.log(theme.muted("Generating SSH key..."));
-
     try {
-      keyPath = generateSSHKey();
+      const usePassphrase = await confirm({
+        message: "Protect this key with a passphrase?",
+        default: true,
+      });
+
+      let passphrase = "";
+      if (usePassphrase) {
+        const first = await password({
+          message: "Enter passphrase:",
+          mask: "*",
+        });
+        const second = await password({
+          message: "Confirm passphrase:",
+          mask: "*",
+        });
+
+        if (first !== second) {
+          console.log(theme.error("Passphrases do not match."));
+          return false;
+        }
+
+        passphrase = first;
+      }
+
+      console.log();
+      console.log(theme.muted("Generating SSH key..."));
+
+      keyPath = generateSSHKey(passphrase);
       keyName = "uvacompute";
       console.log(theme.success(`Created ${keyPath.replace(homedir(), "~")}`));
+
+      if (passphrase) {
+        const addToAgent = await confirm({
+          message: "Add this key to your ssh-agent now?",
+          default: true,
+        });
+        if (addToAgent) {
+          try {
+            execFileSync("ssh-add", [UVACOMPUTE_KEY_PATH], {
+              stdio: "inherit",
+            });
+          } catch (error) {
+            const message =
+              error instanceof Error ? error.message : "Unknown error";
+            console.log(
+              theme.warning(
+                `Couldn't add key to ssh-agent: ${message}. You'll be prompted when you connect.`,
+              ),
+            );
+          }
+        } else {
+          console.log(
+            theme.muted(
+              "You may be prompted for the passphrase when connecting via SSH.",
+            ),
+          );
+        }
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error";
       console.log(theme.error(`Failed to generate SSH key: ${message}`));
