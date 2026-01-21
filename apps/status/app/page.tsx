@@ -1,7 +1,11 @@
 import { subDays } from "date-fns";
 import { StatusContent } from "./_components/status-content";
-import { getStatus, getStatusHistory } from "./actions/status-actions";
-import type { DayAggregate } from "@/types";
+import {
+  getStatus,
+  getStatusHistory,
+  getClusterStatus,
+} from "./actions/status-actions";
+import type { DayAggregate, ClusterStatus } from "@/types";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -9,6 +13,7 @@ export const revalidate = 0;
 export default async function StatusPage() {
   let initialData;
   let historyData: DayAggregate[] = [];
+  let clusterStatus: ClusterStatus | null = null;
   let loadError = null;
 
   try {
@@ -27,6 +32,12 @@ export default async function StatusPage() {
       history: [],
       uptime: 0,
     };
+  }
+
+  try {
+    clusterStatus = await getClusterStatus();
+  } catch (error) {
+    console.error("Failed to load cluster status:", error);
   }
 
   try {
@@ -72,12 +83,17 @@ export default async function StatusPage() {
           </div>
         )}
 
-        <StatusContent initialData={initialData} historyData={historyData} />
+        <StatusContent
+          initialData={initialData}
+          historyData={historyData}
+          initialClusterStatus={clusterStatus}
+        />
 
         <div className="pt-4 sm:pt-6 mt-6 sm:mt-8">
           <div className="text-xs sm:text-sm text-gray-600">
             <p className="mb-2">
-              This page shows the real-time status of uvacompute services.
+              This page shows the real-time status of uvacompute services and
+              cluster resources.
             </p>
             <p>
               Monitoring checks run every minute. Historical data is retained

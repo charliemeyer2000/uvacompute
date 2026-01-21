@@ -16,6 +16,9 @@ export const register = mutation({
     cpus: v.optional(v.number()),
     ram: v.optional(v.number()),
     gpus: v.optional(v.number()),
+    gpuType: v.optional(v.string()),
+    supportsVMs: v.optional(v.boolean()),
+    supportsJobs: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const existing = await ctx.db
@@ -37,6 +40,9 @@ export const register = mutation({
         cpus: args.cpus,
         ram: args.ram,
         gpus: args.gpus,
+        gpuType: args.gpuType,
+        supportsVMs: args.supportsVMs,
+        supportsJobs: args.supportsJobs,
         ...(args.ownerId && !existing.ownerId ? { ownerId: args.ownerId } : {}),
       });
       return existing._id;
@@ -57,6 +63,9 @@ export const register = mutation({
       cpus: args.cpus,
       ram: args.ram,
       gpus: args.gpus,
+      gpuType: args.gpuType,
+      supportsVMs: args.supportsVMs ?? true,
+      supportsJobs: args.supportsJobs ?? true,
     });
   },
 });

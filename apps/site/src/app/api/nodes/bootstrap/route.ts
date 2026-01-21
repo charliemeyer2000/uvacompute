@@ -16,6 +16,9 @@ const BootstrapRequestSchema = z.object({
   cpus: z.number().optional(),
   ram: z.number().optional(),
   gpus: z.number().optional(),
+  gpuType: z.string().optional(),
+  supportsVMs: z.boolean().optional(),
+  supportsJobs: z.boolean().optional(),
 });
 
 export async function POST(request: NextRequest) {
@@ -54,6 +57,9 @@ export async function POST(request: NextRequest) {
       cpus: data.cpus,
       ram: data.ram,
       gpus: data.gpus,
+      gpuType: data.gpuType,
+      supportsVMs: data.supportsVMs,
+      supportsJobs: data.supportsJobs,
     });
 
     // Get k3s agent token from environment
