@@ -1,6 +1,7 @@
-import { mutation, query } from "./_generated/server";
+import { mutation, query, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
 import { authComponent } from "./auth";
+import { internal } from "./_generated/api";
 
 export const register = mutation({
   args: {
@@ -332,5 +333,107 @@ export const setStatusAsAdmin = mutation({
     });
 
     return node._id;
+  },
+});
+
+const NodeHealthSchema = v.object({
+  nodeId: v.string(),
+  k8sNodeName: v.string(),
+  ready: v.boolean(),
+  lastHeartbeat: v.number(),
+  reason: v.optional(v.string()),
+});
+
+export const syncHealth = mutation({
+  args: {
+    nodes: v.array(NodeHealthSchema),
+  },
+  handler: async (ctx, args) => {
+    let nodesUpdated = 0;
+    let workloadsMarkedOffline = 0;
+
+    for (const nodeHealth of args.nodes) {
+      const node = await ctx.db
+        .query("nodes")
+        .withIndex("by_nodeId", (q) => q.eq("nodeId", nodeHealth.nodeId))
+        .first();
+
+      if (!node) {
+        continue;
+      }
+
+      const wasOnline = node.status === "online";
+      const isNowOffline = !nodeHealth.ready;
+      const newStatus = nodeHealth.ready
+        ? node.status === "draining"
+          ? "draining"
+          : "online"
+        : "offline";
+
+      await ctx.db.patch(node._id, {
+        status: newStatus,
+        lastHeartbeat: nodeHealth.lastHeartbeat,
+      });
+      nodesUpdated++;
+
+      if (wasOnline && isNowOffline) {
+        const vmCount = await ctx.runMutation(internal.vms.markNodeOffline, {
+          nodeId: nodeHealth.nodeId,
+        });
+        const jobCount = await ctx.runMutation(internal.jobs.markNodeOffline, {
+          nodeId: nodeHealth.nodeId,
+        });
+        workloadsMarkedOffline += vmCount + jobCount;
+      }
+    }
+
+    return { nodesUpdated, workloadsMarkedOffline };
+  },
+});
+
+export const forceCleanup = mutation({
+  args: {
+    nodeId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const vms = await ctx.db
+      .query("vms")
+      .withIndex("by_nodeId", (q) => q.eq("nodeId", args.nodeId))
+      .collect();
+
+    const jobs = await ctx.db
+      .query("jobs")
+      .withIndex("by_nodeId", (q) => q.eq("nodeId", args.nodeId))
+      .collect();
+
+    const now = Date.now();
+    let vmsDeleted = 0;
+    let jobsCancelled = 0;
+
+    for (const vm of vms) {
+      if (vm.status !== "deleted" && vm.status !== "expired") {
+        await ctx.db.patch(vm._id, {
+          status: "deleted",
+          deletedAt: now,
+        });
+        vmsDeleted++;
+      }
+    }
+
+    for (const job of jobs) {
+      if (
+        job.status !== "completed" &&
+        job.status !== "failed" &&
+        job.status !== "cancelled"
+      ) {
+        await ctx.db.patch(job._id, {
+          status: "cancelled",
+          completedAt: now,
+        });
+        jobsCancelled++;
+      }
+    }
+
+    return { vmsDeleted, jobsCancelled };
   },
 });
