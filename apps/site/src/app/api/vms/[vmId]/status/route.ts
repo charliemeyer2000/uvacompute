@@ -8,6 +8,21 @@ import { VMStatusResponseSchema } from "@/lib/vm-schemas";
 const VM_ORCHESTRATION_SERVICE_URL =
   process.env.VM_ORCHESTRATION_SERVICE_URL || "http://localhost:8080";
 
+function getStatusMessage(status: string): string {
+  const messages: Record<string, string> = {
+    creating: "VM creation in progress",
+    pending: "VM is pending",
+    booting: "VM is booting",
+    provisioning: "VM is being provisioned",
+    ready: "VM is ready",
+    stopping: "VM is stopping",
+    stopped: "VM has stopped",
+    failed: "VM creation failed",
+    offline: "VM is offline (node unreachable)",
+  };
+  return messages[status] || `VM status: ${status}`;
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ vmId: string }> },
@@ -59,6 +74,17 @@ export async function GET(
     );
 
     if (!response.ok) {
+      // Orchestration doesn't know about this VM - fall back to Convex status
+      if (response.status === 404) {
+        return NextResponse.json(
+          {
+            status: vm.status,
+            msg: getStatusMessage(vm.status),
+          },
+          { status: 200 },
+        );
+      }
+
       return NextResponse.json(
         {
           status: "not_found",
