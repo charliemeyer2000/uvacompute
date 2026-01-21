@@ -110,7 +110,7 @@ function JobCard({ job }: { job: Job }) {
         </p>
       </div>
 
-      <div className="grid grid-cols-3 gap-3 mb-4 text-xs">
+      <div className="grid grid-cols-4 gap-3 mb-4 text-xs">
         <div>
           <p className="text-gray-400 uppercase tracking-wide text-[10px]">
             cpu
@@ -129,6 +129,14 @@ function JobCard({ job }: { job: Job }) {
           </p>
           <p className="font-medium text-black">
             {job.gpus > 0 ? `${job.gpus}x` : "—"}
+          </p>
+        </div>
+        <div>
+          <p className="text-gray-400 uppercase tracking-wide text-[10px]">
+            scratch
+          </p>
+          <p className="font-medium text-black">
+            {job.disk ? `${job.disk} GB` : "—"}
           </p>
         </div>
       </div>
