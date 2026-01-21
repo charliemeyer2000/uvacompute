@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "vc env pull && next dev --turbopack",
+    "dev": "pnpm dlx @react-grab/claude-code@latest && vc env pull && next dev --turbopack",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",

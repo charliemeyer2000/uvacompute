@@ -3,18 +3,14 @@ import { v } from "convex/values";
 
 export const VM_STATUSES = [
   "not_found",
-  "creating",
-  "initializing",
-  "starting",
-  "waiting_for_agent",
-  "configuring",
-  "running",
+  "pending",
+  "booting",
+  "provisioning",
+  "ready",
+  "stopping",
+  "stopped",
   "failed",
-  "deleting",
-  "deleted",
-  "expired",
-  "updating",
-  "node_offline",
+  "offline",
 ] as const;
 
 export const JOB_STATUSES = [

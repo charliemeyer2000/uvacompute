@@ -45,21 +45,18 @@ export function formatStatus(status: VMStatus): string {
 
 export function getStatusColor(status: VMStatus): string {
   switch (status) {
-    case "running":
+    case "ready":
       return "bg-green-100 text-green-800 border-green-200";
-    case "creating":
-    case "initializing":
-    case "starting":
-    case "waiting_for_agent":
-    case "configuring":
-    case "updating":
+    case "pending":
+    case "booting":
+    case "provisioning":
       return "bg-blue-100 text-blue-800 border-blue-200";
     case "failed":
+    case "offline":
       return "bg-red-100 text-red-800 border-red-200";
-    case "deleting":
+    case "stopping":
       return "bg-yellow-100 text-yellow-800 border-yellow-200";
-    case "deleted":
-    case "expired":
+    case "stopped":
     case "not_found":
       return "bg-gray-100 text-gray-800 border-gray-200";
     default:

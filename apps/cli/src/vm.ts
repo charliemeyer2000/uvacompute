@@ -36,17 +36,14 @@ const BASE_URL = getBaseUrl();
 function getStatusMessage(status: string): string {
   const messages: Record<string, string> = {
     not_found: "VM not found",
-    creating: "Creating VM...",
-    initializing: "Initializing VM instance...",
-    starting: "Starting VM...",
-    waiting_for_agent: "Waiting for VM agent...",
-    configuring: "Configuring VM (running cloud-init)...",
-    running: "VM is running!",
+    pending: "Creating VM...",
+    booting: "Booting VM...",
+    provisioning: "Provisioning VM (running cloud-init)...",
+    ready: "VM is ready!",
+    stopping: "Stopping VM...",
+    stopped: "VM stopped",
     failed: "VM creation failed",
-    deleting: "Deleting VM...",
-    deleted: "VM deleted",
-    expired: "VM expired",
-    updating: "Updating VM...",
+    offline: "VM offline (node unreachable)",
   };
   return messages[status] || `Status: ${status}`;
 }
@@ -173,7 +170,7 @@ async function pollVMStatus(
 
         spinner.text = getStatusMessage(statusData.status);
 
-        if (statusData.status === "running") {
+        if (statusData.status === "ready") {
           return;
         } else if (statusData.status === "failed") {
           throw new VMOperationError(statusData.msg || "VM creation failed");
@@ -492,7 +489,7 @@ async function createVM(options: {
         process.exit(1);
       }
 
-      spinner.text = getStatusMessage("creating");
+      spinner.text = getStatusMessage("pending");
       await pollVMStatus(data.vmId, token, spinner);
 
       spinner.succeed(theme.success("VM created successfully!"));
@@ -767,7 +764,7 @@ async function listVMs(options: { all?: boolean }): Promise<void> {
 
     const filteredVMs = options.all
       ? data.vms
-      : data.vms.filter((vm) => vm.status === "running");
+      : data.vms.filter((vm) => vm.status === "ready");
 
     spinner.succeed(theme.success("VMs retrieved!"));
 
@@ -849,7 +846,7 @@ async function sshToVM(nameOrVmId: string): Promise<void> {
     const matchingVMs = await fetchAndFilterVMs(
       nameOrVmId,
       token,
-      VM_STATUS_GROUPS.RUNNING,
+      VM_STATUS_GROUPS.READY,
     );
 
     if (matchingVMs.length === 0) {
@@ -873,8 +870,8 @@ async function sshToVM(nameOrVmId: string): Promise<void> {
       spinner.text = "Checking SSH keys...";
     }
 
-    if (vm.status !== "running") {
-      spinner.fail(`VM is not running (current status: ${vm.status})`);
+    if (vm.status !== "ready") {
+      spinner.fail(`VM is not ready (current status: ${vm.status})`);
       process.exit(1);
     }
 

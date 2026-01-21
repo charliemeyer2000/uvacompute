@@ -4,6 +4,9 @@ import { useState } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../../../convex/_generated/api";
 import { authClient } from "@/lib/auth-client";
+import { Button } from "@/components/ui/button";
+import { ChevronDown, ChevronRight, Server, Pause, Play } from "lucide-react";
+import { toast } from "sonner";
 
 interface VM {
   _id: string;
@@ -28,6 +31,32 @@ interface Job {
   status: string;
 }
 
+function getStatusBorderColor(status: string): string {
+  switch (status) {
+    case "online":
+      return "border-l-green-500";
+    case "draining":
+      return "border-l-yellow-500";
+    case "offline":
+      return "border-l-red-500";
+    default:
+      return "border-l-gray-300";
+  }
+}
+
+function getStatusDotColor(status: string): string {
+  switch (status) {
+    case "online":
+      return "bg-green-500";
+    case "draining":
+      return "bg-yellow-500";
+    case "offline":
+      return "bg-red-500";
+    default:
+      return "bg-gray-400";
+  }
+}
+
 export default function MyNodesPage() {
   const { data: session, isPending } = authClient.useSession();
   const [expandedNode, setExpandedNode] = useState<string | null>(null);
@@ -47,71 +76,125 @@ export default function MyNodesPage() {
   async function handlePause(nodeId: string) {
     try {
       await setNodeStatus({ nodeId, status: "draining" });
+      toast.success("node paused", {
+        description: "node is now draining workloads",
+      });
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed to pause node");
+      toast.error("failed to pause node", {
+        description: err instanceof Error ? err.message : "unknown error",
+      });
     }
   }
 
   async function handleResume(nodeId: string) {
     try {
       await setNodeStatus({ nodeId, status: "online" });
+      toast.success("node resumed", {
+        description: "node is now accepting workloads",
+      });
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed to resume node");
+      toast.error("failed to resume node", {
+        description: err instanceof Error ? err.message : "unknown error",
+      });
     }
   }
 
   function toggleExpand(nodeId: string) {
-    if (expandedNode === nodeId) {
-      setExpandedNode(null);
-    } else {
-      setExpandedNode(nodeId);
-    }
+    setExpandedNode(expandedNode === nodeId ? null : nodeId);
   }
+
+  // Count online and offline nodes
+  const onlineCount = nodes?.filter((n) => n.status === "online").length ?? 0;
+  const offlineCount = nodes?.filter((n) => n.status === "offline").length ?? 0;
+  const drainingCount =
+    nodes?.filter((n) => n.status === "draining").length ?? 0;
 
   if (isPending || nodes === undefined) {
     return (
-      <div className="p-6">
-        <div className="animate-pulse space-y-4">
-          <div className="h-8 bg-gray-200 rounded w-1/4"></div>
-          <div className="h-48 bg-gray-200 rounded"></div>
+      <div className="space-y-6">
+        {/* Page Header Skeleton */}
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="h-8 w-48 bg-gray-100 animate-pulse mb-2" />
+            <div className="h-4 w-72 bg-gray-100 animate-pulse" />
+          </div>
+          <div className="flex gap-4">
+            <div className="h-4 w-20 bg-gray-100 animate-pulse" />
+            <div className="h-4 w-20 bg-gray-100 animate-pulse" />
+          </div>
+        </div>
+
+        {/* Cards Skeleton */}
+        <div className="space-y-4">
+          {[1, 2].map((i) => (
+            <div
+              key={i}
+              className="bg-white border border-gray-200 border-l-4 border-l-gray-200 p-5"
+            >
+              <div className="flex justify-between items-center">
+                <div className="flex items-center gap-4">
+                  <div className="h-5 w-5 bg-gray-100 animate-pulse rounded" />
+                  <div>
+                    <div className="h-5 w-32 bg-gray-100 animate-pulse mb-1" />
+                    <div className="h-3 w-48 bg-gray-100 animate-pulse" />
+                  </div>
+                </div>
+                <div className="h-5 w-16 bg-gray-100 animate-pulse" />
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     );
   }
 
-  const statusColors = {
-    online: "bg-green-100 text-green-800",
-    offline: "bg-red-100 text-red-800",
-    draining: "bg-yellow-100 text-yellow-800",
-  };
-
-  const statusIcons = {
-    online: "●",
-    offline: "○",
-    draining: "◐",
-  };
-
   return (
-    <div className="p-6 space-y-6">
+    <div className="space-y-6">
+      {/* Page Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">My Contributed Nodes</h1>
-          <p className="text-gray-600 text-sm mt-1">
-            Manage the nodes you&apos;ve contributed to uvacompute
+          <h1 className="text-2xl font-semibold text-black">
+            contributed nodes
+          </h1>
+          <p className="text-sm text-gray-500 mt-1">
+            manage the nodes you&apos;ve contributed to uvacompute
           </p>
         </div>
+
+        {/* Stats Summary */}
+        {nodes.length > 0 && (
+          <div className="flex items-center gap-6 text-sm">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-green-500" />
+              <span className="text-gray-500">{onlineCount} online</span>
+            </div>
+            {drainingCount > 0 && (
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-yellow-500" />
+                <span className="text-gray-500">{drainingCount} draining</span>
+              </div>
+            )}
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-red-500" />
+              <span className="text-gray-500">{offlineCount} offline</span>
+            </div>
+          </div>
+        )}
       </div>
 
       {nodes.length === 0 ? (
-        <div className="bg-gray-50 border border-gray-200 rounded-lg p-8 text-center">
-          <h3 className="text-lg font-medium text-gray-900 mb-2">
-            No nodes yet
-          </h3>
-          <p className="text-gray-600 mb-4">
-            You haven&apos;t contributed any nodes to uvacompute yet.
+        <div className="border border-gray-200 bg-white p-12 text-center">
+          <div className="mx-auto w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center mb-4">
+            <Server className="w-6 h-6 text-gray-400" />
+          </div>
+          <h2 className="text-lg font-semibold text-black mb-2">
+            no nodes yet
+          </h2>
+          <p className="text-sm text-gray-500 mb-4 max-w-md mx-auto">
+            you haven&apos;t contributed any nodes to uvacompute yet.
           </p>
-          <p className="text-sm text-gray-500">
-            To contribute a node, contact an admin to get an installation token,
+          <p className="text-xs text-gray-400">
+            to contribute a node, contact an admin to get an installation token,
             then run the install script on your machine.
           </p>
         </div>
@@ -120,115 +203,123 @@ export default function MyNodesPage() {
           {nodes.map((node) => (
             <div
               key={node._id}
-              className="bg-white border rounded-lg overflow-hidden"
+              className={`bg-white border border-gray-200 border-l-4 ${getStatusBorderColor(node.status)} overflow-hidden hover:border-gray-300 transition-colors`}
             >
+              {/* Node Header - Clickable */}
               <div
-                className="p-4 cursor-pointer hover:bg-gray-50"
+                className="p-5 cursor-pointer"
                 onClick={() => toggleExpand(node.nodeId)}
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-4">
-                    <span
-                      className={`text-lg ${node.status === "online" ? "text-green-500" : node.status === "draining" ? "text-yellow-500" : "text-red-500"}`}
-                    >
-                      {statusIcons[node.status as keyof typeof statusIcons]}
+                    <span className="text-gray-400">
+                      {expandedNode === node.nodeId ? (
+                        <ChevronDown className="w-5 h-5" />
+                      ) : (
+                        <ChevronRight className="w-5 h-5" />
+                      )}
                     </span>
-                    <div>
-                      <h3 className="font-semibold">
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-sm font-semibold text-black">
                         {node.name || node.nodeId}
                       </h3>
-                      <p className="text-sm text-gray-500">
-                        {node.cpus || 0} CPUs, {node.ram || 0}GB RAM,{" "}
+                      <p className="text-xs text-gray-400 mt-0.5">
+                        {node.cpus || 0} CPUs, {node.ram || 0} GB RAM,{" "}
                         {node.gpus || 0} GPUs
                       </p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-1.5">
                     <span
-                      className={`px-2 py-1 text-xs font-medium rounded-full ${statusColors[node.status as keyof typeof statusColors]}`}
-                    >
-                      {node.status}
-                    </span>
-                    <span className="text-gray-400">
-                      {expandedNode === node.nodeId ? "▼" : "▶"}
-                    </span>
+                      className={`w-2 h-2 rounded-full ${getStatusDotColor(node.status)}`}
+                    />
+                    <span className="text-xs text-gray-600">{node.status}</span>
                   </div>
                 </div>
               </div>
 
+              {/* Expanded Content */}
               {expandedNode === node.nodeId && (
-                <div className="border-t px-4 py-4 bg-gray-50">
+                <div className="border-t border-gray-100 px-5 py-4 bg-gray-50/50">
+                  {/* Actions */}
                   <div className="flex gap-2 mb-4">
                     {node.status === "online" && (
-                      <button
+                      <Button
+                        variant="outline"
+                        size="sm"
                         onClick={(e) => {
                           e.stopPropagation();
                           handlePause(node.nodeId);
                         }}
-                        className="px-3 py-1 text-sm bg-yellow-100 text-yellow-800 rounded hover:bg-yellow-200"
+                        className="text-yellow-700 border-yellow-200 hover:bg-yellow-50"
                       >
-                        Pause Node
-                      </button>
+                        <Pause className="w-3.5 h-3.5 mr-1.5" />
+                        pause node
+                      </Button>
                     )}
                     {node.status === "draining" && (
-                      <button
+                      <Button
+                        variant="outline"
+                        size="sm"
                         onClick={(e) => {
                           e.stopPropagation();
                           handleResume(node.nodeId);
                         }}
-                        className="px-3 py-1 text-sm bg-green-100 text-green-800 rounded hover:bg-green-200"
+                        className="text-green-700 border-green-200 hover:bg-green-50"
                       >
-                        Resume Node
-                      </button>
+                        <Play className="w-3.5 h-3.5 mr-1.5" />
+                        resume node
+                      </Button>
                     )}
                   </div>
 
-                  <div className="mt-4">
-                    <h4 className="font-medium text-sm text-gray-700 mb-2">
-                      Active Workloads
+                  {/* Active Workloads */}
+                  <div className="mb-4">
+                    <h4 className="text-xs text-gray-400 uppercase tracking-wide mb-2">
+                      active workloads
                     </h4>
                     {workloads === undefined ? (
-                      <p className="text-sm text-gray-500">Loading...</p>
+                      <div className="text-xs text-gray-400">loading...</div>
                     ) : workloads.vms.length === 0 &&
                       workloads.jobs.length === 0 ? (
-                      <p className="text-sm text-gray-500">
-                        No active workloads on this node
-                      </p>
+                      <div className="text-xs text-gray-400">
+                        no active workloads on this node
+                      </div>
                     ) : (
                       <div className="space-y-2">
                         {workloads.vms.map((vm: VM) => (
                           <div
                             key={vm._id}
-                            className="flex items-center justify-between bg-white p-2 rounded border text-sm"
+                            className="flex items-center justify-between bg-white p-3 border border-gray-200"
                           >
                             <div className="flex items-center gap-2">
-                              <span className="px-1.5 py-0.5 text-xs bg-blue-100 text-blue-800 rounded">
-                                VM
+                              <span className="px-1.5 py-0.5 text-[10px] uppercase tracking-wide bg-blue-100 text-blue-700 font-medium">
+                                vm
                               </span>
-                              <span className="font-mono">
-                                {vm.name || vm.vmId.slice(0, 8)}
+                              <span className="text-xs font-mono text-black">
+                                {vm.name || vm.vmId.slice(0, 12)}
                               </span>
                             </div>
-                            <span className="text-gray-500">
-                              {vm.cpus}CPU, {vm.ram}GB, {vm.gpus}GPU
+                            <span className="text-xs text-gray-400">
+                              {vm.cpus} CPU, {vm.ram} GB, {vm.gpus} GPU
                             </span>
                           </div>
                         ))}
                         {workloads.jobs.map((job: Job) => (
                           <div
                             key={job._id}
-                            className="flex items-center justify-between bg-white p-2 rounded border text-sm"
+                            className="flex items-center justify-between bg-white p-3 border border-gray-200"
                           >
                             <div className="flex items-center gap-2">
-                              <span className="px-1.5 py-0.5 text-xs bg-purple-100 text-purple-800 rounded">
-                                Job
+                              <span className="px-1.5 py-0.5 text-[10px] uppercase tracking-wide bg-purple-100 text-purple-700 font-medium">
+                                job
                               </span>
-                              <span className="font-mono">
-                                {job.name || job.jobId.slice(0, 8)}
+                              <span className="text-xs font-mono text-black">
+                                {job.name || job.jobId.slice(0, 12)}
                               </span>
                             </div>
-                            <span className="text-gray-500">
-                              {job.cpus}CPU, {job.ram}GB, {job.gpus}GPU
+                            <span className="text-xs text-gray-400">
+                              {job.cpus} CPU, {job.ram} GB, {job.gpus} GPU
                             </span>
                           </div>
                         ))}
@@ -236,16 +327,26 @@ export default function MyNodesPage() {
                     )}
                   </div>
 
-                  <div className="mt-4 pt-4 border-t text-xs text-gray-500">
-                    <p>Node ID: {node.nodeId}</p>
-                    <p>
-                      Registered:{" "}
-                      {new Date(node.registeredAt).toLocaleDateString()}
-                    </p>
-                    <p>
-                      Last heartbeat:{" "}
-                      {new Date(node.lastHeartbeat).toLocaleString()}
-                    </p>
+                  {/* Node Details */}
+                  <div className="border-t border-gray-200 pt-3 space-y-1.5 text-xs">
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">node id</span>
+                      <span className="text-gray-600 font-mono">
+                        {node.nodeId}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">registered</span>
+                      <span className="text-gray-600">
+                        {new Date(node.registeredAt).toLocaleDateString()}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">last heartbeat</span>
+                      <span className="text-gray-600">
+                        {new Date(node.lastHeartbeat).toLocaleString()}
+                      </span>
+                    </div>
                   </div>
                 </div>
               )}

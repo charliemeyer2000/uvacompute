@@ -25,12 +25,15 @@ export const theme = {
 } as const;
 
 export const statusColors = {
-  creating: chalk.yellow,
-  running: chalk.green,
+  not_found: chalk.gray,
+  pending: chalk.yellow,
+  booting: chalk.blue,
+  provisioning: chalk.blue,
+  ready: chalk.green,
+  stopping: chalk.yellow,
+  stopped: chalk.gray,
   failed: chalk.red,
-  deleting: chalk.yellow,
-  deleted: chalk.red,
-  expired: chalk.red,
+  offline: chalk.red,
 } as const;
 
 export const jobStatusColors = {
