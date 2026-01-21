@@ -191,6 +191,8 @@ register_node() {
     TUNNEL_PORT=$(echo "${response}" | jq -r '.tunnelPort')
     K3S_URL=$(echo "${response}" | jq -r '.k3sUrl')
     K3S_TOKEN=$(echo "${response}" | jq -r '.k3sToken')
+    VMPROXY_PUBLIC_KEY=$(echo "${response}" | jq -r '.vmproxyPublicKey')
+    HUB_KUBECONFIG_B64=$(echo "${response}" | jq -r '.hubKubeconfig')
 
     if [[ -z "${K3S_URL}" || "${K3S_URL}" == "null" ]]; then
         die "Invalid response from bootstrap API: missing k3sUrl"
@@ -198,6 +200,14 @@ register_node() {
 
     if [[ -z "${K3S_TOKEN}" || "${K3S_TOKEN}" == "null" ]]; then
         die "Invalid response from bootstrap API: missing k3sToken"
+    fi
+
+    if [[ -z "${VMPROXY_PUBLIC_KEY}" || "${VMPROXY_PUBLIC_KEY}" == "null" ]]; then
+        die "Invalid response from bootstrap API: missing vmproxyPublicKey"
+    fi
+
+    if [[ -z "${HUB_KUBECONFIG_B64}" || "${HUB_KUBECONFIG_B64}" == "null" ]]; then
+        die "Invalid response from bootstrap API: missing hubKubeconfig"
     fi
 
     log_success "Node registered successfully!"
@@ -686,6 +696,117 @@ EOF
     fi
 }
 
+# Install virtctl for VM management
+install_virtctl() {
+    log_step "Installing virtctl"
+
+    if command -v virtctl &> /dev/null; then
+        log_warn "virtctl is already installed"
+        virtctl version --client 2>/dev/null || true
+        return
+    fi
+
+    local virtctl_version="v1.4.0"
+    local arch
+    arch=$(uname -m)
+    case "${arch}" in
+        x86_64) arch="amd64" ;;
+        aarch64) arch="arm64" ;;
+        *) die "Unsupported architecture: ${arch}" ;;
+    esac
+
+    log_info "Downloading virtctl ${virtctl_version} for ${arch}..."
+    curl -L -o /usr/local/bin/virtctl \
+        "https://github.com/kubevirt/kubevirt/releases/download/${virtctl_version}/virtctl-${virtctl_version}-linux-${arch}"
+    chmod +x /usr/local/bin/virtctl
+
+    if virtctl version --client &>/dev/null; then
+        log_success "virtctl installed successfully"
+    else
+        log_warn "virtctl installed but version check failed"
+    fi
+}
+
+# Set up kubeconfig for kubectl/virtctl to talk to hub
+setup_kubeconfig() {
+    log_step "Setting up kubeconfig"
+
+    # The kubeconfig from the hub points to localhost:6443, but we need localhost:6444
+    # which is the tunnel endpoint on this node that forwards to the hub's k3s API
+    mkdir -p /root/.kube
+
+    # Decode and modify the kubeconfig to use localhost:6444
+    echo "${HUB_KUBECONFIG_B64}" | base64 -d | \
+        sed 's|server: https://127.0.0.1:6443|server: https://127.0.0.1:6444|g' \
+        > /root/.kube/config
+    chmod 600 /root/.kube/config
+
+    # Verify it works (may take a moment for tunnel to be ready)
+    log_info "Verifying kubeconfig..."
+    local retries=30
+    while [[ $retries -gt 0 ]]; do
+        if kubectl get nodes &>/dev/null; then
+            log_success "kubeconfig verified - can reach cluster API"
+            return
+        fi
+        sleep 2
+        ((retries--))
+    done
+
+    log_warn "Could not verify kubeconfig immediately - tunnel may need more time"
+    log_info "You can verify later with: kubectl get nodes"
+}
+
+# Add vmproxy public key to allow hub to SSH to this node for VM access
+setup_vmproxy_access() {
+    log_step "Setting up vmproxy SSH access"
+
+    mkdir -p /root/.ssh
+    chmod 700 /root/.ssh
+
+    # Add vmproxy public key if not already present
+    if grep -q "vmproxy@uvacompute" /root/.ssh/authorized_keys 2>/dev/null; then
+        log_warn "vmproxy key already in authorized_keys"
+    else
+        echo "${VMPROXY_PUBLIC_KEY}" >> /root/.ssh/authorized_keys
+        chmod 600 /root/.ssh/authorized_keys
+        log_success "vmproxy public key added to /root/.ssh/authorized_keys"
+    fi
+}
+
+# Annotate node with tunnel port so vm-proxy.sh can find it
+annotate_node() {
+    log_step "Annotating node with tunnel port"
+
+    local node_id
+    node_id=$(hostname)
+
+    # Wait for node to appear in cluster
+    log_info "Waiting for node to appear in cluster..."
+    local retries=60
+    while [[ $retries -gt 0 ]]; do
+        if kubectl get node "${node_id}" &>/dev/null; then
+            break
+        fi
+        sleep 5
+        ((retries--))
+    done
+
+    if [[ $retries -eq 0 ]]; then
+        log_warn "Node not found in cluster yet. Annotation will need to be applied manually:"
+        log_warn "  kubectl annotate node ${node_id} uvacompute.io/tunnel-port=${TUNNEL_PORT}"
+        return
+    fi
+
+    # Apply annotation
+    if kubectl annotate node "${node_id}" "uvacompute.io/tunnel-port=${TUNNEL_PORT}" --overwrite; then
+        log_success "Node annotated with tunnel port: ${TUNNEL_PORT}"
+    else
+        log_warn "Failed to annotate node. Apply manually:"
+        log_warn "  kubectl annotate node ${node_id} uvacompute.io/tunnel-port=${TUNNEL_PORT}"
+    fi
+}
+
 # Save installation state
 save_state() {
     log_step "Saving installation state"
@@ -835,6 +956,10 @@ main() {
     configure_nvidia_k3s
     generate_gpu_scripts
     setup_ssh_tunnel
+    install_virtctl
+    setup_vmproxy_access
+    setup_kubeconfig
+    annotate_node
     label_node
     save_state
     print_summary

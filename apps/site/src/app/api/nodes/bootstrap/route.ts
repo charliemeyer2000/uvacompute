@@ -72,6 +72,26 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Get vmproxy public key - this allows the hub to SSH to nodes for VM access
+    const vmproxyPublicKey = process.env.VMPROXY_PUBLIC_KEY;
+    if (!vmproxyPublicKey) {
+      console.error("VMPROXY_PUBLIC_KEY environment variable not set");
+      return NextResponse.json(
+        { error: "Server configuration error: vmproxy key not configured" },
+        { status: 500 },
+      );
+    }
+
+    // Get hub kubeconfig (base64 encoded) - nodes need this to talk to k8s API
+    const hubKubeconfig = process.env.HUB_KUBECONFIG_B64;
+    if (!hubKubeconfig) {
+      console.error("HUB_KUBECONFIG_B64 environment variable not set");
+      return NextResponse.json(
+        { error: "Server configuration error: kubeconfig not configured" },
+        { status: 500 },
+      );
+    }
+
     return NextResponse.json(
       {
         success: true,
@@ -81,6 +101,8 @@ export async function POST(request: NextRequest) {
         kubeconfigPath: DEFAULT_KUBECONFIG_PATH,
         k3sUrl: K3S_API_URL,
         k3sToken: k3sAgentToken,
+        vmproxyPublicKey: vmproxyPublicKey,
+        hubKubeconfig: hubKubeconfig,
       },
       { status: 200 },
     );
