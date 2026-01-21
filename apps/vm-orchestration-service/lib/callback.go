@@ -184,3 +184,58 @@ func (c *CallbackClient) signRequest(timestamp string, body string) string {
 	h.Write([]byte(payload))
 	return hex.EncodeToString(h.Sum(nil))
 }
+
+type ConvexVM struct {
+	VMId      string  `json:"vmId"`
+	UserId    string  `json:"userId"`
+	Name      *string `json:"name"`
+	Status    string  `json:"status"`
+	Cpus      int     `json:"cpus"`
+	Ram       int     `json:"ram"`
+	Disk      int     `json:"disk"`
+	Gpus      int     `json:"gpus"`
+	GpuType   string  `json:"gpuType"`
+	Hours     int     `json:"hours"`
+	ExpiresAt int64   `json:"expiresAt"`
+	NodeId    *string `json:"nodeId"`
+}
+
+type ActiveVMsResponse struct {
+	VMs []ConvexVM `json:"vms"`
+}
+
+// FetchActiveVMs retrieves active VMs from the site's Convex database
+func (c *CallbackClient) FetchActiveVMs() ([]ConvexVM, error) {
+	url := fmt.Sprintf("%s/api/vms/active", c.siteBaseUrl)
+	timestamp := strconv.FormatInt(time.Now().Unix(), 10)
+
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("X-Timestamp", timestamp)
+	// For GET requests, body is empty
+	signature := c.signRequest(timestamp, "")
+	req.Header.Set("X-Signature", signature)
+
+	log.Printf("Fetching active VMs from Convex...")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch active VMs: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to fetch active VMs: %s", resp.Status)
+	}
+
+	var response ActiveVMsResponse
+	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	log.Printf("Fetched %d active VMs from Convex", len(response.VMs))
+	return response.VMs, nil
+}
