@@ -209,7 +209,10 @@ export const getWorkloadsOnNode = query({
       .collect();
 
     const activeVms = vms.filter(
-      (vm) => vm.status !== "deleted" && vm.status !== "expired",
+      (vm) =>
+        vm.status !== "stopped" &&
+        vm.status !== "failed" &&
+        vm.status !== "offline",
     );
     const activeJobs = jobs.filter(
       (job) =>
@@ -420,9 +423,13 @@ export const forceCleanup = mutation({
     let jobsCancelled = 0;
 
     for (const vm of vms) {
-      if (vm.status !== "deleted" && vm.status !== "expired") {
+      if (
+        vm.status !== "stopped" &&
+        vm.status !== "failed" &&
+        vm.status !== "offline"
+      ) {
         await ctx.db.patch(vm._id, {
-          status: "deleted",
+          status: "stopped",
           deletedAt: now,
         });
         vmsDeleted++;

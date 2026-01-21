@@ -27,19 +27,28 @@ export default function Page() {
         </p>
 
         <h2 className="text-xl font-semibold mt-8 mb-4 text-black">
-          gpus instantly
+          virtual machines
         </h2>
         <p className="mb-4 text-base leading-relaxed">
-          the fastest way to run GPU-intensive workloads right now. get access
-          to our fleet of 5090s, up to 2TB NVMe SSD, 16 vCPUs, and 64GB RAM. get
-          an ssh shell in under 10 seconds.
+          get instant access to gpu-powered vms with rtx 5090s, up to 2tb nvme
+          ssd, 16 vcpus, and 64gb ram. get an ssh shell in under 10 seconds.
         </p>
 
         <h2 className="text-xl font-semibold mt-8 mb-4 text-black">
-          coming soon
+          container jobs
         </h2>
         <p className="mb-4 text-base leading-relaxed">
-          we're working to build serverless containers and k8s vclusters.
+          run any docker container on our network with a single command. perfect
+          for ml training, batch processing, and data pipelines.
+        </p>
+
+        <h2 className="text-xl font-semibold mt-8 mb-4 text-black">
+          distributed network
+        </h2>
+        <p className="mb-4 text-base leading-relaxed">
+          our federated compute network spans multiple nodes. contributors can
+          share their gpu hardware and join the network with a simple install
+          script.
         </p>
 
         <h2 className="text-xl font-semibold mt-8 mb-4 text-black">
@@ -72,7 +81,7 @@ export default function Page() {
 
         <footer className="mt-16 pt-4 border-t border-gray-200">
           <h3 className="text-base font-normal text-footer-grey italic">
-            all content © 2025 the university of virginia compute company
+            all content © 2026 the university of virginia compute company
           </h3>
           <ul className="list-none mb-2 space-y-1 italic">
             <li>

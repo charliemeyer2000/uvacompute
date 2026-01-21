@@ -74,7 +74,7 @@ func (vm *VMManager) CreateVM(req VMCreationRequest) (string, error) {
 		Disk:         disk,
 		Gpus:         gpus,
 		GPUType:      gpuType,
-		Status:       VM_STATUS_CREATING,
+		Status:       VM_STATUS_PENDING,
 	}
 
 	go vm.createVMAsync(vmId, cpus, ram, disk, gpus, req.SSHPublicKeys, req.Hours, startupScript, cloudInitConfig)
@@ -103,7 +103,7 @@ func (vm *VMManager) createVMAsync(vmId string, cpus, ram, disk, gpus int, sshPu
 		return
 	}
 
-	vm.UpdateVMStatus(vmId, VM_STATUS_RUNNING, "")
+	vm.UpdateVMStatus(vmId, VM_STATUS_READY, "")
 	log.Printf("VM %s successfully created and is now running", vmId)
 
 	time.AfterFunc(time.Duration(hours*3600*int(time.Second)), func() {
@@ -113,13 +113,13 @@ func (vm *VMManager) createVMAsync(vmId string, cpus, ram, disk, gpus int, sshPu
 
 		vm.mu.Lock()
 		vmState := vm.vmMap[vmId]
-		vmState.Status = VM_STATUS_EXPIRED
+		vmState.Status = VM_STATUS_STOPPED
 		vm.vmMap[vmId] = vmState
 		vm.mu.Unlock()
 
 		if vm.callbackClient != nil {
 			go func() {
-				if err := vm.callbackClient.NotifyVMStatusUpdate(vmId, string(VM_STATUS_EXPIRED), ""); err != nil {
+				if err := vm.callbackClient.NotifyVMStatusUpdate(vmId, string(VM_STATUS_STOPPED), ""); err != nil {
 					log.Printf("ERROR: Failed to notify site about VM %s expiration: %v", vmId, err)
 				}
 			}()
@@ -163,7 +163,7 @@ func (vm *VMManager) UpdateVMStatus(vmId string, status VMStatus, errorMessage s
 	}
 	vm.mu.Unlock()
 
-	if status == VM_STATUS_RUNNING {
+	if status == VM_STATUS_READY {
 		if info, err := vm.vmProvider.GetVMInfo(vmId); err == nil && info.Location != "" {
 			nodeId = info.Location
 			vm.mu.Lock()
@@ -201,7 +201,7 @@ func (vm *VMManager) DeleteVM(vmId string) error {
 
 	if exists {
 		vmState := vm.vmMap[vmId]
-		vmState.Status = VM_STATUS_DELETING
+		vmState.Status = VM_STATUS_STOPPING
 		vm.vmMap[vmId] = vmState
 	}
 
@@ -212,7 +212,7 @@ func (vm *VMManager) DeleteVM(vmId string) error {
 
 	if exists {
 		vmState := vm.vmMap[vmId]
-		vmState.Status = VM_STATUS_DELETED
+		vmState.Status = VM_STATUS_STOPPED
 		vm.vmMap[vmId] = vmState
 		delete(vm.vmMap, vmId)
 	}
@@ -252,7 +252,7 @@ func (vm *VMManager) InitializeFromBackend() error {
 			Disk:         64,
 			Gpus:         0,
 			GPUType:      DefaultGpuType,
-			Status:       VM_STATUS_RUNNING,
+			Status:       VM_STATUS_READY,
 		}
 
 		if cpuStr, ok := backendVM.Config["limits.cpu"]; ok {
@@ -284,7 +284,7 @@ func (vm *VMManager) InitializeFromBackend() error {
 				if info, err := vm.vmProvider.GetVMInfo(id); err == nil && info.Location != "" {
 					nodeId = info.Location
 				}
-				if err := vm.callbackClient.NotifyVMStatusUpdate(id, string(VM_STATUS_RUNNING), nodeId); err != nil {
+				if err := vm.callbackClient.NotifyVMStatusUpdate(id, string(VM_STATUS_READY), nodeId); err != nil {
 					log.Printf("ERROR: Failed to notify site about synced VM %s status: %v", id, err)
 				}
 			}(vmId)
@@ -298,7 +298,7 @@ func (vm *VMManager) checkResourceAvailability(req VMCreationRequest) error {
 	var totalCpus, totalRam, totalGpus int
 
 	for _, vmState := range vm.vmMap {
-		if vmState.Status == VM_STATUS_RUNNING || vmState.Status == VM_STATUS_CREATING {
+		if vmState.Status == VM_STATUS_READY || vmState.Status == VM_STATUS_PENDING {
 			totalCpus += vmState.Cpus
 			totalRam += vmState.Ram
 			totalGpus += vmState.Gpus
