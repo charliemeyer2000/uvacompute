@@ -760,7 +760,7 @@ async function getVMStatus(vmId: string): Promise<void> {
   }
 }
 
-async function listVMs(options: { all?: boolean }): Promise<void> {
+async function listVMs(): Promise<void> {
   const spinner = ora("Fetching VMs...").start();
 
   try {
@@ -796,17 +796,15 @@ async function listVMs(options: { all?: boolean }): Promise<void> {
 
     const data = VMListResponseSchema.parse(rawData);
 
-    const allVMs = options.all ? data.vms : data.vms;
-
     spinner.succeed(theme.success("VMs retrieved!"));
 
-    if (allVMs.length === 0) {
+    if (data.vms.length === 0) {
       console.log(theme.warning("\nNo VMs found."));
       console.log(theme.muted("Create one with: uva vm create -h 1 -n myvm\n"));
       return;
     }
 
-    const sorted = [...allVMs].sort(
+    const sorted = [...data.vms].sort(
       (a, b) =>
         new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
     );
@@ -1065,11 +1063,7 @@ export function registerVMCommands(program: Command) {
     .argument("<vmId>", "VM ID to check")
     .action(getVMStatus);
 
-  vm.command("list")
-    .alias("ls")
-    .description("List running VMs")
-    .option("-a, --all", "Show all VMs (including non-running)")
-    .action(listVMs);
+  vm.command("list").alias("ls").description("List VMs").action(listVMs);
 
   vm.command("ssh")
     .description("Connect to VM via SSH")
