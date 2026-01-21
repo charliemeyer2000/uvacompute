@@ -1,29 +1,40 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { StatusData, DayAggregate } from "@/types";
-import { getStatus } from "../actions/status-actions";
+import type { StatusData, DayAggregate, ClusterStatus } from "@/types";
+import { getStatus, getClusterStatus } from "../actions/status-actions";
 import { StatusBadge } from "./status-badge";
 import { ServiceStatus } from "./service-status";
 import { StatusIndicator } from "./status-indicator";
+import { ClusterResources } from "./cluster-resources";
+import { NodeList } from "./node-list";
 
 interface StatusContentProps {
   initialData: StatusData;
   historyData?: DayAggregate[];
+  initialClusterStatus?: ClusterStatus | null;
 }
 
 export function StatusContent({
   initialData,
   historyData = [],
+  initialClusterStatus = null,
 }: StatusContentProps) {
   const [statusData, setStatusData] = useState<StatusData>(initialData);
+  const [clusterStatus, setClusterStatus] = useState<ClusterStatus | null>(
+    initialClusterStatus,
+  );
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
   const [fetchError, setFetchError] = useState<string | null>(null);
 
-  async function fetchStatus() {
+  async function fetchAllStatus() {
     try {
-      const data = await getStatus();
-      setStatusData(data);
+      const [serviceData, cluster] = await Promise.all([
+        getStatus(),
+        getClusterStatus(),
+      ]);
+      setStatusData(serviceData);
+      setClusterStatus(cluster);
       setLastUpdate(new Date());
       setFetchError(null);
     } catch (error) {
@@ -35,9 +46,11 @@ export function StatusContent({
   }
 
   useEffect(() => {
-    const interval = setInterval(fetchStatus, 60000);
+    const interval = setInterval(fetchAllStatus, 60000);
     return () => clearInterval(interval);
   }, []);
+
+  const overallStatus = clusterStatus?.overall || statusData.current.status;
 
   return (
     <>
@@ -58,14 +71,27 @@ export function StatusContent({
         )}
       </div>
 
-      <StatusBadge status={statusData.current.status} />
+      <StatusBadge status={overallStatus} />
 
-      <ServiceStatus
-        name="VM Orchestration Service"
-        status={statusData.current.status}
-        responseTime={statusData.current.responseTime}
-        historyData={historyData}
-      />
+      {clusterStatus && (
+        <>
+          <ClusterResources resources={clusterStatus.resources} />
+          <NodeList
+            nodes={clusterStatus.nodes}
+            nodeCounts={clusterStatus.resources.nodes}
+          />
+        </>
+      )}
+
+      <div className="border border-gray-200 p-4 sm:p-6">
+        <h2 className="text-sm font-medium text-gray-900 mb-4">services</h2>
+        <ServiceStatus
+          name="VM Orchestration Service"
+          status={statusData.current.status}
+          responseTime={statusData.current.responseTime}
+          historyData={historyData}
+        />
+      </div>
     </>
   );
 }
