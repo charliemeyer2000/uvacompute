@@ -317,6 +317,27 @@ func (vm *VMManager) InitializeFromBackend() error {
 	return nil
 }
 
+func (vm *VMManager) ListAllVMs() map[string]VMState {
+	vm.mu.Lock()
+	defer vm.mu.Unlock()
+
+	result := make(map[string]VMState)
+	for k, v := range vm.vmMap {
+		result[k] = v
+	}
+	return result
+}
+
+func (vm *VMManager) AddVMFromExternal(vmId string, state VMState) {
+	vm.mu.Lock()
+	defer vm.mu.Unlock()
+
+	if _, exists := vm.vmMap[vmId]; !exists {
+		vm.vmMap[vmId] = state
+		log.Printf("Added VM %s to vmMap from external source (status: %s)", vmId, state.Status)
+	}
+}
+
 func (vm *VMManager) checkResourceAvailability(req VMCreationRequest) error {
 	// Check GPU node availability first (before counting resources)
 	requestGpus := IntOrDefault(req.Gpus, DefaultGpus)
