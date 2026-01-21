@@ -1,5 +1,6 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
+import { authComponent } from "./auth";
 
 export const register = mutation({
   args: {
@@ -254,6 +255,80 @@ export const setOwner = mutation({
 
     await ctx.db.patch(node._id, {
       ownerId: args.ownerId,
+    });
+
+    return node._id;
+  },
+});
+
+export const setStatusAsOwner = mutation({
+  args: {
+    nodeId: v.string(),
+    status: v.union(
+      v.literal("online"),
+      v.literal("offline"),
+      v.literal("draining"),
+    ),
+  },
+  handler: async (ctx, args) => {
+    const user = await authComponent.getAuthUser(ctx);
+    if (!user) {
+      throw new Error("Not authenticated");
+    }
+
+    const node = await ctx.db
+      .query("nodes")
+      .withIndex("by_nodeId", (q) => q.eq("nodeId", args.nodeId))
+      .first();
+
+    if (!node) {
+      throw new Error(`Node ${args.nodeId} not found`);
+    }
+
+    if (node.ownerId !== user._id) {
+      throw new Error("You do not own this node");
+    }
+
+    await ctx.db.patch(node._id, {
+      status: args.status,
+    });
+
+    return node._id;
+  },
+});
+
+export const setStatusAsAdmin = mutation({
+  args: {
+    nodeId: v.string(),
+    status: v.union(
+      v.literal("online"),
+      v.literal("offline"),
+      v.literal("draining"),
+    ),
+  },
+  handler: async (ctx, args) => {
+    const user = await authComponent.getAuthUser(ctx);
+    if (!user?.email) {
+      throw new Error("Not authenticated");
+    }
+
+    const adminUsers =
+      process.env.ADMIN_USERS?.split(",").map((email) => email.trim()) || [];
+    if (!adminUsers.includes(user.email)) {
+      throw new Error("Admin access required");
+    }
+
+    const node = await ctx.db
+      .query("nodes")
+      .withIndex("by_nodeId", (q) => q.eq("nodeId", args.nodeId))
+      .first();
+
+    if (!node) {
+      throw new Error(`Node ${args.nodeId} not found`);
+    }
+
+    await ctx.db.patch(node._id, {
+      status: args.status,
     });
 
     return node._id;
