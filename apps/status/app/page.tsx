@@ -72,14 +72,38 @@ export default async function StatusPage() {
   }
 
   return (
-    <div className="min-h-screen bg-white p-3 sm:p-4 md:p-8">
-      <div className="max-w-6xl mx-auto space-y-6 sm:space-y-8">
-        {loadError && (
-          <div className="border border-red-600 bg-red-50 p-4 mb-6 rounded-lg">
-            <div className="font-medium text-red-900 mb-1">
-              Failed to load status data
+    <div className="min-h-screen bg-white">
+      <div className="border-b border-black">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+          <div className="flex items-start justify-between">
+            <div>
+              <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight text-black">
+                uvacompute
+              </h1>
+              <p className="text-sm text-gray-500 mt-1">system status</p>
             </div>
-            <div className="text-sm text-red-700">{loadError}</div>
+            <div className="text-right">
+              <div className="flex items-center gap-2 justify-end">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full bg-orange-accent opacity-75" />
+                  <span className="relative inline-flex h-2 w-2 bg-orange-accent" />
+                </span>
+                <span className="text-xs text-gray-500 uppercase tracking-wider">
+                  live
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
+        {loadError && (
+          <div className="border-l-4 border-red-600 bg-red-50 p-4 mb-8">
+            <div className="font-medium text-red-900 text-sm">
+              error loading status data
+            </div>
+            <div className="text-sm text-red-700 mt-1">{loadError}</div>
           </div>
         )}
 
@@ -89,19 +113,21 @@ export default async function StatusPage() {
           initialClusterStatus={clusterStatus}
         />
 
-        <div className="pt-4 sm:pt-6 mt-6 sm:mt-8">
-          <div className="text-xs sm:text-sm text-gray-600">
-            <p className="mb-2">
-              This page shows the real-time status of uvacompute services and
-              cluster resources.
-            </p>
+        <footer className="mt-16 pt-8 border-t border-gray-200">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 text-xs text-gray-500">
             <p>
-              Monitoring checks run every minute. Historical data is retained
-              for 30 days.
+              monitoring checks run every minute. historical data retained for
+              30 days.
             </p>
+            <a
+              href="https://uvacompute.com"
+              className="text-orange-accent hover:underline"
+            >
+              uvacompute.com
+            </a>
           </div>
-        </div>
-      </div>
+        </footer>
+      </main>
     </div>
   );
 }

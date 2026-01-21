@@ -15,8 +15,8 @@ type KubeVirtConfig struct {
 func DefaultKubeVirtConfig() KubeVirtConfig {
 	return KubeVirtConfig{
 		Namespace:           getEnvOrDefault("KUBEVIRT_NAMESPACE", "uvacompute"),
-		VMImageCPU:          getEnvOrDefault("VM_IMAGE_CPU", "docker.io/kubevirt/fedora-cloud-container-disk-demo:latest"),
-		VMImageGPU:          getEnvOrDefault("VM_IMAGE_GPU", "docker.io/kubevirt/fedora-cloud-container-disk-demo:latest"),
+		VMImageCPU:          getEnvOrDefault("VM_IMAGE_CPU", "quay.io/containerdisks/ubuntu:22.04"),
+		VMImageGPU:          getEnvOrDefault("VM_IMAGE_GPU", "quay.io/containerdisks/ubuntu:22.04"),
 		DefaultStorageClass: getEnvOrDefault("VM_STORAGE_CLASS", ""),
 		KubeconfigPath:      getEnvOrDefault("KUBECONFIG", ""),
 	}
