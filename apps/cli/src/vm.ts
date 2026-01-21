@@ -42,6 +42,48 @@ import {
 import yaml from "js-yaml";
 const BASE_URL = getBaseUrl();
 
+function stripAnsi(value: string): string {
+  return value.replace(/\x1b\[[0-9;]*m/g, "");
+}
+
+function formatAge(date: Date): string {
+  const diffMs = Date.now() - date.getTime();
+  if (diffMs < 0) return "0m";
+  const minutes = Math.floor(diffMs / 60000);
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h`;
+  const days = Math.floor(hours / 24);
+  return `${days}d`;
+}
+
+function formatResources(vm: {
+  cpus: number;
+  ram: number;
+  disk: number;
+  gpus: number;
+  gpuType?: string | null;
+}): string {
+  const gpuPart = vm.gpus > 0 ? ` | ${vm.gpus}x ${vm.gpuType}` : "";
+  return `${vm.cpus} vCPU | ${vm.ram}GB RAM | ${vm.disk}GB disk${gpuPart}`;
+}
+
+function formatStatus(status: string): string {
+  const expiredStatuses = new Set([
+    "stopped",
+    "failed",
+    "offline",
+    "not_found",
+  ]);
+  if (expiredStatuses.has(status)) {
+    return `${theme.error("●")} Expired`;
+  }
+  if (status === "ready") {
+    return `${theme.success("●")} Ready`;
+  }
+  return `${theme.warning("●")} Provisioning`;
+}
+
 function getStatusMessage(status: string): string {
   const messages: Record<string, string> = {
     not_found: "VM not found",
@@ -754,54 +796,53 @@ async function listVMs(options: { all?: boolean }): Promise<void> {
 
     const data = VMListResponseSchema.parse(rawData);
 
-    const filteredVMs = options.all
-      ? data.vms
-      : data.vms.filter((vm) => vm.status === "ready");
+    const allVMs = options.all ? data.vms : data.vms;
 
     spinner.succeed(theme.success("VMs retrieved!"));
 
-    if (filteredVMs.length === 0) {
-      if (options.all) {
-        console.log(theme.warning("\nNo VMs found."));
-        console.log(
-          theme.muted("Create one with: uva vm create -h 1 -n myvm\n"),
-        );
-      } else {
-        console.log(theme.warning("\nNo running VMs found."));
-        console.log(theme.muted("Use 'uva vm list --all' to see all VMs\n"));
-      }
+    if (allVMs.length === 0) {
+      console.log(theme.warning("\nNo VMs found."));
+      console.log(theme.muted("Create one with: uva vm create -h 1 -n myvm\n"));
       return;
     }
 
-    if (options.all) {
-      console.log(formatSectionHeader("All VMs"));
-    } else {
-      console.log(formatSectionHeader("Running VMs"));
+    const sorted = [...allVMs].sort(
+      (a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    );
+
+    console.log();
+    const headers = ["Age", "VM", "Resources", "Status"];
+    const rows = sorted.map((vm) => {
+      const nameDisplay = vm.name ? vm.name : "(unnamed)";
+      const vmLabel = `${nameDisplay} ${theme.muted(vm.vmId)}`;
+      return [
+        formatAge(new Date(vm.createdAt)),
+        vmLabel,
+        formatResources(vm),
+        formatStatus(vm.status),
+      ];
+    });
+
+    const widths = headers.map((header, index) => {
+      const cellWidths = rows.map((row) => stripAnsi(row[index] ?? "").length);
+      return Math.max(header.length, ...cellWidths);
+    });
+
+    const renderRow = (cols: string[]) =>
+      cols
+        .map((col, index) => {
+          const padding = (widths[index] ?? 0) - stripAnsi(col).length;
+          return `${col}${" ".repeat(Math.max(0, padding + 2))}`;
+        })
+        .join("")
+        .trimEnd();
+
+    console.log(renderRow(headers.map((h) => theme.muted(h))));
+    for (const row of rows) {
+      console.log(renderRow(row));
     }
     console.log();
-
-    for (const vm of filteredVMs) {
-      const statusColor =
-        statusColors[vm.status as keyof typeof statusColors] || theme.muted;
-
-      const nameDisplay = vm.name
-        ? theme.emphasis(vm.name)
-        : theme.muted("(unnamed)");
-      console.log(`${nameDisplay} ${statusColor(`[${vm.status}]`)}`);
-      console.log(theme.muted(`  VM ID: ${vm.vmId}`));
-      console.log(
-        theme.muted(
-          `  Resources: ${vm.cpus} vCPU | ${vm.ram}GB RAM | ${vm.disk}GB disk${vm.gpus > 0 ? ` | ${vm.gpus}x ${vm.gpuType}` : ""}`,
-        ),
-      );
-      console.log(
-        theme.muted(`  Created: ${new Date(vm.createdAt).toLocaleString()}`),
-      );
-      console.log(
-        theme.muted(`  Expires: ${new Date(vm.expiresAt).toLocaleString()}`),
-      );
-      console.log();
-    }
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Unknown error";
     spinner.fail(`Error: ${message}`);
