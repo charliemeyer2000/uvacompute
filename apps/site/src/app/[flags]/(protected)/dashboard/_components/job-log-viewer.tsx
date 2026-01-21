@@ -3,7 +3,15 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Copy, Check, RefreshCw, Loader2, FileText, X } from "lucide-react";
+import {
+  Copy,
+  Check,
+  RefreshCw,
+  Loader2,
+  FileText,
+  X,
+  Clock,
+} from "lucide-react";
 import { toast } from "sonner";
 import { JobStatus } from "@/lib/job-schemas";
 
@@ -15,11 +23,16 @@ interface JobLogViewerProps {
   onOpenChange: (open: boolean) => void;
 }
 
+// Jobs that are actively producing logs and can be streamed
+const STREAMABLE_STATUSES: JobStatus[] = ["pulling", "running"];
+
+// Jobs that are waiting to start (no logs yet)
+const WAITING_STATUSES: JobStatus[] = ["pending", "scheduled"];
+
+// All active (non-terminal) jobs
 const ACTIVE_STATUSES: JobStatus[] = [
-  "pending",
-  "scheduled",
-  "pulling",
-  "running",
+  ...WAITING_STATUSES,
+  ...STREAMABLE_STATUSES,
 ];
 
 const MAX_RECONNECT_ATTEMPTS = 5;
@@ -48,9 +61,13 @@ export default function JobLogViewer({
   const isActiveRef = useRef(ACTIVE_STATUSES.includes(jobStatus));
 
   const isActive = ACTIVE_STATUSES.includes(jobStatus);
+  const isStreamable = STREAMABLE_STATUSES.includes(jobStatus);
+  const isWaiting = WAITING_STATUSES.includes(jobStatus);
 
-  // Keep ref in sync for use in callbacks
+  // Keep refs in sync for use in callbacks
   isActiveRef.current = isActive;
+  const isStreamableRef = useRef(isStreamable);
+  isStreamableRef.current = isStreamable;
 
   const scrollToBottom = useCallback(() => {
     if (logContainerRef.current) {
@@ -145,10 +162,12 @@ export default function JobLogViewer({
 
     eventSource.onerror = () => {
       eventSource.close();
+      eventSourceRef.current = null;
 
-      // Try to reconnect if still active and under max attempts
+      // Only reconnect if job is still streamable (pulling/running) and under max attempts
+      // Don't reconnect for pending/scheduled jobs - they have no logs to stream yet
       if (
-        isActiveRef.current &&
+        isStreamableRef.current &&
         reconnectAttemptsRef.current < MAX_RECONNECT_ATTEMPTS
       ) {
         const delay = Math.min(
@@ -158,15 +177,18 @@ export default function JobLogViewer({
         reconnectAttemptsRef.current++;
 
         setTimeout(() => {
-          if (isActiveRef.current && eventSourceRef.current === null) {
+          if (isStreamableRef.current && eventSourceRef.current === null) {
             startStreaming();
           }
         }, delay);
       } else {
-        // Max attempts reached or job no longer active, fall back to fetch
+        // Max attempts reached or job not streamable, stop streaming
         setIsStreaming(false);
         reconnectAttemptsRef.current = 0;
-        fetchLogs();
+        // Only fetch logs if job is terminal (completed/failed/cancelled)
+        if (!isActiveRef.current) {
+          fetchLogs();
+        }
       }
     };
 
@@ -216,11 +238,13 @@ export default function JobLogViewer({
             eventSourceRef.current.close();
             eventSourceRef.current = null;
           }
-          if (isActiveRef.current) {
+          if (isStreamableRef.current) {
             startStreaming();
           } else {
             setIsStreaming(false);
-            fetchLogs();
+            if (!isActiveRef.current) {
+              fetchLogs();
+            }
           }
         }
       }, HEARTBEAT_CHECK_INTERVAL_MS);
@@ -237,9 +261,19 @@ export default function JobLogViewer({
   useEffect(() => {
     if (open) {
       reconnectAttemptsRef.current = 0;
-      if (isActive) {
+      setError(null);
+
+      if (isStreamable) {
+        // Job is pulling or running - stream logs
         startStreaming();
+      } else if (isWaiting) {
+        // Job is pending or scheduled - no logs yet, just wait
+        // The UI will show "waiting for job to start"
+        // When status changes to streamable, this effect re-runs
+        stopStreaming();
       } else {
+        // Job is terminal (completed/failed/cancelled) - fetch archived logs
+        stopStreaming();
         fetchLogs();
       }
     } else {
@@ -251,7 +285,7 @@ export default function JobLogViewer({
     return () => {
       stopStreaming();
     };
-  }, [open, isActive, startStreaming, stopStreaming, fetchLogs]);
+  }, [open, isStreamable, isWaiting, startStreaming, stopStreaming, fetchLogs]);
 
   const handleCopy = async () => {
     if (copied || !logs) return;
@@ -267,12 +301,14 @@ export default function JobLogViewer({
   };
 
   const handleRefresh = () => {
-    if (isActive) {
+    if (isStreamable) {
       stopStreaming();
       startStreaming();
-    } else {
+    } else if (!isWaiting) {
+      // Only fetch logs for terminal jobs, not waiting ones
       fetchLogs();
     }
+    // For waiting jobs, refresh does nothing - there are no logs yet
   };
 
   const logLines = logs ? logs.split("\n") : [];
@@ -303,6 +339,12 @@ export default function JobLogViewer({
                 </p>
               </div>
 
+              {isWaiting && (
+                <span className="flex items-center gap-1.5 text-xs text-yellow-600 flex-shrink-0 ml-2">
+                  <Clock className="h-3 w-3" />
+                  {jobStatus}
+                </span>
+              )}
               {isStreaming && (
                 <span className="flex items-center gap-1.5 text-xs text-orange-accent flex-shrink-0 ml-2">
                   <span className="relative flex h-2 w-2">
@@ -401,16 +443,29 @@ export default function JobLogViewer({
                 </div>
               ) : (
                 <div className="flex flex-col items-center justify-center h-full gap-2 text-gray-400">
-                  <FileText className="w-8 h-8" />
-                  <p className="text-sm">
-                    {isStreaming
-                      ? "waiting for output..."
-                      : "no logs available"}
-                  </p>
-                  {isStreaming && (
-                    <p className="text-xs text-gray-400">
-                      logs will appear here as they are generated
-                    </p>
+                  {isWaiting ? (
+                    <>
+                      <Clock className="w-8 h-8" />
+                      <p className="text-sm">waiting for job to start</p>
+                      <p className="text-xs text-gray-400">
+                        {jobStatus === "pending"
+                          ? "job is queued and will start soon"
+                          : "job is scheduled and starting up"}
+                      </p>
+                    </>
+                  ) : isStreaming ? (
+                    <>
+                      <FileText className="w-8 h-8" />
+                      <p className="text-sm">waiting for output...</p>
+                      <p className="text-xs text-gray-400">
+                        logs will appear here as they are generated
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <FileText className="w-8 h-8" />
+                      <p className="text-sm">no logs available</p>
+                    </>
                   )}
                 </div>
               )}
