@@ -1,6 +1,7 @@
 package structs
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"strconv"
@@ -25,6 +26,7 @@ type VMProvider interface {
 	GetVMStatus(vmId string) (string, error)
 	GetVMInfo(vmId string) (*VMInfo, error)
 	ListVMs() ([]ListVM, error)
+	HasVfioCapableNode(ctx context.Context) (bool, error)
 }
 
 type VMManager struct {
@@ -301,6 +303,19 @@ func (vm *VMManager) InitializeFromBackend() error {
 }
 
 func (vm *VMManager) checkResourceAvailability(req VMCreationRequest) error {
+	// Check GPU node availability first (before counting resources)
+	requestGpus := IntOrDefault(req.Gpus, DefaultGpus)
+	if requestGpus > 0 {
+		ctx := context.Background()
+		hasVfio, err := vm.vmProvider.HasVfioCapableNode(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to check GPU node availability: %w", err)
+		}
+		if !hasVfio {
+			return fmt.Errorf("no GPU nodes available for VM passthrough (all GPUs in container mode)")
+		}
+	}
+
 	var totalCpus, totalRam, totalGpus int
 
 	for _, vmState := range vm.vmMap {
@@ -313,7 +328,6 @@ func (vm *VMManager) checkResourceAvailability(req VMCreationRequest) error {
 
 	requestCpus := IntOrDefault(req.Cpus, DefaultCpus)
 	requestRam := IntOrDefault(req.Ram, DefaultRam)
-	requestGpus := IntOrDefault(req.Gpus, DefaultGpus)
 
 	if totalCpus+requestCpus > vm.limits.MaxCpus {
 		return fmt.Errorf("insufficient CPU resources: requested %d vCPUs, %d already allocated, limit is %d",
