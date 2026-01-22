@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useQuery } from "convex/react";
 import { api } from "../../../../../../convex/_generated/api";
 import { authClient } from "@/lib/auth-client";
@@ -13,40 +14,20 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
-import { VM, formatDate, formatStatus } from "@/lib/vm-utils";
+import {
+  VM,
+  formatDate,
+  formatStatus,
+  getStatusBorderColor,
+  getStatusDotColor,
+} from "@/lib/vm-utils";
 import { Archive } from "lucide-react";
-
-function getStatusBorderColor(status: string): string {
-  switch (status) {
-    case "failed":
-    case "offline":
-      return "border-l-red-500";
-    case "stopping":
-      return "border-l-yellow-500";
-    case "stopped":
-    case "not_found":
-      return "border-l-gray-300";
-    default:
-      return "border-l-gray-300";
-  }
-}
-
-function getStatusDotColor(status: string): string {
-  switch (status) {
-    case "failed":
-    case "offline":
-      return "bg-red-500";
-    case "stopping":
-      return "bg-yellow-500";
-    default:
-      return "bg-gray-400";
-  }
-}
 
 function VMCard({ vm }: { vm: VM }) {
   return (
-    <div
-      className={`bg-white border border-gray-200 border-l-4 ${getStatusBorderColor(vm.status)} p-5 hover:border-gray-300 transition-colors`}
+    <Link
+      href={`/vms/${vm.vmId}`}
+      className={`block bg-white border border-gray-200 border-l-4 ${getStatusBorderColor(vm.status)} p-5 hover:border-gray-300 transition-colors`}
     >
       <div className="flex justify-between items-start mb-3">
         <div className="flex-1 min-w-0">
@@ -108,7 +89,7 @@ function VMCard({ vm }: { vm: VM }) {
           </div>
         )}
       </div>
-    </div>
+    </Link>
   );
 }
 
