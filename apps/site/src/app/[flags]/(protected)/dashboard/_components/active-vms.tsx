@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useQuery } from "convex/react";
 import { api } from "../../../../../../convex/_generated/api";
 import { authClient } from "@/lib/auth-client";
@@ -33,113 +34,58 @@ import {
   formatDate,
   formatTimeRemaining,
   formatStatus,
+  getStatusBorderColor,
+  getStatusDotColor,
+  getSshCommand,
+  deleteVm,
 } from "@/lib/vm-utils";
 import { MoreVertical, Loader2, Copy, Check, Monitor } from "lucide-react";
 import { toast } from "sonner";
-
-function getStatusBorderColor(status: string): string {
-  switch (status) {
-    case "ready":
-      return "border-l-green-500";
-    case "creating":
-    case "pending":
-    case "booting":
-    case "provisioning":
-      return "border-l-blue-500";
-    case "failed":
-    case "offline":
-      return "border-l-red-500";
-    case "stopping":
-      return "border-l-yellow-500";
-    case "stopped":
-    case "not_found":
-      return "border-l-gray-300";
-    default:
-      return "border-l-gray-300";
-  }
-}
-
-function getStatusDotColor(status: string): string {
-  switch (status) {
-    case "ready":
-      return "bg-green-500";
-    case "creating":
-    case "pending":
-    case "booting":
-    case "provisioning":
-      return "bg-blue-500";
-    case "failed":
-    case "offline":
-      return "bg-red-500";
-    case "stopping":
-      return "bg-yellow-500";
-    case "stopped":
-    case "not_found":
-      return "bg-gray-400";
-    default:
-      return "bg-gray-400";
-  }
-}
 
 function VMCard({ vm, isActive }: { vm: VM; isActive: boolean }) {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [sshCopied, setSSHCopied] = useState(false);
 
-  const handleCopySSH = async () => {
+  async function handleCopySSH(): Promise<void> {
     if (sshCopied) return;
 
     try {
-      // Use the CLI command which handles all the SSH proxy complexity
-      const sshCommand = `uva vm ssh ${vm.name || vm.vmId}`;
-
-      await navigator.clipboard.writeText(sshCommand);
+      await navigator.clipboard.writeText(getSshCommand(vm));
       setSSHCopied(true);
-
       toast.success("ssh command copied", {
-        description: "paste it into your terminal to connect!",
+        description: "paste it into your terminal to connect",
       });
-
       setTimeout(() => setSSHCopied(false), 2000);
-    } catch (error) {
-      toast.error("copy failed", {
-        description: error instanceof Error ? error.message : "unknown error",
-      });
+    } catch {
+      toast.error("copy failed");
     }
-  };
+  }
 
-  const handleDelete = async () => {
+  async function handleDelete(): Promise<void> {
     setIsDeleting(true);
 
-    try {
-      const response = await fetch(`/api/vms/${vm.vmId}`, {
-        method: "DELETE",
-      });
+    const result = await deleteVm(vm.vmId);
 
-      const data = await response.json();
-
-      if (!response.ok || data.status !== "deletion_success") {
-        throw new Error(data.msg || "failed to delete vm");
-      }
-
+    if (result.success) {
       toast.success("vm deleted", {
         description: `${vm.name || vm.vmId} has been deleted`,
       });
-
       setShowDeleteDialog(false);
-    } catch (error) {
+    } else {
       toast.error("deletion failed", {
-        description: error instanceof Error ? error.message : "unknown error",
+        description: result.error,
       });
-    } finally {
-      setIsDeleting(false);
     }
-  };
+
+    setIsDeleting(false);
+  }
 
   return (
     <>
-      <div
-        className={`bg-white border border-gray-200 border-l-4 ${getStatusBorderColor(vm.status)} p-5 hover:border-gray-300 transition-colors`}
+      <Link
+        href={`/vms/${vm.vmId}`}
+        className={`block bg-white border border-gray-200 border-l-4 ${getStatusBorderColor(vm.status)} p-5 hover:border-gray-300 transition-colors`}
       >
         <div className="flex justify-between items-start mb-3">
           <div className="flex-1 min-w-0">
@@ -160,45 +106,47 @@ function VMCard({ vm, isActive }: { vm: VM; isActive: boolean }) {
               </span>
             </div>
             {isActive && (
-              <DropdownMenu modal={false}>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    className="h-6 w-6 cursor-pointer"
-                  >
-                    <MoreVertical className="h-4 w-4" />
-                    <span className="sr-only">open menu</span>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  {vm.status === "ready" && (
+              <div onClick={(e) => e.preventDefault()}>
+                <DropdownMenu modal={false}>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      className="h-6 w-6 cursor-pointer"
+                    >
+                      <MoreVertical className="h-4 w-4" />
+                      <span className="sr-only">open menu</span>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    {vm.status === "ready" && (
+                      <DropdownMenuItem
+                        onClick={handleCopySSH}
+                        className="cursor-pointer"
+                      >
+                        {sshCopied ? (
+                          <>
+                            <Check className="h-4 w-4 mr-2" />
+                            copied!
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="h-4 w-4 mr-2" />
+                            copy ssh command
+                          </>
+                        )}
+                      </DropdownMenuItem>
+                    )}
                     <DropdownMenuItem
-                      onClick={handleCopySSH}
+                      variant="destructive"
+                      onClick={() => setShowDeleteDialog(true)}
                       className="cursor-pointer"
                     >
-                      {sshCopied ? (
-                        <>
-                          <Check className="h-4 w-4 mr-2" />
-                          copied!
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="h-4 w-4 mr-2" />
-                          copy ssh command
-                        </>
-                      )}
+                      delete vm
                     </DropdownMenuItem>
-                  )}
-                  <DropdownMenuItem
-                    variant="destructive"
-                    onClick={() => setShowDeleteDialog(true)}
-                    className="cursor-pointer"
-                  >
-                    delete vm
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
             )}
           </div>
         </div>
@@ -256,7 +204,7 @@ function VMCard({ vm, isActive }: { vm: VM; isActive: boolean }) {
             </div>
           )}
         </div>
-      </div>
+      </Link>
 
       <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <DialogContent>
