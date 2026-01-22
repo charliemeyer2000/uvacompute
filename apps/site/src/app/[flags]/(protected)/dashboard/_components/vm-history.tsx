@@ -14,35 +14,14 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
-import { VM, formatDate, formatStatus } from "@/lib/vm-utils";
+import {
+  VM,
+  formatDate,
+  formatStatus,
+  getStatusBorderColor,
+  getStatusDotColor,
+} from "@/lib/vm-utils";
 import { Archive } from "lucide-react";
-
-function getStatusBorderColor(status: string): string {
-  switch (status) {
-    case "failed":
-    case "offline":
-      return "border-l-red-500";
-    case "stopping":
-      return "border-l-yellow-500";
-    case "stopped":
-    case "not_found":
-      return "border-l-gray-300";
-    default:
-      return "border-l-gray-300";
-  }
-}
-
-function getStatusDotColor(status: string): string {
-  switch (status) {
-    case "failed":
-    case "offline":
-      return "bg-red-500";
-    case "stopping":
-      return "bg-yellow-500";
-    default:
-      return "bg-gray-400";
-  }
-}
 
 function VMCard({ vm }: { vm: VM }) {
   return (
