@@ -146,17 +146,7 @@ export const listActiveByUser = query({
       "ready",
     ];
 
-    const runningStatuses = ["ready"];
-
-    return allVms.filter((vm) => {
-      if (!activeStatuses.includes(vm.status)) {
-        return false;
-      }
-      if (runningStatuses.includes(vm.status)) {
-        return vm.expiresAt > Date.now();
-      }
-      return true;
-    });
+    return allVms.filter((vm) => activeStatuses.includes(vm.status));
   },
 });
 
@@ -222,15 +212,10 @@ export const listActive = query({
       "ready",
     ];
 
-    const now = Date.now();
-
     return allVms
       .filter((vm) => {
         if (!activeStatuses.includes(vm.status)) {
           return false;
-        }
-        if (vm.status === "ready") {
-          return vm.expiresAt > now;
         }
         return true;
       })
