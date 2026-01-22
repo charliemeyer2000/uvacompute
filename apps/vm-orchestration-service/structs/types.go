@@ -124,6 +124,27 @@ type VMState struct {
 	Status       VMStatus `json:"status"`
 	ErrorMessage string   `json:"errorMessage,omitempty"`
 	NodeId       string   `json:"nodeId,omitempty"`
+	ExpiresAt    int64    `json:"expiresAt,omitempty"`
+}
+
+type VMExtendStatus string
+
+const (
+	VM_EXTEND_SUCCESS           VMExtendStatus = "extend_success"
+	VM_EXTEND_FAILED_VALIDATION VMExtendStatus = "extend_failed_validation"
+	VM_EXTEND_FAILED_NOT_FOUND  VMExtendStatus = "extend_failed_not_found"
+	VM_EXTEND_FAILED_INTERNAL   VMExtendStatus = "extend_failed_internal"
+)
+
+type VMExtendRequest struct {
+	Hours int `json:"hours" validate:"required,min=1"`
+}
+
+type VMExtendResponse struct {
+	Status    VMExtendStatus `json:"status"`
+	VMId      string         `json:"vmId,omitempty"`
+	ExpiresAt int64          `json:"expiresAt,omitempty"`
+	Msg       string         `json:"msg"`
 }
 
 type ListVM struct {
