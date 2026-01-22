@@ -212,8 +212,6 @@ func (k *KubeVirtAdapter) buildVMObject(vmId string, cpus, ram, disk, gpus int, 
 		"volumes": []interface{}{
 			map[string]interface{}{
 				"name": "rootdisk",
-				// Using DataVolume for resizable disks via CDI
-				// CDI importer uses proxy configured in CDI CR for TLS connectivity
 				"dataVolume": map[string]interface{}{
 					"name": fmt.Sprintf("%s-rootdisk", vmId),
 				},
@@ -265,8 +263,6 @@ func (k *KubeVirtAdapter) buildVMObject(vmId string, cpus, ram, disk, gpus int, 
 			},
 			"spec": map[string]interface{}{
 				"running": true,
-				// DataVolumeTemplates for resizable disks - CDI pulls the VM image
-				// and creates a PVC with the user-specified size
 				"dataVolumeTemplates": []interface{}{
 					map[string]interface{}{
 						"metadata": map[string]interface{}{
