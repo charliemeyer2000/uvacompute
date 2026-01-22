@@ -2,7 +2,6 @@ import type { Command } from "commander";
 import ora from "ora";
 import { confirm } from "@inquirer/prompts";
 import { theme } from "./lib/theme";
-import chalk from "chalk";
 import { getBaseUrl, compareVersions, findBinaryPath } from "./lib/utils";
 import { VersionResponseSchema } from "./lib/schemas";
 import { PROD_SITE_URL } from "./lib/constants";
@@ -22,7 +21,7 @@ async function upgrade(): Promise<void> {
 
     if (!response.ok) {
       spinner.fail(theme.error("Failed to check for updates"));
-      console.log(chalk.gray("\nPlease try again later."));
+      console.log(theme.muted("\nPlease try again later."));
       process.exit(1);
     }
 
@@ -34,7 +33,7 @@ async function upgrade(): Promise<void> {
       spinner.succeed(
         theme.success("You're already on the latest version!") +
           " " +
-          chalk.gray(`(${CURRENT_VERSION})`),
+          theme.muted(`(${CURRENT_VERSION})`),
       );
       process.exit(0);
     }
@@ -54,7 +53,7 @@ async function upgrade(): Promise<void> {
     });
 
     if (!shouldUpgrade) {
-      console.log(chalk.gray("\nUpgrade cancelled."));
+      console.log(theme.muted("\nUpgrade cancelled."));
       process.exit(0);
     }
 
@@ -91,11 +90,11 @@ async function upgrade(): Promise<void> {
           theme.success(`Successfully upgraded to v${latestVersion}!`),
         );
         console.log(
-          chalk.gray("\nRestart your terminal or run ") +
+          theme.muted("\nRestart your terminal or run ") +
             theme.accent("source ~/.bashrc") +
-            chalk.gray(" (or ") +
+            theme.muted(" (or ") +
             theme.accent("source ~/.zshrc") +
-            chalk.gray(") to use the new version."),
+            theme.muted(") to use the new version."),
         );
       } else {
         const errorOutput = await new Response(installProc.stderr).text();
@@ -106,13 +105,13 @@ async function upgrade(): Promise<void> {
         ) {
           upgradeSpinner.fail(theme.error("Permission denied"));
           console.log(
-            chalk.yellow("\nTry running with sudo:\n") +
+            theme.warning("\nTry running with sudo:\n") +
               theme.accent("sudo uva upgrade"),
           );
         } else {
           upgradeSpinner.fail(theme.error("Upgrade failed"));
           console.log(
-            chalk.gray("\nPlease upgrade manually:\n") +
+            theme.muted("\nPlease upgrade manually:\n") +
               theme.accent(`curl -fsSL ${PROD_SITE_URL}/install.sh | bash`),
           );
         }
@@ -121,7 +120,7 @@ async function upgrade(): Promise<void> {
     } catch (error: any) {
       upgradeSpinner.fail(theme.error("Upgrade failed"));
       console.log(
-        chalk.gray("\nPlease upgrade manually:\n") +
+        theme.muted("\nPlease upgrade manually:\n") +
           theme.accent(`curl -fsSL ${PROD_SITE_URL}/install.sh | bash`),
       );
       process.exit(1);

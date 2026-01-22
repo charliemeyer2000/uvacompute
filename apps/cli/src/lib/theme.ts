@@ -67,3 +67,53 @@ export function formatDetail(label: string, value: string): string {
 export function formatCommand(command: string): string {
   return theme.accent(`  ${command}`);
 }
+
+function stripAnsi(value: string): string {
+  return value.replace(/\x1b\[[0-9;]*m/g, "");
+}
+
+export function formatAge(date: Date): string {
+  const diffMs = Date.now() - date.getTime();
+  if (diffMs < 0) return "0m";
+  const minutes = Math.floor(diffMs / 60000);
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h`;
+  const days = Math.floor(hours / 24);
+  return `${days}d`;
+}
+
+export function renderTable(headers: string[], rows: string[][]): void {
+  const widths = headers.map((header, index) => {
+    const cellWidths = rows.map((row) => stripAnsi(row[index] ?? "").length);
+    return Math.max(header.length, ...cellWidths);
+  });
+
+  const renderRow = (cols: string[]) =>
+    cols
+      .map((col, index) => {
+        const padding = (widths[index] ?? 0) - stripAnsi(col).length;
+        return `${col}${" ".repeat(Math.max(0, padding + 2))}`;
+      })
+      .join("")
+      .trimEnd();
+
+  console.log(renderRow(headers.map((h) => theme.muted(h))));
+  for (const row of rows) {
+    console.log(renderRow(row));
+  }
+}
+
+export function formatStatusBullet(
+  status: "success" | "warning" | "error" | "info" | "muted",
+  label: string,
+): string {
+  const colors = {
+    success: theme.success,
+    warning: theme.warning,
+    error: theme.error,
+    info: theme.info,
+    muted: theme.muted,
+  };
+  return `${colors[status]("●")} ${label}`;
+}

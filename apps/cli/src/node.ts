@@ -14,7 +14,6 @@ import {
 } from "./lib/constants";
 import { theme } from "./lib/theme";
 import { loadToken, getBaseUrl } from "./lib/utils";
-import chalk from "chalk";
 import yaml from "js-yaml";
 
 interface RemoteNode {
@@ -412,39 +411,39 @@ async function nodePrepare(options: {
 }): Promise<void> {
   const isCheck = options.check ?? false;
 
-  console.log(chalk.bold("\n🔧 uvacompute Node Preparation\n"));
+  console.log(theme.emphasis("\nNode Preparation\n"));
 
   if (isCheck) {
     console.log(
-      chalk.cyan("Running in check mode (no changes will be made)\n"),
+      theme.accent("Running in check mode (no changes will be made)\n"),
     );
   }
 
   const os = detectOS();
   if (!os) {
-    console.log(chalk.red("✗ Could not detect operating system"));
-    console.log(chalk.gray("  /etc/os-release not found"));
+    console.log(theme.error("✗ Could not detect operating system"));
+    console.log(theme.muted("  /etc/os-release not found"));
     process.exit(1);
   }
 
-  console.log(chalk.underline("Operating System:"));
-  console.log(chalk.green(`  ✓ ${os.name}`));
+  console.log(theme.info("Operating System:"));
+  console.log(theme.success(`  ✓ ${os.name}`));
   if (os.version) {
-    console.log(chalk.gray(`    Version: ${os.version}`));
+    console.log(theme.muted(`    Version: ${os.version}`));
   }
-  console.log(chalk.gray(`    ID: ${os.id}`));
+  console.log(theme.muted(`    ID: ${os.id}`));
 
   const supportedDistros = ["ubuntu", "debian", "arch", "fedora", "gentoo"];
   const isSupported = supportedDistros.includes(os.id);
   if (!isSupported) {
     console.log(
-      chalk.yellow(`\n⚠ ${os.id} is not a fully supported distribution`),
+      theme.warning(`\n⚠ ${os.id} is not a fully supported distribution`),
     );
-    console.log(chalk.gray("  Driver installation guidance may be limited"));
+    console.log(theme.muted("  Driver installation guidance may be limited"));
   }
 
   console.log();
-  console.log(chalk.underline("GPU Detection:"));
+  console.log(theme.info("GPU Detection:"));
   const spinner = ora({
     text: "Checking for NVIDIA GPU...",
     indent: 2,
@@ -452,8 +451,8 @@ async function nodePrepare(options: {
 
   const gpu = await checkNvidiaGpu();
   if (!gpu.detected) {
-    spinner.info(chalk.gray("No NVIDIA GPU detected"));
-    console.log(chalk.gray("  GPU preparation not required"));
+    spinner.info(theme.muted("No NVIDIA GPU detected"));
+    console.log(theme.muted("  GPU preparation not required"));
 
     if (!options.skipIommu) {
       console.log();
@@ -470,22 +469,22 @@ async function nodePrepare(options: {
         driver_installed: false,
         reboot_required: false,
       });
-      console.log(chalk.gray("\n  Prepare state saved."));
+      console.log(theme.muted("\n  Prepare state saved."));
     }
 
-    console.log(chalk.green("\n✓ System preparation complete (no GPU)"));
-    console.log(chalk.gray("  You can now run 'uva node install'"));
+    console.log(theme.success("\n✓ System preparation complete (no GPU)"));
+    console.log(theme.muted("  You can now run 'uva node install'"));
     return;
   }
 
-  spinner.succeed(chalk.green("NVIDIA GPU detected"));
-  console.log(chalk.gray(`    PCI: ${gpu.pciAddress || "unknown"}`));
+  spinner.succeed(theme.success("NVIDIA GPU detected"));
+  console.log(theme.muted(`    PCI: ${gpu.pciAddress || "unknown"}`));
   if (gpu.deviceId) {
-    console.log(chalk.gray(`    Device ID: ${gpu.deviceId}`));
+    console.log(theme.muted(`    Device ID: ${gpu.deviceId}`));
   }
 
   console.log();
-  console.log(chalk.underline("Driver Status:"));
+  console.log(theme.info("Driver Status:"));
   const driverSpinner = ora({
     text: "Checking nvidia-smi...",
     indent: 2,
@@ -496,18 +495,18 @@ async function nodePrepare(options: {
   let rebootRequired = false;
 
   if (driver.works) {
-    driverSpinner.succeed(chalk.green("NVIDIA driver is loaded"));
-    console.log(chalk.gray(`    Version: ${driver.version}`));
+    driverSpinner.succeed(theme.success("NVIDIA driver is loaded"));
+    console.log(theme.muted(`    Version: ${driver.version}`));
     if (driver.gpuName) {
-      console.log(chalk.gray(`    GPU: ${driver.gpuName}`));
+      console.log(theme.muted(`    GPU: ${driver.gpuName}`));
     }
     driverInstalled = true;
   } else {
-    driverSpinner.warn(chalk.yellow("NVIDIA driver not loaded"));
+    driverSpinner.warn(theme.warning("NVIDIA driver not loaded"));
 
     if (isCheck) {
       console.log(
-        chalk.cyan("\n  [CHECK] Would install NVIDIA driver for " + os.id),
+        theme.accent("\n  [CHECK] Would install NVIDIA driver for " + os.id),
       );
       printDriverInstructions(os.id);
     } else {
@@ -521,16 +520,16 @@ async function nodePrepare(options: {
         if (installResult.success) {
           driverInstalled = true;
           rebootRequired = true;
-          console.log(chalk.green("\n  ✓ Driver installation initiated"));
-          console.log(chalk.yellow("  ⚠ Reboot required to load the driver"));
+          console.log(theme.success("\n  ✓ Driver installation initiated"));
+          console.log(theme.warning("  ⚠ Reboot required to load the driver"));
         } else {
-          console.log(chalk.red("\n  ✗ Driver installation failed"));
+          console.log(theme.error("\n  ✗ Driver installation failed"));
           if (installResult.message) {
-            console.log(chalk.gray(`    ${installResult.message}`));
+            console.log(theme.muted(`    ${installResult.message}`));
           }
         }
       } else {
-        console.log(chalk.gray("\n  Driver installation skipped"));
+        console.log(theme.muted("\n  Driver installation skipped"));
         printDriverInstructions(os.id);
       }
     }
@@ -555,21 +554,23 @@ async function nodePrepare(options: {
       iommu_gpu_isolated: iommu.gpuIsolated,
       reboot_required: rebootRequired,
     });
-    console.log(chalk.gray("\n  Prepare state saved."));
+    console.log(theme.muted("\n  Prepare state saved."));
   }
 
   console.log();
   if (rebootRequired) {
     console.log(
-      chalk.yellow("⚠ Please reboot your system, then run 'uva node install'"),
+      theme.warning(
+        "⚠ Please reboot your system, then run 'uva node install'",
+      ),
     );
   } else if (driverInstalled) {
-    console.log(chalk.green("✓ System is prepared for node installation"));
-    console.log(chalk.gray("  Run 'uva node install' to continue"));
+    console.log(theme.success("✓ System is prepared for node installation"));
+    console.log(theme.muted("  Run 'uva node install' to continue"));
   } else {
-    console.log(chalk.yellow("⚠ Driver not installed"));
+    console.log(theme.warning("⚠ Driver not installed"));
     console.log(
-      chalk.gray(
+      theme.muted(
         "  Install the driver manually, reboot, then run 'uva node install'",
       ),
     );
@@ -578,98 +579,98 @@ async function nodePrepare(options: {
 }
 
 async function checkAndReportIOMMU(isCheck: boolean): Promise<void> {
-  console.log(chalk.underline("IOMMU Status:"));
+  console.log(theme.info("IOMMU Status:"));
   const iommuSpinner = ora({ text: "Checking IOMMU...", indent: 2 }).start();
 
   const iommu = await checkIOMMU();
 
   if (iommu.enabled) {
     iommuSpinner.succeed(
-      chalk.green(`IOMMU enabled (${iommu.groupCount} groups)`),
+      theme.success(`IOMMU enabled (${iommu.groupCount} groups)`),
     );
-    console.log(chalk.gray(`    CPU: ${iommu.cpuVendor.toUpperCase()}`));
+    console.log(theme.muted(`    CPU: ${iommu.cpuVendor.toUpperCase()}`));
     if (iommu.gpuIsolated) {
-      console.log(chalk.green("    ✓ GPU is in isolated IOMMU group"));
+      console.log(theme.success("    ✓ GPU is in isolated IOMMU group"));
     } else {
       console.log(
-        chalk.yellow("    ⚠ GPU may share IOMMU group with other devices"),
+        theme.warning("    ⚠ GPU may share IOMMU group with other devices"),
       );
-      console.log(chalk.gray("      This could affect GPU passthrough"));
+      console.log(theme.muted("      This could affect GPU passthrough"));
     }
   } else {
-    iommuSpinner.warn(chalk.yellow("IOMMU not enabled"));
-    console.log(chalk.gray("    GPU passthrough requires IOMMU"));
+    iommuSpinner.warn(theme.warning("IOMMU not enabled"));
+    console.log(theme.muted("    GPU passthrough requires IOMMU"));
     console.log();
-    console.log(chalk.gray("  To enable IOMMU:"));
+    console.log(theme.muted("  To enable IOMMU:"));
     console.log(
-      chalk.gray("    1. Enable VT-d (Intel) or AMD-Vi (AMD) in BIOS"),
+      theme.muted("    1. Enable VT-d (Intel) or AMD-Vi (AMD) in BIOS"),
     );
-    console.log(chalk.gray("    2. Add kernel parameter to GRUB:"));
+    console.log(theme.muted("    2. Add kernel parameter to GRUB:"));
     if (iommu.cpuVendor === "intel") {
-      console.log(chalk.cyan('       GRUB_CMDLINE_LINUX="intel_iommu=on"'));
+      console.log(theme.accent('       GRUB_CMDLINE_LINUX="intel_iommu=on"'));
     } else if (iommu.cpuVendor === "amd") {
-      console.log(chalk.cyan('       GRUB_CMDLINE_LINUX="amd_iommu=on"'));
+      console.log(theme.accent('       GRUB_CMDLINE_LINUX="amd_iommu=on"'));
     } else {
       console.log(
-        chalk.cyan('       GRUB_CMDLINE_LINUX="intel_iommu=on"  (Intel)'),
+        theme.accent('       GRUB_CMDLINE_LINUX="intel_iommu=on"  (Intel)'),
       );
       console.log(
-        chalk.cyan('       GRUB_CMDLINE_LINUX="amd_iommu=on"   (AMD)'),
+        theme.accent('       GRUB_CMDLINE_LINUX="amd_iommu=on"   (AMD)'),
       );
     }
-    console.log(chalk.gray("    3. Run: sudo update-grub && sudo reboot"));
+    console.log(theme.muted("    3. Run: sudo update-grub && sudo reboot"));
   }
 }
 
 function printDriverInstructions(osId: string): void {
-  console.log(chalk.gray("\n  Manual installation instructions:"));
+  console.log(theme.muted("\n  Manual installation instructions:"));
 
   switch (osId) {
     case "ubuntu":
     case "debian":
-      console.log(chalk.cyan("    sudo ubuntu-drivers autoinstall"));
-      console.log(chalk.gray("    # Or for a specific version:"));
-      console.log(chalk.cyan("    ubuntu-drivers devices"));
-      console.log(chalk.cyan("    sudo apt install nvidia-driver-XXX"));
+      console.log(theme.accent("    sudo ubuntu-drivers autoinstall"));
+      console.log(theme.muted("    # Or for a specific version:"));
+      console.log(theme.accent("    ubuntu-drivers devices"));
+      console.log(theme.accent("    sudo apt install nvidia-driver-XXX"));
       break;
     case "arch":
-      console.log(chalk.cyan("    sudo pacman -S nvidia nvidia-utils"));
+      console.log(theme.accent("    sudo pacman -S nvidia nvidia-utils"));
       console.log(
-        chalk.gray("    # For newer GPUs (RTX 30+), use open driver:"),
+        theme.muted("    # For newer GPUs (RTX 30+), use open driver:"),
       );
-      console.log(chalk.cyan("    sudo pacman -S nvidia-open nvidia-utils"));
+      console.log(theme.accent("    sudo pacman -S nvidia-open nvidia-utils"));
       break;
     case "fedora":
-      console.log(chalk.gray("    # First, enable RPM Fusion:"));
+      console.log(theme.muted("    # First, enable RPM Fusion:"));
       console.log(
-        chalk.cyan(
+        theme.accent(
           "    sudo dnf install https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm",
         ),
       );
       console.log(
-        chalk.cyan(
+        theme.accent(
           "    sudo dnf install https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-$(rpm -E %fedora).noarch.rpm",
         ),
       );
-      console.log(chalk.gray("    # Then install driver:"));
-      console.log(chalk.cyan("    sudo dnf install akmod-nvidia"));
+      console.log(theme.muted("    # Then install driver:"));
+      console.log(theme.accent("    sudo dnf install akmod-nvidia"));
       break;
     case "gentoo":
       console.log(
-        chalk.cyan("    sudo emerge --ask x11-drivers/nvidia-drivers"),
+        theme.accent("    sudo emerge --ask x11-drivers/nvidia-drivers"),
       );
-      console.log(chalk.gray("    # May require kernel configuration"));
+      console.log(theme.muted("    # May require kernel configuration"));
       break;
     default:
       console.log(
-        chalk.gray(
+        theme.muted(
           "    Please install the NVIDIA driver for your distribution",
         ),
       );
-      console.log(chalk.gray("    Consult your distribution's documentation"));
+      console.log(theme.muted("    Consult your distribution's documentation"));
   }
 
-  console.log(chalk.gray("\n  After installation, reboot your system."));
+  console.log(theme.muted("\n  After installation, reboot your system."));
 }
 
 async function installNvidiaDriver(
@@ -678,7 +679,7 @@ async function installNvidiaDriver(
   switch (osId) {
     case "ubuntu":
     case "debian": {
-      console.log(chalk.gray("\n  Running: sudo ubuntu-drivers autoinstall"));
+      console.log(theme.muted("\n  Running: sudo ubuntu-drivers autoinstall"));
       const result = await runCommand("ubuntu-drivers", ["autoinstall"], {
         sudo: true,
       });
@@ -693,7 +694,7 @@ async function installNvidiaDriver(
 
     case "arch":
       console.log(
-        chalk.yellow("\n  Arch Linux requires manual driver installation:"),
+        theme.warning("\n  Arch Linux requires manual driver installation:"),
       );
       printDriverInstructions("arch");
       return {
@@ -710,13 +711,13 @@ async function installNvidiaDriver(
 
       if (!repoCheck.stdout.includes("rpmfusion-nonfree")) {
         console.log(
-          chalk.yellow("\n  RPM Fusion nonfree repository required."),
+          theme.warning("\n  RPM Fusion nonfree repository required."),
         );
         printDriverInstructions("fedora");
         return { success: false, message: "Enable RPM Fusion first" };
       }
 
-      console.log(chalk.gray("\n  Running: sudo dnf install akmod-nvidia"));
+      console.log(theme.muted("\n  Running: sudo dnf install akmod-nvidia"));
       const result = await runCommand(
         "dnf",
         ["install", "-y", "akmod-nvidia"],
@@ -727,7 +728,7 @@ async function installNvidiaDriver(
 
       if (result.exitCode === 0) {
         console.log(
-          chalk.yellow(
+          theme.warning(
             "\n  Note: akmod-nvidia compiles on reboot. First boot may take 5-10 minutes.",
           ),
         );
@@ -738,7 +739,7 @@ async function installNvidiaDriver(
 
     case "gentoo":
       console.log(
-        chalk.yellow("\n  Gentoo requires manual driver installation:"),
+        theme.warning("\n  Gentoo requires manual driver installation:"),
       );
       printDriverInstructions("gentoo");
       return {
@@ -748,7 +749,9 @@ async function installNvidiaDriver(
 
     default:
       console.log(
-        chalk.yellow("\n  Unsupported distribution for automatic installation"),
+        theme.warning(
+          "\n  Unsupported distribution for automatic installation",
+        ),
       );
       return {
         success: false,
@@ -758,24 +761,26 @@ async function installNvidiaDriver(
 }
 
 async function nodeInstall(): Promise<void> {
-  console.log(chalk.bold("\n🚀 uvacompute Node Installation\n"));
+  console.log(theme.emphasis("\nNode Installation\n"));
 
   const gpu = await checkNvidiaGpu();
   if (gpu.detected) {
     const driver = await checkNvidiaSmi();
     if (!driver.works) {
-      console.log(chalk.yellow("⚠ NVIDIA GPU detected but driver not loaded"));
+      console.log(
+        theme.warning("⚠ NVIDIA GPU detected but driver not loaded"),
+      );
       console.log();
       console.log(
-        chalk.gray(
+        theme.muted(
           "The driver must be installed and loaded before proceeding.",
         ),
       );
-      console.log(chalk.gray("Run the following commands:"));
+      console.log(theme.muted("Run the following commands:"));
       console.log();
-      console.log(chalk.cyan("  uva node prepare"));
-      console.log(chalk.gray("  # Reboot your system"));
-      console.log(chalk.cyan("  uva node install"));
+      console.log(theme.accent("  uva node prepare"));
+      console.log(theme.muted("  # Reboot your system"));
+      console.log(theme.accent("  uva node install"));
       console.log();
       process.exit(1);
     }
@@ -783,21 +788,21 @@ async function nodeInstall(): Promise<void> {
 
   const state = loadNodeState();
   if (state?.installed) {
-    console.log(chalk.yellow("Node appears to be already installed."));
+    console.log(theme.warning("Node appears to be already installed."));
     const proceed = await confirm({
       message: "Do you want to reinstall?",
       default: false,
     });
     if (!proceed) {
-      console.log(chalk.gray("Installation cancelled."));
+      console.log(theme.muted("Installation cancelled."));
       process.exit(0);
     }
   }
 
-  console.log(chalk.gray("This will install:"));
-  console.log(chalk.gray("  • k3s (Kubernetes)"));
-  console.log(chalk.gray("  • KubeVirt (VM orchestration)"));
-  console.log(chalk.gray("  • NVIDIA container toolkit (if GPU detected)"));
+  console.log(theme.muted("This will install:"));
+  console.log(theme.muted("  • k3s (Kubernetes)"));
+  console.log(theme.muted("  • KubeVirt (VM orchestration)"));
+  console.log(theme.muted("  • NVIDIA container toolkit (if GPU detected)"));
   console.log();
 
   const proceed = await confirm({
@@ -806,7 +811,7 @@ async function nodeInstall(): Promise<void> {
   });
 
   if (!proceed) {
-    console.log(chalk.gray("\nInstallation cancelled."));
+    console.log(theme.muted("\nInstallation cancelled."));
     process.exit(0);
   }
 
@@ -826,7 +831,9 @@ async function nodeInstall(): Promise<void> {
     spinner.succeed("Downloaded install script");
 
     console.log(
-      chalk.gray("\nRunning installation (this may take several minutes)...\n"),
+      theme.muted(
+        "\nRunning installation (this may take several minutes)...\n",
+      ),
     );
 
     const tmpFile = `/tmp/install-node-${Date.now()}.sh`;
@@ -839,18 +846,18 @@ async function nodeInstall(): Promise<void> {
     } catch {}
 
     if (result.exitCode !== 0) {
-      console.log(chalk.red("\n✗ Installation failed"));
+      console.log(theme.error("\n✗ Installation failed"));
       process.exit(1);
     }
 
-    console.log(chalk.green("\n✓ Node installation complete!"));
+    console.log(theme.success("\n✓ Node installation complete!"));
     console.log();
-    console.log(chalk.gray("Next steps:"));
+    console.log(theme.muted("Next steps:"));
     console.log(
-      chalk.gray("  • Run 'uva node status' to check the node status"),
+      theme.muted("  • Run 'uva node status' to check the node status"),
     );
     console.log(
-      chalk.gray(
+      theme.muted(
         "  • If you have a GPU, run 'sudo gpu-mode-status' to check GPU mode",
       ),
     );
@@ -862,7 +869,7 @@ async function nodeInstall(): Promise<void> {
 }
 
 async function nodeUninstall(): Promise<void> {
-  console.log(chalk.bold("\n🗑️  uvacompute Node Uninstallation\n"));
+  console.log(theme.emphasis("\nNode Uninstallation\n"));
 
   const state = loadNodeState();
   const isAgentMode =
@@ -870,28 +877,28 @@ async function nodeUninstall(): Promise<void> {
     existsSync("/usr/local/bin/k3s-agent-uninstall.sh");
 
   if (!state?.installed) {
-    console.log(chalk.yellow("Node does not appear to be installed."));
+    console.log(theme.warning("Node does not appear to be installed."));
     const proceed = await confirm({
       message: "Do you want to attempt uninstallation anyway?",
       default: false,
     });
     if (!proceed) {
-      console.log(chalk.gray("Uninstallation cancelled."));
+      console.log(theme.muted("Uninstallation cancelled."));
       process.exit(0);
     }
   }
 
-  console.log(chalk.yellow("This will remove:"));
+  console.log(theme.warning("This will remove:"));
   if (isAgentMode) {
-    console.log(chalk.yellow("  • k3s agent"));
-    console.log(chalk.yellow("  • SSH tunnel service"));
+    console.log(theme.warning("  • k3s agent"));
+    console.log(theme.warning("  • SSH tunnel service"));
   } else {
-    console.log(chalk.yellow("  • k3s server and all Kubernetes resources"));
-    console.log(chalk.yellow("  • KubeVirt"));
+    console.log(theme.warning("  • k3s server and all Kubernetes resources"));
+    console.log(theme.warning("  • KubeVirt"));
   }
-  console.log(chalk.yellow("  • All container images"));
-  console.log(chalk.yellow("  • NVIDIA container toolkit configuration"));
-  console.log(chalk.yellow("  • GPU mode switching scripts"));
+  console.log(theme.warning("  • All container images"));
+  console.log(theme.warning("  • NVIDIA container toolkit configuration"));
+  console.log(theme.warning("  • GPU mode switching scripts"));
   console.log();
 
   const proceed = await confirm({
@@ -900,7 +907,7 @@ async function nodeUninstall(): Promise<void> {
   });
 
   if (!proceed) {
-    console.log(chalk.gray("\nUninstallation cancelled."));
+    console.log(theme.muted("\nUninstallation cancelled."));
     process.exit(0);
   }
 
@@ -1026,10 +1033,10 @@ async function nodeUninstall(): Promise<void> {
     spinner.succeed("Node uninstalled successfully");
     console.log();
     console.log(
-      chalk.gray("Note: nvidia-container-toolkit package was not removed."),
+      theme.muted("Note: nvidia-container-toolkit package was not removed."),
     );
     console.log(
-      chalk.gray(
+      theme.muted(
         "Run 'sudo apt remove nvidia-container-toolkit' to remove it.",
       ),
     );
@@ -1204,12 +1211,12 @@ function saveNodeConfig(config: NodeConfig): void {
 }
 
 async function nodeConfig(): Promise<void> {
-  console.log(chalk.bold("\n⚙️  Node Configuration\n"));
+  console.log(theme.emphasis("\nNode Configuration\n"));
 
   const state = loadNodeState();
   if (!state?.installed) {
-    console.log(chalk.red("✗ Node is not installed"));
-    console.log(chalk.gray("  Run 'uva node install' first"));
+    console.log(theme.error("✗ Node is not installed"));
+    console.log(theme.muted("  Run 'uva node install' first"));
     process.exit(1);
   }
 
@@ -1217,10 +1224,10 @@ async function nodeConfig(): Promise<void> {
   const resources = await getSystemResources();
   spinner.succeed("System resources detected");
 
-  console.log(chalk.gray(`  CPUs: ${resources.cpus}`));
-  console.log(chalk.gray(`  RAM: ${resources.ramGb} GB`));
+  console.log(theme.muted(`  CPUs: ${resources.cpus}`));
+  console.log(theme.muted(`  RAM: ${resources.ramGb} GB`));
   console.log(
-    chalk.gray(
+    theme.muted(
       `  GPUs: ${resources.gpuCount > 0 ? resources.gpuCount : "None"}`,
     ),
   );
@@ -1229,9 +1236,9 @@ async function nodeConfig(): Promise<void> {
   const currentConfig = loadNodeConfig();
   const currentSharing = currentConfig?.sharing;
 
-  console.log(chalk.underline("Configure Resource Sharing"));
+  console.log(theme.info("Configure Resource Sharing"));
   console.log(
-    chalk.gray(
+    theme.muted(
       "Specify how many resources to share with the uvacompute network.\n",
     ),
   );
@@ -1290,11 +1297,11 @@ async function nodeConfig(): Promise<void> {
   };
 
   console.log();
-  console.log(chalk.underline("Configuration Summary:"));
-  console.log(chalk.gray(`  CPUs: ${newSharing.cpus}`));
-  console.log(chalk.gray(`  RAM: ${newSharing.ram} GB`));
-  console.log(chalk.gray(`  GPUs: ${newSharing.gpus}`));
-  console.log(chalk.gray(`  GPU Mode: ${newSharing.gpu_mode}`));
+  console.log(theme.info("Configuration Summary:"));
+  console.log(theme.muted(`  CPUs: ${newSharing.cpus}`));
+  console.log(theme.muted(`  RAM: ${newSharing.ram} GB`));
+  console.log(theme.muted(`  GPUs: ${newSharing.gpus}`));
+  console.log(theme.muted(`  GPU Mode: ${newSharing.gpu_mode}`));
   console.log();
 
   const shouldSave = await confirm({
@@ -1303,7 +1310,7 @@ async function nodeConfig(): Promise<void> {
   });
 
   if (!shouldSave) {
-    console.log(chalk.gray("\nConfiguration cancelled."));
+    console.log(theme.muted("\nConfiguration cancelled."));
     return;
   }
 
@@ -1314,33 +1321,33 @@ async function nodeConfig(): Promise<void> {
 
   saveNodeConfig(updatedConfig);
 
-  console.log(chalk.green("\n✓ Configuration saved"));
-  console.log(chalk.gray(`  Config file: ${NODE_CONFIG_FILE}`));
+  console.log(theme.success("\n✓ Configuration saved"));
+  console.log(theme.muted(`  Config file: ${NODE_CONFIG_FILE}`));
   console.log();
 }
 
 async function nodePause(): Promise<void> {
-  console.log(chalk.bold("\n⏸️  Pausing Node\n"));
+  console.log(theme.emphasis("\nPausing Node\n"));
 
   const state = loadNodeState();
   if (!state?.installed) {
-    console.log(chalk.red("✗ Node is not installed"));
-    console.log(chalk.gray("  Run 'uva node install' first"));
+    console.log(theme.error("✗ Node is not installed"));
+    console.log(theme.muted("  Run 'uva node install' first"));
     process.exit(1);
   }
 
   const nodeName = await getK3sNodeName();
   if (!nodeName) {
-    console.log(chalk.red("✗ Could not get node name"));
-    console.log(chalk.gray("  Is k3s running? Try 'uva node status'"));
+    console.log(theme.error("✗ Could not get node name"));
+    console.log(theme.muted("  Is k3s running? Try 'uva node status'"));
     process.exit(1);
   }
 
   const alreadyPaused = await isNodePaused();
   if (alreadyPaused) {
-    console.log(chalk.yellow("Node is already paused"));
+    console.log(theme.warning("Node is already paused"));
     console.log(
-      chalk.gray("  Run 'uva node resume' to accept workloads again"),
+      theme.muted("  Run 'uva node resume' to accept workloads again"),
     );
     return;
   }
@@ -1351,39 +1358,39 @@ async function nodePause(): Promise<void> {
 
   if (result.exitCode !== 0) {
     spinner.fail("Failed to pause node");
-    console.log(chalk.red(result.stderr));
+    console.log(theme.error(result.stderr));
     process.exit(1);
   }
 
-  spinner.succeed(chalk.green(`Node ${nodeName} is now paused`));
+  spinner.succeed(theme.success(`Node ${nodeName} is now paused`));
   console.log();
-  console.log(chalk.gray("The node will no longer accept new workloads."));
-  console.log(chalk.gray("Existing workloads will continue running."));
-  console.log(chalk.gray("Run 'uva node resume' to accept workloads again."));
+  console.log(theme.muted("The node will no longer accept new workloads."));
+  console.log(theme.muted("Existing workloads will continue running."));
+  console.log(theme.muted("Run 'uva node resume' to accept workloads again."));
   console.log();
 }
 
 async function nodeResume(): Promise<void> {
-  console.log(chalk.bold("\n▶️  Resuming Node\n"));
+  console.log(theme.emphasis("\nResuming Node\n"));
 
   const state = loadNodeState();
   if (!state?.installed) {
-    console.log(chalk.red("✗ Node is not installed"));
-    console.log(chalk.gray("  Run 'uva node install' first"));
+    console.log(theme.error("✗ Node is not installed"));
+    console.log(theme.muted("  Run 'uva node install' first"));
     process.exit(1);
   }
 
   const nodeName = await getK3sNodeName();
   if (!nodeName) {
-    console.log(chalk.red("✗ Could not get node name"));
-    console.log(chalk.gray("  Is k3s running? Try 'uva node status'"));
+    console.log(theme.error("✗ Could not get node name"));
+    console.log(theme.muted("  Is k3s running? Try 'uva node status'"));
     process.exit(1);
   }
 
   const isPaused = await isNodePaused();
   if (!isPaused) {
-    console.log(chalk.yellow("Node is not paused"));
-    console.log(chalk.gray("  The node is already accepting workloads"));
+    console.log(theme.warning("Node is not paused"));
+    console.log(theme.muted("  The node is already accepting workloads"));
     return;
   }
 
@@ -1393,132 +1400,134 @@ async function nodeResume(): Promise<void> {
 
   if (result.exitCode !== 0) {
     spinner.fail("Failed to resume node");
-    console.log(chalk.red(result.stderr));
+    console.log(theme.error(result.stderr));
     process.exit(1);
   }
 
-  spinner.succeed(chalk.green(`Node ${nodeName} is now accepting workloads`));
+  spinner.succeed(theme.success(`Node ${nodeName} is now accepting workloads`));
   console.log();
 }
 
 async function nodeStatus(): Promise<void> {
-  console.log(chalk.bold("\n📊 uvacompute Node Status\n"));
+  console.log(theme.emphasis("\nNode Status\n"));
 
   const config = loadNodeConfig();
   const state = loadNodeState();
   const prepareState = loadPrepareState();
 
-  console.log(chalk.underline("Preparation State:"));
+  console.log(theme.info("Preparation State:"));
   if (prepareState?.prepared) {
-    console.log(chalk.green("  ✓ System is prepared"));
+    console.log(theme.success("  ✓ System is prepared"));
     if (prepareState.prepare_date) {
-      console.log(chalk.gray(`    Prepared: ${prepareState.prepare_date}`));
+      console.log(theme.muted(`    Prepared: ${prepareState.prepare_date}`));
     }
     if (prepareState.os_id) {
       console.log(
-        chalk.gray(
+        theme.muted(
           `    OS: ${prepareState.os_id}${prepareState.os_version ? ` ${prepareState.os_version}` : ""}`,
         ),
       );
     }
     if (prepareState.gpu_detected) {
       console.log(
-        chalk.gray(
+        theme.muted(
           `    GPU: Detected${prepareState.driver_installed ? `, driver ${prepareState.driver_version || "installed"}` : ", driver not installed"}`,
         ),
       );
     }
     if (prepareState.iommu_enabled !== undefined) {
       console.log(
-        chalk.gray(
+        theme.muted(
           `    IOMMU: ${prepareState.iommu_enabled ? "Enabled" : "Not enabled"}${prepareState.iommu_gpu_isolated ? ", GPU isolated" : ""}`,
         ),
       );
     }
     if (prepareState.reboot_required) {
-      console.log(chalk.yellow("    ⚠ Reboot required before installation"));
+      console.log(theme.warning("    ⚠ Reboot required before installation"));
     }
   } else {
-    console.log(chalk.gray("  ○ Not prepared"));
-    console.log(chalk.gray("    Run 'uva node prepare' to prepare the system"));
+    console.log(theme.muted("  ○ Not prepared"));
+    console.log(
+      theme.muted("    Run 'uva node prepare' to prepare the system"),
+    );
   }
 
   console.log();
-  console.log(chalk.underline("Installation State:"));
+  console.log(theme.info("Installation State:"));
   if (state?.installed) {
-    console.log(chalk.green("  ✓ Node is installed"));
+    console.log(theme.success("  ✓ Node is installed"));
     if (config?.install_date) {
-      console.log(chalk.gray(`    Installed: ${config.install_date}`));
+      console.log(theme.muted(`    Installed: ${config.install_date}`));
     }
   } else {
-    console.log(chalk.yellow("  ✗ Node is not installed"));
+    console.log(theme.warning("  ✗ Node is not installed"));
     if (prepareState?.prepared && !prepareState.reboot_required) {
-      console.log(chalk.gray("    Run 'uva node install' to install"));
+      console.log(theme.muted("    Run 'uva node install' to install"));
     } else if (prepareState?.reboot_required) {
-      console.log(chalk.gray("    Reboot first, then run 'uva node install'"));
+      console.log(theme.muted("    Reboot first, then run 'uva node install'"));
     } else {
-      console.log(chalk.gray("    Run 'uva node prepare' first"));
+      console.log(theme.muted("    Run 'uva node prepare' first"));
     }
     console.log();
     return;
   }
 
   console.log();
-  console.log(chalk.underline("k3s (Kubernetes):"));
+  console.log(theme.info("k3s (Kubernetes):"));
   const spinner = ora({ text: "Checking k3s...", indent: 2 }).start();
 
   const k3s = await checkK3sStatus();
   if (k3s.running) {
     spinner.succeed(
-      chalk.green(`Running${k3s.version ? ` (${k3s.version})` : ""}`),
+      theme.success(`Running${k3s.version ? ` (${k3s.version})` : ""}`),
     );
   } else {
-    spinner.fail(chalk.red("Not running"));
+    spinner.fail(theme.error("Not running"));
   }
 
   console.log();
-  console.log(chalk.underline("KubeVirt:"));
+  console.log(theme.info("KubeVirt:"));
   const kvSpinner = ora({ text: "Checking KubeVirt...", indent: 2 }).start();
 
   const kubevirt = await checkKubeVirtStatus();
   if (kubevirt.installed) {
     if (kubevirt.phase === "Deployed") {
-      kvSpinner.succeed(chalk.green(`Deployed`));
+      kvSpinner.succeed(theme.success(`Deployed`));
     } else {
-      kvSpinner.warn(chalk.yellow(`Phase: ${kubevirt.phase}`));
+      kvSpinner.warn(theme.warning(`Phase: ${kubevirt.phase}`));
     }
   } else {
-    kvSpinner.fail(chalk.red("Not installed"));
+    kvSpinner.fail(theme.error("Not installed"));
   }
 
   console.log();
-  console.log(chalk.underline("GPU:"));
+  console.log(theme.info("GPU:"));
   const gpuSpinner = ora({ text: "Checking GPU...", indent: 2 }).start();
 
   const gpu = await checkGpuStatus();
   if (gpu.detected) {
-    gpuSpinner.succeed(chalk.green("NVIDIA GPU detected"));
-    console.log(chalk.gray(`    Driver in use: ${gpu.driver}`));
+    gpuSpinner.succeed(theme.success("NVIDIA GPU detected"));
+    console.log(theme.muted(`    Driver in use: ${gpu.driver}`));
     if (gpu.available) {
-      console.log(chalk.green("    ✓ Available to Kubernetes"));
+      console.log(theme.success("    ✓ Available to Kubernetes"));
     } else {
-      console.log(chalk.yellow("    ✗ Not available to Kubernetes"));
+      console.log(theme.warning("    ✗ Not available to Kubernetes"));
     }
     console.log();
-    console.log(chalk.gray("  GPU mode commands:"));
-    console.log(chalk.gray("    sudo gpu-mode-status  - Show current mode"));
+    console.log(theme.muted("  GPU mode commands:"));
+    console.log(theme.muted("    sudo gpu-mode-status  - Show current mode"));
     console.log(
-      chalk.gray("    sudo gpu-mode-nvidia  - Switch to container mode"),
+      theme.muted("    sudo gpu-mode-nvidia  - Switch to container mode"),
     );
     console.log(
-      chalk.gray("    sudo gpu-mode-vfio    - Switch to VM passthrough mode"),
+      theme.muted("    sudo gpu-mode-vfio    - Switch to VM passthrough mode"),
     );
   } else {
-    gpuSpinner.info(chalk.gray("No NVIDIA GPU detected"));
+    gpuSpinner.info(theme.muted("No NVIDIA GPU detected"));
   }
 
   console.log();
-  console.log(chalk.underline("Node Scheduling:"));
+  console.log(theme.info("Node Scheduling:"));
   const schedSpinner = ora({
     text: "Checking scheduling status...",
     indent: 2,
@@ -1526,14 +1535,14 @@ async function nodeStatus(): Promise<void> {
 
   const paused = await isNodePaused();
   if (paused) {
-    schedSpinner.warn(chalk.yellow("Paused (not accepting new workloads)"));
-    console.log(chalk.gray("    Run 'uva node resume' to accept workloads"));
+    schedSpinner.warn(theme.warning("Paused (not accepting new workloads)"));
+    console.log(theme.muted("    Run 'uva node resume' to accept workloads"));
   } else {
-    schedSpinner.succeed(chalk.green("Active (accepting workloads)"));
+    schedSpinner.succeed(theme.success("Active (accepting workloads)"));
   }
 
   console.log();
-  console.log(chalk.underline("Workloads:"));
+  console.log(theme.info("Workloads:"));
   const workloadSpinner = ora({
     text: "Checking workloads...",
     indent: 2,
@@ -1543,18 +1552,18 @@ async function nodeStatus(): Promise<void> {
   workloadSpinner.stop();
 
   if (workloads.vms.length === 0 && workloads.jobs.length === 0) {
-    console.log(chalk.gray("  No active workloads"));
+    console.log(theme.muted("  No active workloads"));
   } else {
     if (workloads.vms.length > 0) {
-      console.log(chalk.gray(`  VMs: ${workloads.vms.length}`));
+      console.log(theme.muted(`  VMs: ${workloads.vms.length}`));
       for (const vm of workloads.vms) {
-        console.log(chalk.gray(`    • ${vm.name} (${vm.status})`));
+        console.log(theme.muted(`    • ${vm.name} (${vm.status})`));
       }
     }
     if (workloads.jobs.length > 0) {
-      console.log(chalk.gray(`  Jobs: ${workloads.jobs.length}`));
+      console.log(theme.muted(`  Jobs: ${workloads.jobs.length}`));
       for (const job of workloads.jobs) {
-        console.log(chalk.gray(`    • ${job.name} (${job.status})`));
+        console.log(theme.muted(`    • ${job.name} (${job.status})`));
       }
     }
   }
@@ -1579,12 +1588,12 @@ interface TokenListItem {
 }
 
 async function nodeTokenCreate(options: { name?: string }): Promise<void> {
-  console.log(chalk.bold("\n🔑 Create Node Registration Token\n"));
+  console.log(theme.emphasis("\nCreate Node Registration Token\n"));
 
   const token = loadToken();
   if (!token) {
-    console.log(chalk.red("✗ Not logged in"));
-    console.log(chalk.gray("  Run 'uva login' first"));
+    console.log(theme.error("✗ Not logged in"));
+    console.log(theme.muted("  Run 'uva login' first"));
     process.exit(1);
   }
 
@@ -1615,22 +1624,22 @@ async function nodeTokenCreate(options: { name?: string }): Promise<void> {
 
     spinner.succeed("Registration token created!");
     console.log();
-    console.log(chalk.underline("Token Details:"));
-    console.log(chalk.gray(`  Token: ${chalk.cyan(data.token)}`));
-    console.log(chalk.gray(`  Assigned Port: ${data.assignedPort}`));
+    console.log(theme.info("Token Details:"));
+    console.log(theme.muted(`  Token: ${theme.accent(data.token)}`));
+    console.log(theme.muted(`  Assigned Port: ${data.assignedPort}`));
     console.log(
-      chalk.gray(`  Expires: ${new Date(data.expiresAt).toLocaleString()}`),
+      theme.muted(`  Expires: ${new Date(data.expiresAt).toLocaleString()}`),
     );
     console.log();
-    console.log(chalk.underline("Installation Command:"));
+    console.log(theme.info("Installation Command:"));
     console.log(
-      chalk.cyan(
+      theme.accent(
         `  curl -fsSL ${baseUrl}/install-node.sh | sudo bash -s -- --token ${data.token}`,
       ),
     );
     console.log();
     console.log(
-      chalk.yellow(
+      theme.warning(
         "⚠ This token can only be used once and expires in 24 hours.",
       ),
     );
@@ -1643,12 +1652,12 @@ async function nodeTokenCreate(options: { name?: string }): Promise<void> {
 }
 
 async function nodeTokenList(): Promise<void> {
-  console.log(chalk.bold("\n📋 Node Registration Tokens\n"));
+  console.log(theme.emphasis("\nNode Registration Tokens\n"));
 
   const token = loadToken();
   if (!token) {
-    console.log(chalk.red("✗ Not logged in"));
-    console.log(chalk.gray("  Run 'uva login' first"));
+    console.log(theme.error("✗ Not logged in"));
+    console.log(theme.muted("  Run 'uva login' first"));
     process.exit(1);
   }
 
@@ -1677,15 +1686,15 @@ async function nodeTokenList(): Promise<void> {
     console.log();
 
     if (tokens.length === 0) {
-      console.log(chalk.gray("  No tokens found"));
-      console.log(chalk.gray("  Create one with 'uva node token create'"));
+      console.log(theme.muted("  No tokens found"));
+      console.log(theme.muted("  Create one with 'uva node token create'"));
     } else {
       for (const token of tokens) {
         const statusColor = token.used
-          ? chalk.gray
+          ? theme.muted
           : token.expired
-            ? chalk.yellow
-            : chalk.green;
+            ? theme.warning
+            : theme.success;
         const status = token.used
           ? "[USED]"
           : token.expired
@@ -1693,14 +1702,16 @@ async function nodeTokenList(): Promise<void> {
             : "[ACTIVE]";
 
         console.log(statusColor(`  ${status} Port ${token.assignedPort}`));
-        console.log(chalk.gray(`    Token: ${token.token.substring(0, 8)}...`));
         console.log(
-          chalk.gray(
+          theme.muted(`    Token: ${token.token.substring(0, 8)}...`),
+        );
+        console.log(
+          theme.muted(
             `    Created: ${new Date(token.createdAt).toLocaleString()}`,
           ),
         );
         if (token.usedByNodeId) {
-          console.log(chalk.gray(`    Used by: ${token.usedByNodeId}`));
+          console.log(theme.muted(`    Used by: ${token.usedByNodeId}`));
         }
         console.log();
       }
@@ -1713,11 +1724,11 @@ async function nodeTokenList(): Promise<void> {
 }
 
 async function nodeListRemote(): Promise<void> {
-  console.log(chalk.bold("\n📋 My Contributed Nodes\n"));
+  console.log(theme.emphasis("\nMy Contributed Nodes\n"));
 
   const token = loadToken();
   if (!token) {
-    console.log(chalk.red("✗ Not logged in. Run 'uva login' first."));
+    console.log(theme.error("✗ Not logged in. Run 'uva login' first."));
     process.exit(1);
   }
 
@@ -1743,18 +1754,18 @@ async function nodeListRemote(): Promise<void> {
     console.log();
 
     if (nodes.length === 0) {
-      console.log(chalk.gray("  You haven't contributed any nodes yet."));
+      console.log(theme.muted("  You haven't contributed any nodes yet."));
       console.log(
-        chalk.gray("  Contact an admin to get an installation token."),
+        theme.muted("  Contact an admin to get an installation token."),
       );
     } else {
       for (const node of nodes) {
         const statusColor =
           node.status === "online"
-            ? chalk.green
+            ? theme.success
             : node.status === "draining"
-              ? chalk.yellow
-              : chalk.red;
+              ? theme.warning
+              : theme.error;
         const statusIcon =
           node.status === "online"
             ? "●"
@@ -1763,17 +1774,17 @@ async function nodeListRemote(): Promise<void> {
               : "○";
 
         console.log(
-          `  ${statusColor(statusIcon)} ${chalk.bold(node.name || node.nodeId)}`,
+          `  ${statusColor(statusIcon)} ${theme.emphasis(node.name || node.nodeId)}`,
         );
-        console.log(chalk.gray(`    ID: ${node.nodeId}`));
+        console.log(theme.muted(`    ID: ${node.nodeId}`));
         console.log(
-          chalk.gray(
+          theme.muted(
             `    Resources: ${node.cpus || 0} CPUs, ${node.ram || 0}GB RAM, ${node.gpus || 0} GPUs`,
           ),
         );
-        console.log(chalk.gray(`    Status: ${statusColor(node.status)}`));
+        console.log(theme.muted(`    Status: ${statusColor(node.status)}`));
         console.log(
-          chalk.gray(
+          theme.muted(
             `    Last heartbeat: ${new Date(node.lastHeartbeat).toLocaleString()}`,
           ),
         );
@@ -1788,11 +1799,11 @@ async function nodeListRemote(): Promise<void> {
 }
 
 async function nodeStatusRemote(nodeId: string): Promise<void> {
-  console.log(chalk.bold(`\n📊 Node Status: ${nodeId}\n`));
+  console.log(theme.emphasis(`\nNode Status: ${nodeId}\n`));
 
   const token = loadToken();
   if (!token) {
-    console.log(chalk.red("✗ Not logged in. Run 'uva login' first."));
+    console.log(theme.error("✗ Not logged in. Run 'uva login' first."));
     process.exit(1);
   }
 
@@ -1819,22 +1830,22 @@ async function nodeStatusRemote(nodeId: string): Promise<void> {
 
     const statusColor =
       node.status === "online"
-        ? chalk.green
+        ? theme.success
         : node.status === "draining"
-          ? chalk.yellow
-          : chalk.red;
+          ? theme.warning
+          : theme.error;
 
-    console.log(`  ${chalk.bold("Name:")} ${node.name || "(unnamed)"}`);
-    console.log(`  ${chalk.bold("Node ID:")} ${node.nodeId}`);
-    console.log(`  ${chalk.bold("Status:")} ${statusColor(node.status)}`);
-    console.log(`  ${chalk.bold("CPUs:")} ${node.cpus || 0}`);
-    console.log(`  ${chalk.bold("RAM:")} ${node.ram || 0}GB`);
-    console.log(`  ${chalk.bold("GPUs:")} ${node.gpus || 0}`);
+    console.log(`  ${theme.emphasis("Name:")} ${node.name || "(unnamed)"}`);
+    console.log(`  ${theme.emphasis("Node ID:")} ${node.nodeId}`);
+    console.log(`  ${theme.emphasis("Status:")} ${statusColor(node.status)}`);
+    console.log(`  ${theme.emphasis("CPUs:")} ${node.cpus || 0}`);
+    console.log(`  ${theme.emphasis("RAM:")} ${node.ram || 0}GB`);
+    console.log(`  ${theme.emphasis("GPUs:")} ${node.gpus || 0}`);
     console.log(
-      `  ${chalk.bold("Registered:")} ${new Date(node.registeredAt).toLocaleString()}`,
+      `  ${theme.emphasis("Registered:")} ${new Date(node.registeredAt).toLocaleString()}`,
     );
     console.log(
-      `  ${chalk.bold("Last heartbeat:")} ${new Date(node.lastHeartbeat).toLocaleString()}`,
+      `  ${theme.emphasis("Last heartbeat:")} ${new Date(node.lastHeartbeat).toLocaleString()}`,
     );
     console.log();
   } catch (err) {
@@ -1845,11 +1856,11 @@ async function nodeStatusRemote(nodeId: string): Promise<void> {
 }
 
 async function nodePauseRemote(nodeId: string): Promise<void> {
-  console.log(chalk.bold(`\n⏸️  Pausing Node: ${nodeId}\n`));
+  console.log(theme.emphasis(`\nPausing Node: ${nodeId}\n`));
 
   const token = loadToken();
   if (!token) {
-    console.log(chalk.red("✗ Not logged in. Run 'uva login' first."));
+    console.log(theme.error("✗ Not logged in. Run 'uva login' first."));
     process.exit(1);
   }
 
@@ -1873,8 +1884,8 @@ async function nodePauseRemote(nodeId: string): Promise<void> {
     }
 
     spinner.succeed("Node paused successfully");
-    console.log(chalk.gray("\n  The node will stop accepting new workloads."));
-    console.log(chalk.gray("  Existing workloads will continue to run."));
+    console.log(theme.muted("\n  The node will stop accepting new workloads."));
+    console.log(theme.muted("  Existing workloads will continue to run."));
     console.log();
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -1884,11 +1895,11 @@ async function nodePauseRemote(nodeId: string): Promise<void> {
 }
 
 async function nodeResumeRemote(nodeId: string): Promise<void> {
-  console.log(chalk.bold(`\n▶️  Resuming Node: ${nodeId}\n`));
+  console.log(theme.emphasis(`\nResuming Node: ${nodeId}\n`));
 
   const token = loadToken();
   if (!token) {
-    console.log(chalk.red("✗ Not logged in. Run 'uva login' first."));
+    console.log(theme.error("✗ Not logged in. Run 'uva login' first."));
     process.exit(1);
   }
 
@@ -1912,7 +1923,7 @@ async function nodeResumeRemote(nodeId: string): Promise<void> {
     }
 
     spinner.succeed("Node resumed successfully");
-    console.log(chalk.gray("\n  The node is now accepting new workloads."));
+    console.log(theme.muted("\n  The node is now accepting new workloads."));
     console.log();
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -1922,11 +1933,11 @@ async function nodeResumeRemote(nodeId: string): Promise<void> {
 }
 
 async function nodeWorkloadsRemote(nodeId: string): Promise<void> {
-  console.log(chalk.bold(`\n📦 Workloads on Node: ${nodeId}\n`));
+  console.log(theme.emphasis(`\nWorkloads on Node: ${nodeId}\n`));
 
   const token = loadToken();
   if (!token) {
-    console.log(chalk.red("✗ Not logged in. Run 'uva login' first."));
+    console.log(theme.error("✗ Not logged in. Run 'uva login' first."));
     process.exit(1);
   }
 
@@ -1959,14 +1970,14 @@ async function nodeWorkloadsRemote(nodeId: string): Promise<void> {
     console.log();
 
     if (total === 0) {
-      console.log(chalk.gray("  No active workloads on this node."));
+      console.log(theme.muted("  No active workloads on this node."));
     } else {
       if (vms.length > 0) {
-        console.log(chalk.bold("  VMs:"));
+        console.log(theme.emphasis("  VMs:"));
         for (const vm of vms) {
-          console.log(chalk.blue(`    • ${vm.name || vm.vmId.slice(0, 8)}`));
+          console.log(theme.info(`    • ${vm.name || vm.vmId.slice(0, 8)}`));
           console.log(
-            chalk.gray(
+            theme.muted(
               `      ${vm.cpus} CPUs, ${vm.ram}GB RAM, ${vm.gpus} GPUs - ${vm.status}`,
             ),
           );
@@ -1975,13 +1986,13 @@ async function nodeWorkloadsRemote(nodeId: string): Promise<void> {
       }
 
       if (jobs.length > 0) {
-        console.log(chalk.bold("  Jobs:"));
+        console.log(theme.emphasis("  Jobs:"));
         for (const job of jobs) {
           console.log(
-            chalk.magenta(`    • ${job.name || job.jobId.slice(0, 8)}`),
+            theme.accent(`    • ${job.name || job.jobId.slice(0, 8)}`),
           );
           console.log(
-            chalk.gray(
+            theme.muted(
               `      ${job.cpus} CPUs, ${job.ram}GB RAM, ${job.gpus} GPUs - ${job.status}`,
             ),
           );
