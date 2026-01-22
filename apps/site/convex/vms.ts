@@ -84,6 +84,30 @@ export const updateStatus = mutation({
   },
 });
 
+export const extend = mutation({
+  args: {
+    userId: v.string(),
+    vmId: v.string(),
+    expiresAt: v.number(),
+  },
+  handler: async (ctx, args) => {
+    const vm = await ctx.db
+      .query("vms")
+      .withIndex("by_vmId", (q) => q.eq("vmId", args.vmId))
+      .first();
+
+    if (!vm || vm.userId !== args.userId) {
+      throw new Error("VM not found");
+    }
+
+    await ctx.db.patch(vm._id, {
+      expiresAt: args.expiresAt,
+    });
+
+    return vm._id;
+  },
+});
+
 export const listByUser = query({
   args: {
     userId: v.string(),

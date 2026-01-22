@@ -72,6 +72,14 @@ Alias for
 .BR "vm delete" .
 Accepts VM ID or name. Supports interactive selection for duplicate names.
 .TP
+.B vm extend \fInameOrVmId\fR
+Extend a running VM's expiration time by the specified number of hours. Only VMs in running state can be extended.
+.RS
+.TP
+.BR \-\-hours " \fIhours\fR"
+(Required) Number of hours to extend the VM. Must be a positive integer.
+.RE
+.TP
 .B vm status \fIvmId\fR
 Display current status and detailed information about a virtual machine including state, configuration, and any error messages.
 .TP
@@ -423,6 +431,14 @@ Delete a VM by name (if multiple VMs share the name, interactive menu appears):
 .nf
 .RS
 $ uva vm delete training-vm
+.RE
+.fi
+.PP
+Extend a running VM by 2 hours:
+.PP
+.nf
+.RS
+$ uva vm extend training-vm --hours 2
 .RE
 .fi
 .SS SSH Access
@@ -820,4 +836,3 @@ Written by Charlie Meyer.
 Full documentation and API reference: https://uvacompute.com
 .PP
 Installation: curl -fsSL https://uvacompute.com/install.sh | bash
-
