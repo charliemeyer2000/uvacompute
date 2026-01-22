@@ -115,10 +115,11 @@ export async function POST(
         console.error("Failed to update VM expiration in Convex:", convexError);
         return NextResponse.json(
           {
-            ...data,
+            status: "extend_failed_internal",
+            vmId,
             msg: "VM extended, but failed to update expiration in database",
           },
-          { status: 200 },
+          { status: 500 },
         );
       }
     }
