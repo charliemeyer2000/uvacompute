@@ -7,6 +7,7 @@ import { useQuery } from "convex/react";
 import { api } from "../../../../../../convex/_generated/api";
 import { authClient } from "@/lib/auth-client";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Dialog,
   DialogContent,
@@ -24,6 +25,7 @@ import {
   getStatusTextColor,
   getSshCommand,
   deleteVm,
+  extendVm,
 } from "@/lib/vm-utils";
 import {
   ArrowLeft,
@@ -61,6 +63,9 @@ export default function VMDetailPage() {
   const [sshCopied, setSshCopied] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showExtendDialog, setShowExtendDialog] = useState(false);
+  const [isExtending, setIsExtending] = useState(false);
+  const [extendHours, setExtendHours] = useState("1");
 
   const isActive = vm?.status ? ACTIVE_STATUSES.includes(vm.status) : false;
   const isReady = vm?.status === "ready";
@@ -98,6 +103,36 @@ export default function VMDetailPage() {
     }
 
     setIsDeleting(false);
+  }
+
+  async function handleExtend(): Promise<void> {
+    if (!vm) return;
+    const hours = Number(extendHours);
+    if (Number.isNaN(hours) || hours < 1) {
+      toast.error("invalid hours", {
+        description: "enter a positive number of hours to extend",
+      });
+      return;
+    }
+
+    setIsExtending(true);
+
+    const result = await extendVm(vm.vmId, hours);
+
+    if (result.success) {
+      toast.success("vm extended", {
+        description: result.expiresAt
+          ? `new expiration: ${formatDate(result.expiresAt)}`
+          : "expiration updated",
+      });
+      setShowExtendDialog(false);
+    } else {
+      toast.error("extension failed", {
+        description: result.error,
+      });
+    }
+
+    setIsExtending(false);
   }
 
   if (vm === undefined) {
@@ -173,13 +208,23 @@ export default function VMDetailPage() {
         </div>
 
         {isOwner && isActive && (
-          <Button
-            variant="outline"
-            className="text-red-600 border-red-200 hover:bg-red-50 hover:border-red-300"
-            onClick={() => setShowDeleteDialog(true)}
-          >
-            delete vm
-          </Button>
+          <div className="flex items-center gap-2">
+            {isReady && (
+              <Button
+                variant="outline"
+                onClick={() => setShowExtendDialog(true)}
+              >
+                extend
+              </Button>
+            )}
+            <Button
+              variant="outline"
+              className="text-red-600 border-red-200 hover:bg-red-50 hover:border-red-300"
+              onClick={() => setShowDeleteDialog(true)}
+            >
+              delete vm
+            </Button>
+          </div>
         )}
       </div>
 
@@ -307,6 +352,60 @@ export default function VMDetailPage() {
                 </>
               ) : (
                 "delete"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showExtendDialog} onOpenChange={setShowExtendDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>extend vm</DialogTitle>
+            <DialogDescription>
+              add more time to {vm.name || vm.vmId}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <p className="text-xs text-gray-500 mb-1">hours</p>
+              <Input
+                type="number"
+                min={1}
+                value={extendHours}
+                onChange={(e) => setExtendHours(e.target.value)}
+                aria-invalid={Number(extendHours) < 1}
+              />
+            </div>
+            <div className="flex gap-2">
+              {[1, 2, 4, 8].map((hours) => (
+                <Button
+                  key={hours}
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setExtendHours(String(hours))}
+                >
+                  +{hours}h
+                </Button>
+              ))}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowExtendDialog(false)}
+              disabled={isExtending}
+            >
+              cancel
+            </Button>
+            <Button onClick={handleExtend} disabled={isExtending}>
+              {isExtending ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  extending...
+                </>
+              ) : (
+                "extend"
               )}
             </Button>
           </DialogFooter>

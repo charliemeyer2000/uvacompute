@@ -283,6 +283,8 @@ async function fetchVMsForCompletion(
           return isVMStatusInGroup(vm.status, VM_STATUS_GROUPS.READY);
         } else if (subcommandName === "delete" || subcommandName === "rm") {
           return isVMStatusInGroup(vm.status, VM_STATUS_GROUPS.DELETABLE);
+        } else if (subcommandName === "extend") {
+          return isVMStatusInGroup(vm.status, VM_STATUS_GROUPS.EXTENDABLE);
         }
         return true;
       });

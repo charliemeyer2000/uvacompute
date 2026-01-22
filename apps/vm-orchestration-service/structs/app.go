@@ -67,6 +67,7 @@ type VMHandlers struct {
 	CreateVM  func(*App, http.ResponseWriter, *http.Request)
 	GetStatus func(*App, http.ResponseWriter, *http.Request, string)
 	DeleteVM  func(*App, http.ResponseWriter, *http.Request, string)
+	ExtendVM  func(*App, http.ResponseWriter, *http.Request, string)
 }
 
 type JobHandlers struct {
@@ -121,6 +122,11 @@ func (app *App) SetupAllRoutes(
 	app.Router.Delete("/vms/{vmId}", authMiddleware(func(w http.ResponseWriter, r *http.Request) {
 		vmId := chi.URLParam(r, "vmId")
 		vmHandlers.DeleteVM(app, w, r, vmId)
+	}))
+
+	app.Router.Post("/vms/{vmId}/extend", authMiddleware(func(w http.ResponseWriter, r *http.Request) {
+		vmId := chi.URLParam(r, "vmId")
+		vmHandlers.ExtendVM(app, w, r, vmId)
 	}))
 
 	app.Router.Post("/jobs", authMiddleware(func(w http.ResponseWriter, r *http.Request) {
