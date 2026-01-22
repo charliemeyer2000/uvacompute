@@ -16,6 +16,7 @@ export interface VM {
   createdAt: number;
   expiresAt: number;
   deletedAt?: number;
+  nodeId?: string;
 }
 
 export function formatDate(timestamp: number): string {
@@ -63,4 +64,85 @@ export function getStatusColor(status: VMStatus): string {
     default:
       return "bg-gray-100 text-gray-800 border-gray-200";
   }
+}
+
+export function getStatusBorderColor(status: string): string {
+  switch (status) {
+    case "ready":
+      return "border-l-green-500";
+    case "creating":
+    case "pending":
+    case "booting":
+    case "provisioning":
+      return "border-l-blue-500";
+    case "failed":
+    case "offline":
+      return "border-l-red-500";
+    case "stopping":
+      return "border-l-yellow-500";
+    case "stopped":
+    case "not_found":
+    default:
+      return "border-l-gray-300";
+  }
+}
+
+export function getStatusDotColor(status: string): string {
+  switch (status) {
+    case "ready":
+      return "bg-green-500";
+    case "creating":
+    case "pending":
+    case "booting":
+    case "provisioning":
+      return "bg-blue-500";
+    case "failed":
+    case "offline":
+      return "bg-red-500";
+    case "stopping":
+      return "bg-yellow-500";
+    case "stopped":
+    case "not_found":
+    default:
+      return "bg-gray-400";
+  }
+}
+
+export function getStatusTextColor(status: string): string {
+  switch (status) {
+    case "ready":
+      return "text-green-600";
+    case "creating":
+    case "pending":
+    case "booting":
+    case "provisioning":
+      return "text-blue-600";
+    case "failed":
+    case "offline":
+      return "text-red-600";
+    case "stopping":
+      return "text-yellow-600";
+    default:
+      return "text-gray-500";
+  }
+}
+
+export function getSshCommand(vm: VM): string {
+  return `uva vm ssh ${vm.name || vm.vmId}`;
+}
+
+export async function deleteVm(
+  vmId: string,
+): Promise<{ success: boolean; error?: string }> {
+  const response = await fetch(`/api/vms/${vmId}`, {
+    method: "DELETE",
+  });
+
+  const data = await response.json();
+
+  if (!response.ok || data.status !== "deletion_success") {
+    return { success: false, error: data.msg || "failed to delete vm" };
+  }
+
+  return { success: true };
 }
