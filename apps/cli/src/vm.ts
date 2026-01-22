@@ -28,6 +28,8 @@ import { type VMCreationRequest } from "./lib/types";
 import {
   VMCreationResponseSchema,
   VMDeletionResponseSchema,
+  VMExtendRequestSchema,
+  VMExtendResponseSchema,
   VMStatusResponseSchema,
   VMListResponseSchema,
   VM_STATUS_GROUPS,
@@ -695,6 +697,114 @@ async function deleteVM(nameOrVmId: string): Promise<void> {
   }
 }
 
+async function extendVM(
+  nameOrVmId: string,
+  options: { hours?: string },
+): Promise<void> {
+  let spinner = ora("Fetching VMs...").start();
+  let spinnerActive = true;
+
+  try {
+    const token = loadToken();
+    if (!token) {
+      spinner.fail("Not authenticated. Please run 'uva login' first.");
+      process.exit(1);
+    }
+
+    const hours = Number(options.hours);
+    if (!options.hours || Number.isNaN(hours)) {
+      spinner.fail("Invalid hours value. Please provide a number.");
+      process.exit(1);
+    }
+
+    VMExtendRequestSchema.parse({ hours });
+
+    const matchingVMs = await fetchAndFilterVMs(
+      nameOrVmId,
+      token,
+      VM_STATUS_GROUPS.EXTENDABLE,
+    );
+
+    if (matchingVMs.length === 0) {
+      spinner.fail(`No extendable VM found with name or ID: ${nameOrVmId}`);
+      console.log(theme.muted("\nRun 'uva vm list --all' to see all VMs"));
+      console.log(theme.muted("Note: Only running VMs can be extended\n"));
+      process.exit(1);
+    }
+
+    let vm = matchingVMs[0];
+    if (matchingVMs.length > 1) {
+      spinner.stop();
+      spinnerActive = false;
+      vm = await selectVM(matchingVMs, nameOrVmId);
+      console.log();
+    } else {
+      spinner.stop();
+      spinnerActive = false;
+    }
+
+    const extendSpinner = ora(`Extending VM ${vm.vmId}...`).start();
+
+    let response: Response;
+    try {
+      response = await fetch(`${BASE_URL}/api/vms/${vm.vmId}/extend`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ hours }),
+      });
+    } catch (error: unknown) {
+      const statusData = await checkServiceStatus();
+      const serviceError = new ServiceUnavailableError(
+        statusData?.current.status ?? null,
+      );
+      extendSpinner.fail(serviceError.message);
+      process.exit(1);
+    }
+
+    const rawData = (await response.json()) as any;
+
+    if (!response.ok) {
+      extendSpinner.fail(
+        `Failed to extend VM ${vm.vmId}: ${rawData.msg || rawData.error || "Unknown error"}`,
+      );
+      process.exit(1);
+    }
+
+    const data = VMExtendResponseSchema.parse(rawData);
+
+    if (data.status === "extend_success") {
+      extendSpinner.succeed(theme.success("VM extended successfully!"));
+      console.log(formatSectionHeader("VM Extension"));
+      console.log(formatDetail("VM ID", vm.vmId));
+      console.log(formatDetail("Extended By", `${hours} hour(s)`));
+      if (data.expiresAt) {
+        console.log(
+          formatDetail(
+            "New Expiration",
+            new Date(data.expiresAt).toLocaleString(),
+          ),
+        );
+      }
+      console.log();
+      return;
+    }
+
+    extendSpinner.fail(`VM extension failed: ${data.msg}`);
+    process.exit(1);
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    if (spinnerActive && spinner) {
+      spinner.fail(`Error: ${message}`);
+    } else {
+      console.log(theme.warning(`Error: ${message}`));
+    }
+    process.exit(1);
+  }
+}
+
 async function getVMStatus(vmId: string): Promise<void> {
   const spinner = ora(`Getting status for VM ${vmId}...`).start();
 
@@ -1028,6 +1138,12 @@ export function registerVMCommands(program: Command) {
     .description("Delete a VM")
     .argument("<nameOrVmId>", "VM name or VM ID")
     .action(deleteVM);
+
+  vm.command("extend")
+    .description("Extend a VM's expiration time")
+    .argument("<nameOrVmId>", "VM name or VM ID")
+    .requiredOption("--hours <hours>", "Number of hours to extend")
+    .action(extendVM);
 
   vm.command("status")
     .description("Get VM status")
