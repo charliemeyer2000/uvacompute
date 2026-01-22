@@ -46,6 +46,10 @@ export default defineSchema({
 
     orchestrationResponse: v.optional(v.any()),
     nodeId: v.optional(v.string()),
+
+    exposePort: v.optional(v.number()),
+    exposeSubdomain: v.optional(v.string()),
+    exposeUrl: v.optional(v.string()),
   })
     .index("by_user", ["userId"])
     .index("by_user_and_status", ["userId", "status"])
@@ -98,11 +102,28 @@ export default defineSchema({
     nodeId: v.optional(v.string()),
     logsUrl: v.optional(v.string()),
     logsStorageId: v.optional(v.id("_storage")),
+
+    // Ephemeral endpoint fields (--expose flag)
+    exposePort: v.optional(v.number()),
+    exposeSubdomain: v.optional(v.string()),
+    exposeUrl: v.optional(v.string()),
   })
     .index("by_user", ["userId"])
     .index("by_user_and_status", ["userId", "status"])
     .index("by_jobId", ["jobId"])
     .index("by_nodeId", ["nodeId"]),
+
+  // Ephemeral endpoints table for subdomain uniqueness
+  endpoints: defineTable({
+    subdomain: v.string(),
+    type: v.union(v.literal("vm"), v.literal("job")),
+    resourceId: v.string(), // vmId or jobId
+    port: v.number(),
+    cloudflareRecordId: v.optional(v.string()), // Cloudflare DNS record ID for cleanup
+    createdAt: v.number(),
+  })
+    .index("by_subdomain", ["subdomain"])
+    .index("by_resource", ["type", "resourceId"]),
 
   nodes: defineTable({
     nodeId: v.string(),
@@ -112,6 +133,7 @@ export default defineSchema({
     tunnelUser: v.optional(v.string()), // SSH user on the node (default: root)
     kubeconfigPath: v.optional(v.string()), // Path to kubeconfig (default: /etc/rancher/k3s/k3s.yaml)
     sshPublicKey: v.optional(v.string()), // Node's SSH public key for DO VPS tunnel
+    nodeSecret: v.optional(v.string()), // Per-node secret for node API authentication
     ownerId: v.optional(v.string()), // User who contributed this node
     status: v.union(
       v.literal("online"),
@@ -124,6 +146,7 @@ export default defineSchema({
     ram: v.optional(v.number()),
     gpus: v.optional(v.number()),
     gpuType: v.optional(v.string()), // e.g., "nvidia-rtx-5090", "nvidia-rtx-4090", "none"
+    gpuMode: v.optional(v.union(v.literal("nvidia"), v.literal("vfio"))), // Current GPU driver mode
     supportsVMs: v.optional(v.boolean()), // Default: true if KubeVirt available
     supportsJobs: v.optional(v.boolean()), // Default: true (container runtime)
   })

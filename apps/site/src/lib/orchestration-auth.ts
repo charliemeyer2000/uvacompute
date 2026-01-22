@@ -1,5 +1,7 @@
 import crypto from "crypto";
 import { NextRequest } from "next/server";
+import { fetchQuery } from "convex/nextjs";
+import { api } from "../../convex/_generated/api";
 
 export function signRequest(
   method: string,
@@ -56,6 +58,48 @@ export function verifyRequest(request: NextRequest, body: string): boolean {
   const payload = `${timestamp}:${body}`;
   const expectedSignature = crypto
     .createHmac("sha256", secret)
+    .update(payload)
+    .digest("hex");
+
+  return signature === expectedSignature;
+}
+
+export function isNodeAuthRequest(request: NextRequest): boolean {
+  return request.headers.has("X-Node-Id");
+}
+
+// Signature payload: "${nodeId}:${timestamp}:${body}"
+export async function verifyNodeRequest(
+  request: NextRequest,
+  body: string,
+  expectedNodeId: string,
+): Promise<boolean> {
+  const nodeId = request.headers.get("X-Node-Id");
+  const signature = request.headers.get("X-Signature");
+  const timestamp = request.headers.get("X-Timestamp");
+
+  if (!nodeId || !signature || !timestamp) {
+    return false;
+  }
+
+  if (nodeId !== expectedNodeId) {
+    return false;
+  }
+
+  const now = Math.floor(Date.now() / 1000);
+  const requestTimestamp = parseInt(timestamp);
+  if (Math.abs(now - requestTimestamp) > 5 * 60) {
+    return false;
+  }
+
+  const nodeSecret = await fetchQuery(api.nodes.getNodeSecret, { nodeId });
+  if (!nodeSecret) {
+    return false;
+  }
+
+  const payload = `${nodeId}:${timestamp}:${body}`;
+  const expectedSignature = crypto
+    .createHmac("sha256", nodeSecret)
     .update(payload)
     .digest("hex");
 

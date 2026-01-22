@@ -21,6 +21,9 @@ export interface Job {
   completedAt?: number;
   nodeId?: string;
   logsUrl?: string;
+  exposePort?: number;
+  exposeSubdomain?: string;
+  exposeUrl?: string;
 }
 
 export function formatDate(timestamp: number): string {

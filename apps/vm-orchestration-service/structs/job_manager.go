@@ -13,7 +13,7 @@ import (
 type JobStatusCallback func(status JobStatus, exitCode *int, errorMsg string, nodeId string)
 
 type JobProvider interface {
-	CreateJob(jobId string, image string, command []string, env map[string]string, cpus, ram, gpus, disk int, statusCallback JobStatusCallback) error
+	CreateJob(jobId string, image string, command []string, env map[string]string, cpus, ram, gpus, disk int, statusCallback JobStatusCallback, expose *int, exposeSubdomain *string) error
 	DeleteJob(jobId string) error
 	GetJobStatus(jobId string) (JobStatus, error)
 	GetJobLogs(jobId string) (io.ReadCloser, error)
@@ -46,7 +46,11 @@ func (jm *JobManager) CreateJob(req JobCreationRequest) (string, error) {
 		return "", err
 	}
 
-	jobId := uuid.New().String()
+	// Use pre-generated jobId if provided, otherwise generate one
+	jobId := req.JobId
+	if jobId == "" {
+		jobId = uuid.New().String()
+	}
 
 	cpus := IntOrDefault(req.Cpus, DefaultJobCpus)
 	ram := IntOrDefault(req.Ram, DefaultJobRam)
@@ -69,12 +73,12 @@ func (jm *JobManager) CreateJob(req JobCreationRequest) (string, error) {
 		Status:       JOB_STATUS_PENDING,
 	}
 
-	go jm.createJobAsync(jobId, req.Image, req.Command, req.Env, cpus, ram, gpus, disk)
+	go jm.createJobAsync(jobId, req.Image, req.Command, req.Env, cpus, ram, gpus, disk, req.Expose, req.ExposeSubdomain)
 
 	return jobId, nil
 }
 
-func (jm *JobManager) createJobAsync(jobId string, image string, command []string, env map[string]string, cpus, ram, gpus, disk int) {
+func (jm *JobManager) createJobAsync(jobId string, image string, command []string, env map[string]string, cpus, ram, gpus, disk int, expose *int, exposeSubdomain *string) {
 	defer func() {
 		if r := recover(); r != nil {
 			log.Printf("ERROR: Panic in createJobAsync for Job %s: %v", jobId, r)
@@ -88,7 +92,7 @@ func (jm *JobManager) createJobAsync(jobId string, image string, command []strin
 
 	log.Printf("Starting async job creation for %s (image: %s, cpus: %d, ram: %d, gpus: %d, disk: %d)", jobId, image, cpus, ram, gpus, disk)
 
-	err := jm.jobProvider.CreateJob(jobId, image, command, env, cpus, ram, gpus, disk, statusCallback)
+	err := jm.jobProvider.CreateJob(jobId, image, command, env, cpus, ram, gpus, disk, statusCallback, expose, exposeSubdomain)
 	if err != nil {
 		log.Printf("ERROR: Failed to create Job %s: %v", jobId, err)
 		jm.UpdateJobStatus(jobId, JOB_STATUS_FAILED, nil, err.Error(), "")
