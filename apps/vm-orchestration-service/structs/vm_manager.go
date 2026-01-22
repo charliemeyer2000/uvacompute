@@ -138,8 +138,10 @@ func (vm *VMManager) createVMSync(vmId string, cpus, ram, disk, gpus int, sshPub
 func (vm *VMManager) StartExpirationTimer(vmId string, expiresAt int64) {
 	vm.mu.Lock()
 	if vmState, exists := vm.vmMap[vmId]; exists {
-		vmState.ExpiresAt = expiresAt
-		vm.vmMap[vmId] = vmState
+		if vmState.ExpiresAt != expiresAt {
+			vmState.ExpiresAt = expiresAt
+			vm.vmMap[vmId] = vmState
+		}
 	}
 	vm.stopExpirationTimerLocked(vmId)
 	remaining := time.Until(time.UnixMilli(expiresAt))
@@ -149,6 +151,13 @@ func (vm *VMManager) StartExpirationTimer(vmId string, expiresAt int64) {
 	})
 	vm.expirationTimers[vmId] = timer
 	vm.mu.Unlock()
+}
+
+func (vm *VMManager) HasExpirationTimer(vmId string) bool {
+	vm.mu.Lock()
+	defer vm.mu.Unlock()
+	_, exists := vm.expirationTimers[vmId]
+	return exists
 }
 
 func (vm *VMManager) stopExpirationTimerLocked(vmId string) {
@@ -162,22 +171,24 @@ func (vm *VMManager) handleExpiration(vmId string) {
 	log.Printf("VM %s expired, deleting", vmId)
 
 	vm.mu.Lock()
-	vm.stopExpirationTimerLocked(vmId)
-	_, exists := vm.vmMap[vmId]
-	vm.mu.Unlock()
+	vmState, exists := vm.vmMap[vmId]
 	if !exists {
+		vm.mu.Unlock()
 		return
 	}
+
+	if vmState.ExpiresAt > time.Now().UnixMilli() {
+		vm.mu.Unlock()
+		return
+	}
+
+	vm.stopExpirationTimerLocked(vmId)
+	vm.mu.Unlock()
 
 	vm.vmProvider.DestroyVM(vmId)
 
 	vm.mu.Lock()
-	vmState, exists := vm.vmMap[vmId]
-	if exists {
-		vmState.Status = VM_STATUS_STOPPED
-		vm.vmMap[vmId] = vmState
-		delete(vm.vmMap, vmId)
-	}
+	delete(vm.vmMap, vmId)
 	vm.mu.Unlock()
 
 	if vm.callbackClient != nil {

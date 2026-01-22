@@ -34,7 +34,8 @@ func SyncFromConvex(vmManager *structs.VMManager, vmProvider structs.VMProvider,
 		if existingVM, exists := currentVMs[cvm.VMId]; exists {
 			if cvm.ExpiresAt > 0 &&
 				cvm.ExpiresAt > time.Now().UnixMilli() &&
-				existingVM.Status == structs.VM_STATUS_READY {
+				existingVM.Status == structs.VM_STATUS_READY &&
+				!vmManager.HasExpirationTimer(cvm.VMId) {
 				vmManager.StartExpirationTimer(cvm.VMId, cvm.ExpiresAt)
 			}
 			continue
