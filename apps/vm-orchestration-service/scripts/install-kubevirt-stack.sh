@@ -158,11 +158,6 @@ install_cdi_proxy() {
     local hub_ip
     hub_ip=$(hostname -I | awk '{print $1}')
 
-    # Configure tinyproxy to allow connections from anywhere
-    # This is safe because:
-    # 1. Worker nodes connect via SSH tunnel with various source IPs
-    # 2. The proxy is only used for pulling VM images (read-only)
-    # 3. The hub should have proper firewall rules
     cat > /etc/tinyproxy/tinyproxy.conf << 'TINYPROXY_EOF'
 User tinyproxy
 Group tinyproxy
