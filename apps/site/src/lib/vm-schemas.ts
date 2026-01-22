@@ -32,6 +32,15 @@ export const VMDeletionStatusEnum = z.enum([
 
 export type VMDeletionStatus = z.infer<typeof VMDeletionStatusEnum>;
 
+export const VMExtendStatusEnum = z.enum([
+  "extend_success",
+  "extend_failed_validation",
+  "extend_failed_not_found",
+  "extend_failed_internal",
+]);
+
+export type VMExtendStatus = z.infer<typeof VMExtendStatusEnum>;
+
 export const VMStatusResponseSchema = z.object({
   status: VMStatusEnum,
   msg: z.string(),
@@ -55,6 +64,21 @@ export const VMDeletionResponseSchema = z.object({
 });
 
 export type VMDeletionResponse = z.infer<typeof VMDeletionResponseSchema>;
+
+export const VMExtendRequestSchema = z.object({
+  hours: z.number().int().min(1),
+});
+
+export type VMExtendRequest = z.infer<typeof VMExtendRequestSchema>;
+
+export const VMExtendResponseSchema = z.object({
+  status: VMExtendStatusEnum,
+  vmId: z.string().optional(),
+  expiresAt: z.number().optional(),
+  msg: z.string(),
+});
+
+export type VMExtendResponse = z.infer<typeof VMExtendResponseSchema>;
 
 export const VMCreationRequestSchema = z.object({
   hours: z.number().int().min(1),
