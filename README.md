@@ -115,6 +115,8 @@ _
 
 ## Accounts
 
+(Contact charlie for access to any of these)
+
 - Convex using github email
 - GitHub (for github app) - using github email:
   - dev/staging/prod apps (all separate apps)
