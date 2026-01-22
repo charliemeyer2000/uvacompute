@@ -28,20 +28,22 @@ type VMProvider interface {
 }
 
 type VMManager struct {
-	mu             sync.Mutex
-	vmMap          map[string]VMState
-	limits         VMResourceLimits
-	vmProvider     VMProvider
-	callbackClient CallbackClient
+	mu               sync.Mutex
+	vmMap            map[string]VMState
+	expirationTimers map[string]*time.Timer
+	limits           VMResourceLimits
+	vmProvider       VMProvider
+	callbackClient   CallbackClient
 }
 
 func NewVMManager(limits VMResourceLimits, vmProvider VMProvider, callbackClient CallbackClient) *VMManager {
 	return &VMManager{
-		mu:             sync.Mutex{},
-		vmMap:          make(map[string]VMState),
-		limits:         limits,
-		vmProvider:     vmProvider,
-		callbackClient: callbackClient,
+		mu:               sync.Mutex{},
+		vmMap:            make(map[string]VMState),
+		expirationTimers: make(map[string]*time.Timer),
+		limits:           limits,
+		vmProvider:       vmProvider,
+		callbackClient:   callbackClient,
 	}
 }
 
@@ -134,31 +136,68 @@ func (vm *VMManager) createVMSync(vmId string, cpus, ram, disk, gpus int, sshPub
 }
 
 func (vm *VMManager) StartExpirationTimer(vmId string, expiresAt int64) {
+	vm.mu.Lock()
+	if vmState, exists := vm.vmMap[vmId]; exists {
+		if vmState.ExpiresAt != expiresAt {
+			vmState.ExpiresAt = expiresAt
+			vm.vmMap[vmId] = vmState
+		}
+	}
+	vm.stopExpirationTimerLocked(vmId)
 	remaining := time.Until(time.UnixMilli(expiresAt))
 	log.Printf("VM %s expiration timer set for %v from now", vmId, remaining)
-	time.AfterFunc(remaining, func() {
-		log.Printf("VM %s expired, deleting", vmId)
-
-		vm.vmProvider.DestroyVM(vmId)
-
-		vm.mu.Lock()
-		vmState := vm.vmMap[vmId]
-		vmState.Status = VM_STATUS_STOPPED
-		vm.vmMap[vmId] = vmState
-		vm.mu.Unlock()
-
-		if vm.callbackClient != nil {
-			go func() {
-				if err := vm.callbackClient.NotifyVMStatusUpdate(vmId, string(VM_STATUS_STOPPED), ""); err != nil {
-					log.Printf("ERROR: Failed to notify site about VM %s expiration: %v", vmId, err)
-				}
-			}()
-		}
-
-		vm.mu.Lock()
-		delete(vm.vmMap, vmId)
-		vm.mu.Unlock()
+	timer := time.AfterFunc(remaining, func() {
+		vm.handleExpiration(vmId)
 	})
+	vm.expirationTimers[vmId] = timer
+	vm.mu.Unlock()
+}
+
+func (vm *VMManager) HasExpirationTimer(vmId string) bool {
+	vm.mu.Lock()
+	defer vm.mu.Unlock()
+	_, exists := vm.expirationTimers[vmId]
+	return exists
+}
+
+func (vm *VMManager) stopExpirationTimerLocked(vmId string) {
+	if timer, exists := vm.expirationTimers[vmId]; exists {
+		timer.Stop()
+		delete(vm.expirationTimers, vmId)
+	}
+}
+
+func (vm *VMManager) handleExpiration(vmId string) {
+	log.Printf("VM %s expired, deleting", vmId)
+
+	vm.mu.Lock()
+	vmState, exists := vm.vmMap[vmId]
+	if !exists {
+		vm.mu.Unlock()
+		return
+	}
+
+	if vmState.ExpiresAt > time.Now().UnixMilli() {
+		vm.mu.Unlock()
+		return
+	}
+
+	vm.stopExpirationTimerLocked(vmId)
+	vm.mu.Unlock()
+
+	vm.vmProvider.DestroyVM(vmId)
+
+	vm.mu.Lock()
+	delete(vm.vmMap, vmId)
+	vm.mu.Unlock()
+
+	if vm.callbackClient != nil {
+		go func() {
+			if err := vm.callbackClient.NotifyVMStatusUpdate(vmId, string(VM_STATUS_STOPPED), ""); err != nil {
+				log.Printf("ERROR: Failed to notify site about VM %s expiration: %v", vmId, err)
+			}
+		}()
+	}
 }
 
 func (vm *VMManager) GetVM(vmId string) (VMState, bool) {
@@ -233,6 +272,7 @@ func (vm *VMManager) DeleteVM(vmId string) error {
 		vmState := vm.vmMap[vmId]
 		vmState.Status = VM_STATUS_STOPPING
 		vm.vmMap[vmId] = vmState
+		vm.stopExpirationTimerLocked(vmId)
 	}
 
 	err := vm.vmProvider.DestroyVM(vmId)
@@ -248,6 +288,36 @@ func (vm *VMManager) DeleteVM(vmId string) error {
 	}
 
 	return nil
+}
+
+func (vm *VMManager) ExtendVM(vmId string, hours int) (int64, error) {
+	vm.mu.Lock()
+	vmState, exists := vm.vmMap[vmId]
+	if !exists {
+		vm.mu.Unlock()
+		return 0, fmt.Errorf("VM %s not found", vmId)
+	}
+
+	if vmState.Status == VM_STATUS_STOPPED || vmState.Status == VM_STATUS_FAILED || vmState.Status == VM_STATUS_OFFLINE {
+		vm.mu.Unlock()
+		return 0, fmt.Errorf("VM %s is not running", vmId)
+	}
+
+	now := time.Now().UnixMilli()
+	if vmState.ExpiresAt <= 0 || vmState.ExpiresAt < now {
+		vm.mu.Unlock()
+		return 0, fmt.Errorf("VM %s already expired", vmId)
+	}
+
+	extension := time.Duration(hours) * time.Hour
+	newExpiresAt := vmState.ExpiresAt + extension.Milliseconds()
+	vmState.ExpiresAt = newExpiresAt
+	vm.vmMap[vmId] = vmState
+	vm.mu.Unlock()
+
+	vm.StartExpirationTimer(vmId, newExpiresAt)
+
+	return newExpiresAt, nil
 }
 
 func (vm *VMManager) InitializeFromBackend() error {
