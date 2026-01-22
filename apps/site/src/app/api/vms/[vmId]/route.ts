@@ -31,7 +31,10 @@ export async function DELETE(
   try {
     const { vmId } = await params;
 
-    const vm = await fetchQuery(api.vms.getByVmId, { vmId });
+    const vm = await fetchQuery(api.vms.getByVmId, {
+      vmId,
+      userId: session.user.id,
+    });
     if (!vm) {
       return NextResponse.json(
         {
@@ -39,16 +42,6 @@ export async function DELETE(
           msg: "VM not found",
         },
         { status: 404 },
-      );
-    }
-
-    if (vm.userId !== session.user.id) {
-      return NextResponse.json(
-        {
-          status: "deletion_failed_internal",
-          msg: "Unauthorized: VM does not belong to this user",
-        },
-        { status: 403 },
       );
     }
 
@@ -166,18 +159,11 @@ export async function GET(
   try {
     const { vmId } = await params;
 
-    const vm = await fetchQuery(api.vms.getByVmId, { vmId });
+    const vm = await fetchQuery(api.vms.getByVmId, {
+      vmId,
+      userId: session.user.id,
+    });
     if (!vm) {
-      return NextResponse.json(
-        {
-          status: "not_found",
-          msg: "VM not found",
-        },
-        { status: 404 },
-      );
-    }
-
-    if (vm.userId !== session.user.id) {
       return NextResponse.json(
         {
           status: "not_found",
