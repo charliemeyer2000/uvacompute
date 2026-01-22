@@ -47,7 +47,7 @@ export default function JobsDocsPage() {
             </p>
             <div className="bg-gray-50 border border-gray-200 p-4 space-y-2">
               <code className="text-sm text-black block">
-                uva run alpine echo &quot;hello world&quot;
+                uva jobs run alpine echo &quot;hello world&quot;
               </code>
             </div>
           </div>
@@ -66,10 +66,10 @@ export default function JobsDocsPage() {
             </p>
             <div className="bg-gray-50 border border-gray-200 p-4 space-y-2">
               <code className="text-sm text-black block">
-                uva run python:3.11 python -c &quot;print(1+1)&quot;
+                uva jobs run python:3.11 python -c &quot;print(1+1)&quot;
               </code>
               <code className="text-sm text-gray-500 block">
-                uva run node:20 node -e
+                uva jobs run node:20 node -e
                 &quot;console.log(&apos;hello&apos;)&quot;
               </code>
             </div>
@@ -85,7 +85,7 @@ export default function JobsDocsPage() {
             <h4 className="font-medium mb-2">run a python script</h4>
             <div className="bg-gray-50 border border-gray-200 p-4">
               <code className="text-sm text-black">
-                uva run python:3.11 python -c &quot;import torch;
+                uva jobs run python:3.11 python -c &quot;import torch;
                 print(torch.cuda.is_available())&quot;
               </code>
             </div>
@@ -95,7 +95,7 @@ export default function JobsDocsPage() {
             <h4 className="font-medium mb-2">run with gpu support</h4>
             <div className="bg-gray-50 border border-gray-200 p-4">
               <code className="text-sm text-black">
-                uva run pytorch/pytorch:latest python train.py
+                uva jobs run --gpu pytorch/pytorch:latest python train.py
               </code>
             </div>
           </div>
@@ -104,8 +104,8 @@ export default function JobsDocsPage() {
             <h4 className="font-medium mb-2">run a bash script</h4>
             <div className="bg-gray-50 border border-gray-200 p-4">
               <code className="text-sm text-black">
-                uva run ubuntu:22.04 bash -c &quot;apt update &amp;&amp; apt
-                install -y curl&quot;
+                uva jobs run ubuntu:22.04 bash -c &quot;apt update &amp;&amp;
+                apt install -y curl&quot;
               </code>
             </div>
           </div>
@@ -120,15 +120,6 @@ export default function JobsDocsPage() {
             <h4 className="font-medium mb-2">list your jobs</h4>
             <div className="bg-gray-50 border border-gray-200 p-4">
               <code className="text-sm text-black">uva jobs list</code>
-            </div>
-          </div>
-
-          <div>
-            <h4 className="font-medium mb-2">get job details</h4>
-            <div className="bg-gray-50 border border-gray-200 p-4">
-              <code className="text-sm text-black">
-                uva jobs get &lt;job-id&gt;
-              </code>
             </div>
           </div>
 
@@ -170,7 +161,7 @@ export default function JobsDocsPage() {
             <tbody>
               <tr>
                 <td className="p-3 border-b border-gray-200">
-                  <code>--name</code>
+                  <code>-n, --name</code>
                 </td>
                 <td className="p-3 border-b border-gray-200">
                   name for the job
@@ -181,13 +172,79 @@ export default function JobsDocsPage() {
               </tr>
               <tr>
                 <td className="p-3 border-b border-gray-200">
-                  <code>--env</code>
+                  <code>-g, --gpu</code>
                 </td>
                 <td className="p-3 border-b border-gray-200">
-                  environment variables
+                  request a GPU for the job
+                </td>
+                <td className="p-3 border-b border-gray-200">
+                  <code>--gpu</code>
+                </td>
+              </tr>
+              <tr>
+                <td className="p-3 border-b border-gray-200">
+                  <code>-c, --cpu</code>
+                </td>
+                <td className="p-3 border-b border-gray-200">
+                  number of CPUs (default: 1)
+                </td>
+                <td className="p-3 border-b border-gray-200">
+                  <code>--cpu 4</code>
+                </td>
+              </tr>
+              <tr>
+                <td className="p-3 border-b border-gray-200">
+                  <code>-r, --ram</code>
+                </td>
+                <td className="p-3 border-b border-gray-200">
+                  RAM in GB (default: 4)
+                </td>
+                <td className="p-3 border-b border-gray-200">
+                  <code>--ram 16</code>
+                </td>
+              </tr>
+              <tr>
+                <td className="p-3 border-b border-gray-200">
+                  <code>-d, --disk</code>
+                </td>
+                <td className="p-3 border-b border-gray-200">
+                  scratch disk in GB (mounted at /scratch)
+                </td>
+                <td className="p-3 border-b border-gray-200">
+                  <code>--disk 50</code>
+                </td>
+              </tr>
+              <tr>
+                <td className="p-3 border-b border-gray-200">
+                  <code>-e, --env</code>
+                </td>
+                <td className="p-3 border-b border-gray-200">
+                  environment variable (can use multiple times)
                 </td>
                 <td className="p-3 border-b border-gray-200">
                   <code>--env KEY=value</code>
+                </td>
+              </tr>
+              <tr>
+                <td className="p-3 border-b border-gray-200">
+                  <code>--expose</code>
+                </td>
+                <td className="p-3 border-b border-gray-200">
+                  expose port via HTTPS endpoint
+                </td>
+                <td className="p-3 border-b border-gray-200">
+                  <code>--expose 8000</code>
+                </td>
+              </tr>
+              <tr>
+                <td className="p-3 border-b border-gray-200">
+                  <code>--no-follow</code>
+                </td>
+                <td className="p-3 border-b border-gray-200">
+                  don&apos;t stream logs after job starts
+                </td>
+                <td className="p-3 border-b border-gray-200">
+                  <code>--no-follow</code>
                 </td>
               </tr>
             </tbody>

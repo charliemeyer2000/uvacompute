@@ -260,6 +260,7 @@ async function createVM(options: {
   name?: string;
   startupScript?: string;
   cloudInit?: string;
+  expose?: string;
 }): Promise<void> {
   let spinner: Ora | null = null;
 
@@ -485,6 +486,15 @@ async function createVM(options: {
       }
     }
 
+    if (options.expose) {
+      const port = parseInt(options.expose, 10);
+      if (isNaN(port) || port < 1 || port > 65535) {
+        spinner.fail("Invalid port number. Must be between 1 and 65535.");
+        process.exit(1);
+      }
+      requestBody.expose = port;
+    }
+
     let response: Response;
     try {
       response = await fetch(`${BASE_URL}/api/vms`, {
@@ -535,6 +545,9 @@ async function createVM(options: {
       if (options.gpus) console.log(formatDetail("GPUs", String(options.gpus)));
       if (options.gpuType)
         console.log(formatDetail("GPU Type", options.gpuType));
+      if (data.exposeUrl) {
+        console.log(formatDetail("Endpoint", data.exposeUrl));
+      }
       console.log();
 
       const postCreationKeysResult = await getRegisteredKeys(token);
@@ -850,6 +863,9 @@ async function getVMStatus(vmId: string): Promise<void> {
     if (data.info) {
       console.log(formatDetail("Info", JSON.stringify(data.info, null, 2)));
     }
+    if (data.status === "ready" && data.exposeUrl) {
+      console.log(formatDetail("Endpoint", data.exposeUrl));
+    }
     console.log();
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Unknown error";
@@ -1130,6 +1146,10 @@ export function registerVMCommands(program: Command) {
     .option(
       "--cloud-init <path>",
       "Path to cloud-init config file (mutually exclusive with --startup-script)",
+    )
+    .option(
+      "-e, --expose <port>",
+      "Expose port via HTTPS endpoint (e.g., --expose 8000)",
     )
     .action(createVM);
 

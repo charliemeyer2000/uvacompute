@@ -19,7 +19,7 @@ type VMResourceLimits struct {
 type StatusCallback func(status VMStatus)
 
 type VMProvider interface {
-	CreateVM(vmId string, cpus, ram, disk, gpus int, sshPublicKeys []string, statusCallback StatusCallback, startupScript, cloudInitConfig string) error
+	CreateVM(vmId string, cpus, ram, disk, gpus int, sshPublicKeys []string, statusCallback StatusCallback, startupScript, cloudInitConfig string, expose *int, exposeSubdomain *string) error
 	DestroyVM(vmId string) error
 	GetVMStatus(vmId string) (string, error)
 	GetVMInfo(vmId string) (*VMInfo, error)
@@ -88,7 +88,7 @@ func (vm *VMManager) CreateVM(req VMCreationRequest) (string, error) {
 
 	// Create VM asynchronously - return immediately so UI shows "creating" status
 	go func() {
-		err := vm.createVMSync(vmId, cpus, ram, disk, gpus, req.SSHPublicKeys, req.Hours, startupScript, cloudInitConfig)
+		err := vm.createVMSync(vmId, cpus, ram, disk, gpus, req.SSHPublicKeys, req.Hours, startupScript, cloudInitConfig, req.Expose, req.ExposeSubdomain)
 		if err != nil {
 			// VM creation failed - update status to failed and notify
 			log.Printf("ERROR: VM %s creation failed: %v", vmId, err)
@@ -112,14 +112,14 @@ func (vm *VMManager) CreateVM(req VMCreationRequest) (string, error) {
 	return vmId, nil
 }
 
-func (vm *VMManager) createVMSync(vmId string, cpus, ram, disk, gpus int, sshPublicKeys []string, hours int, startupScript, cloudInitConfig string) error {
+func (vm *VMManager) createVMSync(vmId string, cpus, ram, disk, gpus int, sshPublicKeys []string, hours int, startupScript, cloudInitConfig string, expose *int, exposeSubdomain *string) error {
 	statusCallback := func(status VMStatus) {
 		vm.UpdateVMStatus(vmId, status, "")
 	}
 
 	log.Printf("Starting VM creation for %s (cpus: %d, ram: %d, disk: %d, gpus: %d)", vmId, cpus, ram, disk, gpus)
 
-	err := vm.vmProvider.CreateVM(vmId, cpus, ram, disk, gpus, sshPublicKeys, statusCallback, startupScript, cloudInitConfig)
+	err := vm.vmProvider.CreateVM(vmId, cpus, ram, disk, gpus, sshPublicKeys, statusCallback, startupScript, cloudInitConfig, expose, exposeSubdomain)
 	if err != nil {
 		log.Printf("ERROR: Failed to create VM %s: %v", vmId, err)
 		return err

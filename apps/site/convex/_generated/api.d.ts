@@ -17,6 +17,7 @@ import type * as betterAuth_userHelpers from "../betterAuth/userHelpers.js";
 import type * as devAccess from "../devAccess.js";
 import type * as earlyAccess from "../earlyAccess.js";
 import type * as earlyAccessTokens from "../earlyAccessTokens.js";
+import type * as endpoints from "../endpoints.js";
 import type * as http from "../http.js";
 import type * as jobs from "../jobs.js";
 import type * as logs from "../logs.js";
@@ -50,6 +51,7 @@ declare const fullApi: ApiFromModules<{
   devAccess: typeof devAccess;
   earlyAccess: typeof earlyAccess;
   earlyAccessTokens: typeof earlyAccessTokens;
+  endpoints: typeof endpoints;
   http: typeof http;
   jobs: typeof jobs;
   logs: typeof logs;
