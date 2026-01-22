@@ -37,6 +37,7 @@ import {
   MemoryStick,
   Zap,
   Monitor,
+  ExternalLink,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -61,6 +62,7 @@ export default function VMDetailPage() {
   ) as VM | null | undefined;
 
   const [sshCopied, setSshCopied] = useState(false);
+  const [endpointCopied, setEndpointCopied] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showExtendDialog, setShowExtendDialog] = useState(false);
@@ -69,6 +71,7 @@ export default function VMDetailPage() {
 
   const isActive = vm?.status ? ACTIVE_STATUSES.includes(vm.status) : false;
   const isReady = vm?.status === "ready";
+  const hasEndpoint = isReady && vm?.exposeUrl;
 
   async function handleCopySSH(): Promise<void> {
     if (sshCopied || !vm) return;
@@ -80,6 +83,21 @@ export default function VMDetailPage() {
         description: "paste it into your terminal to connect",
       });
       setTimeout(() => setSshCopied(false), 2000);
+    } catch {
+      toast.error("failed to copy");
+    }
+  }
+
+  async function handleCopyEndpoint(): Promise<void> {
+    if (endpointCopied || !vm?.exposeUrl) return;
+
+    try {
+      await navigator.clipboard.writeText(vm.exposeUrl);
+      setEndpointCopied(true);
+      toast.success("endpoint url copied", {
+        description: "paste it into your browser to access",
+      });
+      setTimeout(() => setEndpointCopied(false), 2000);
     } catch {
       toast.error("failed to copy");
     }
@@ -285,6 +303,40 @@ export default function VMDetailPage() {
               )}
             </Button>
           </div>
+        </div>
+      )}
+
+      {hasEndpoint && (
+        <div className="border border-gray-200 bg-white p-4">
+          <h3 className="text-sm font-medium text-black mb-3">endpoint</h3>
+          <div className="flex items-center gap-2">
+            <div className="flex-1 bg-gray-50 border border-gray-200 px-4 py-2.5 font-mono text-sm text-gray-700 truncate">
+              {vm.exposeUrl}
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleCopyEndpoint}
+              className="h-10"
+            >
+              {endpointCopied ? (
+                <Check className="h-4 w-4 text-green-600" />
+              ) : (
+                <Copy className="h-4 w-4" />
+              )}
+            </Button>
+            <Button variant="outline" size="sm" asChild className="h-10">
+              <a href={vm.exposeUrl} target="_blank" rel="noopener noreferrer">
+                <ExternalLink className="h-4 w-4" />
+              </a>
+            </Button>
+          </div>
+          {vm.exposePort && (
+            <p className="text-xs text-gray-400 mt-2">
+              port {vm.exposePort} exposed via {vm.exposeSubdomain}
+              .uvacompute.com
+            </p>
+          )}
         </div>
       )}
 

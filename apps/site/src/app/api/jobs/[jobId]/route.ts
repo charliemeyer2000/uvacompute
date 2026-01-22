@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { authClient } from "@/lib/auth-client";
-import { fetchMutation, fetchQuery } from "convex/nextjs";
+import { fetchAction, fetchMutation, fetchQuery } from "convex/nextjs";
 import { api } from "../../../../../convex/_generated/api";
 import { createAuthHeaders } from "@/lib/orchestration-auth";
 import {
@@ -78,7 +78,14 @@ export async function GET(
     const rawData = await response.json();
     const data = JobStatusResponseSchema.parse(rawData);
 
-    return NextResponse.json(data, { status: response.status });
+    // Add exposeUrl from Convex if job is running and has an endpoint
+    const responseData = {
+      ...data,
+      ...(data.status === "running" &&
+        job.exposeUrl && { exposeUrl: job.exposeUrl }),
+    };
+
+    return NextResponse.json(responseData, { status: response.status });
   } catch (error: unknown) {
     console.error("Error getting job status:", error);
 
@@ -188,6 +195,15 @@ export async function DELETE(
           jobId,
           userId: session.user.id,
         });
+        // Release endpoint if one was reserved
+        try {
+          await fetchAction(api.endpoints.release, {
+            type: "job",
+            resourceId: jobId,
+          });
+        } catch (endpointError) {
+          console.error("Warning: Failed to release endpoint:", endpointError);
+        }
       } catch (convexError: unknown) {
         console.error(
           "Warning: Failed to mark job as cancelled in Convex:",

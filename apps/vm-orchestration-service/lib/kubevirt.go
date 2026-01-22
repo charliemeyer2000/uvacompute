@@ -86,7 +86,7 @@ func NewKubeVirtAdapter(config KubeVirtConfig) (*KubeVirtAdapter, error) {
 	}, nil
 }
 
-func (k *KubeVirtAdapter) CreateVM(vmId string, cpus, ram, disk, gpus int, sshPublicKeys []string, statusCallback structs.StatusCallback, startupScript, cloudInitConfig string) error {
+func (k *KubeVirtAdapter) CreateVM(vmId string, cpus, ram, disk, gpus int, sshPublicKeys []string, statusCallback structs.StatusCallback, startupScript, cloudInitConfig string, expose *int, exposeSubdomain *string) error {
 	ctx := context.Background()
 
 	statusCallback(structs.VM_STATUS_BOOTING)
@@ -97,7 +97,7 @@ func (k *KubeVirtAdapter) CreateVM(vmId string, cpus, ram, disk, gpus int, sshPu
 	}
 
 	// Generate cloud-init data and store in a Secret (to bypass 2048 byte limit)
-	cloudInitUserData := generateCloudInitUserData(sshPublicKeys, startupScript, cloudInitConfig, gpus > 0)
+	cloudInitUserData := generateCloudInitUserData(sshPublicKeys, startupScript, cloudInitConfig, gpus > 0, expose, exposeSubdomain)
 	secretName := fmt.Sprintf("cloudinit-%s", vmId)
 
 	if err := k.createCloudInitSecret(ctx, secretName, cloudInitUserData); err != nil {
@@ -673,11 +673,11 @@ func prettyPrint(v interface{}) string {
 	return string(b)
 }
 
-func generateCloudInitUserData(sshPublicKeys []string, startupScript, cloudInitConfig string, hasGPU bool) string {
+func generateCloudInitUserData(sshPublicKeys []string, startupScript, cloudInitConfig string, hasGPU bool, expose *int, exposeSubdomain *string) string {
 	sshConfig := generateSSHKeysConfig(sshPublicKeys)
 
 	// Always use MIME multipart to inject base templates
-	return generateMIMEMultipart(sshConfig, startupScript, cloudInitConfig, hasGPU)
+	return generateMIMEMultipart(sshConfig, startupScript, cloudInitConfig, hasGPU, expose, exposeSubdomain)
 }
 
 func generateSSHKeysConfig(sshPublicKeys []string) string {
@@ -695,7 +695,7 @@ ssh_pwauth: false
 disable_root: false`, strings.Join(userLevelKeys, "\n"))
 }
 
-func generateMIMEMultipart(sshConfig, startupScript, cloudInitConfig string, hasGPU bool) string {
+func generateMIMEMultipart(sshConfig, startupScript, cloudInitConfig string, hasGPU bool, expose *int, exposeSubdomain *string) string {
 	boundary := "==CLOUDCONFIG_BOUNDARY=="
 	parts := []string{
 		"Content-Type: multipart/mixed; boundary=\"" + boundary + "\"",
@@ -737,7 +737,22 @@ func generateMIMEMultipart(sshConfig, startupScript, cloudInitConfig string, has
 		)
 	}
 
-	// Part 4: User's startup script (if provided)
+	// Part 4: frpc configuration (for ephemeral endpoints - --expose flag)
+	if expose != nil && exposeSubdomain != nil {
+		frpcConfig := GenerateFrpcCloudInit(*expose, *exposeSubdomain)
+		parts = append(parts,
+			"--"+boundary,
+			"Content-Type: text/cloud-config; charset=\"us-ascii\"",
+			"MIME-Version: 1.0",
+			"Content-Transfer-Encoding: 7bit",
+			"Content-Disposition: attachment; filename=\"frpc-config.cfg\"",
+			"Merge-Type: list(append)+dict(no_replace,recurse_list)+str()",
+			"",
+			frpcConfig,
+		)
+	}
+
+	// Part 5: User's startup script (if provided)
 	if startupScript != "" {
 		wrappedScript := `#!/bin/bash
 export HOME=/root
@@ -759,7 +774,7 @@ cd /root
 		)
 	}
 
-	// Part 5: User's cloud-init config (if provided)
+	// Part 6: User's cloud-init config (if provided)
 	if cloudInitConfig != "" {
 		parts = append(parts,
 			"--"+boundary,
@@ -773,7 +788,7 @@ cd /root
 		)
 	}
 
-	// Part 6: Completion marker (always last - signals cloud-init finished)
+	// Part 7: Completion marker (always last - signals cloud-init finished)
 	// This creates a marker file that the readinessProbe checks for
 	completionMarker := `#cloud-config
 runcmd:

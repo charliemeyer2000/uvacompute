@@ -1,6 +1,7 @@
 import { mutation, query, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
 import { JOB_STATUSES } from "./schema";
+import { api } from "./_generated/api";
 
 export const create = mutation({
   args: {
@@ -14,6 +15,9 @@ export const create = mutation({
     ram: v.number(),
     gpus: v.number(),
     disk: v.optional(v.number()),
+    exposePort: v.optional(v.number()),
+    exposeSubdomain: v.optional(v.string()),
+    exposeUrl: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const now = Date.now();
@@ -31,6 +35,9 @@ export const create = mutation({
       disk: args.disk,
       status: "pending",
       createdAt: now,
+      exposePort: args.exposePort,
+      exposeSubdomain: args.exposeSubdomain,
+      exposeUrl: args.exposeUrl,
     });
 
     return jobDocId;
@@ -70,6 +77,14 @@ export const updateStatus = mutation({
       args.status === "cancelled"
     ) {
       updates.completedAt = Date.now();
+
+      // Schedule endpoint release (handles both Convex DB and Cloudflare DNS cleanup)
+      if (job.exposeSubdomain) {
+        await ctx.scheduler.runAfter(0, api.endpoints.release, {
+          type: "job",
+          resourceId: args.jobId,
+        });
+      }
     }
 
     if (args.exitCode !== undefined) {
@@ -184,6 +199,14 @@ export const cancel = mutation({
     const cancellableStatuses = ["pending", "scheduled", "pulling", "running"];
     if (!cancellableStatuses.includes(job.status)) {
       throw new Error(`Cannot cancel job in status: ${job.status}`);
+    }
+
+    // Schedule endpoint release (handles both Convex DB and Cloudflare DNS cleanup)
+    if (job.exposeSubdomain) {
+      await ctx.scheduler.runAfter(0, api.endpoints.release, {
+        type: "job",
+        resourceId: args.jobId,
+      });
     }
 
     await ctx.db.patch(job._id, {

@@ -59,15 +59,18 @@ func NewJobAdapter(config JobAdapterConfig) (*JobAdapter, error) {
 	}, nil
 }
 
-func (j *JobAdapter) CreateJob(jobId string, image string, command []string, env map[string]string, cpus, ram, gpus, disk int, statusCallback structs.JobStatusCallback) error {
+func (j *JobAdapter) CreateJob(jobId string, image string, command []string, env map[string]string, cpus, ram, gpus, disk int, statusCallback structs.JobStatusCallback, expose *int, exposeSubdomain *string) error {
 	ctx := context.Background()
 
 	statusCallback(structs.JOB_STATUS_PENDING, nil, "", "")
 
-	job := j.buildJobObject(jobId, image, command, env, cpus, ram, gpus, disk)
+	job, err := j.buildJobObject(jobId, image, command, env, cpus, ram, gpus, disk, expose, exposeSubdomain)
+	if err != nil {
+		return fmt.Errorf("failed to build job: %w", err)
+	}
 
 	statusCallback(structs.JOB_STATUS_SCHEDULED, nil, "", "")
-	_, err := j.client.BatchV1().Jobs(j.namespace).Create(ctx, job, metav1.CreateOptions{})
+	_, err = j.client.BatchV1().Jobs(j.namespace).Create(ctx, job, metav1.CreateOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to create job: %w", err)
 	}
@@ -77,7 +80,7 @@ func (j *JobAdapter) CreateJob(jobId string, image string, command []string, env
 	return nil
 }
 
-func (j *JobAdapter) buildJobObject(jobId string, image string, command []string, env map[string]string, cpus, ram, gpus, disk int) *batchv1.Job {
+func (j *JobAdapter) buildJobObject(jobId string, image string, command []string, env map[string]string, cpus, ram, gpus, disk int, expose *int, exposeSubdomain *string) (*batchv1.Job, error) {
 	var backoffLimit int32 = 0
 	var ttlSeconds int32 = 3600
 
@@ -125,9 +128,16 @@ func (j *JobAdapter) buildJobObject(jobId string, image string, command []string
 		}
 	}
 
+	containers := []corev1.Container{container}
+
+	if expose != nil && exposeSubdomain != nil {
+		frpcSidecar := buildFrpcSidecar(*expose, *exposeSubdomain)
+		containers = append(containers, frpcSidecar)
+	}
+
 	podSpec := corev1.PodSpec{
 		RestartPolicy: corev1.RestartPolicyNever,
-		Containers:    []corev1.Container{container},
+		Containers:    containers,
 	}
 
 	// Add scratch volume if disk > 0
@@ -145,7 +155,26 @@ func (j *JobAdapter) buildJobObject(jobId string, image string, command []string
 		}
 	}
 
-	// Add nodeSelector and RuntimeClass for GPU jobs
+	if expose != nil && exposeSubdomain != nil {
+		frpcConfig := GenerateFrpcConfig(*expose, *exposeSubdomain)
+		if podSpec.Volumes == nil {
+			podSpec.Volumes = []corev1.Volume{}
+		}
+		podSpec.Volumes = append(podSpec.Volumes, corev1.Volume{
+			Name: "frpc-config",
+			VolumeSource: corev1.VolumeSource{
+				ConfigMap: &corev1.ConfigMapVolumeSource{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: fmt.Sprintf("frpc-%s", jobId),
+					},
+				},
+			},
+		})
+		if err := j.createFrpcConfigMap(jobId, frpcConfig); err != nil {
+			return nil, fmt.Errorf("failed to create frpc ConfigMap: %w", err)
+		}
+	}
+
 	if gpus > 0 {
 		podSpec.NodeSelector = map[string]string{
 			"uvacompute.com/has-gpu": "true",
@@ -179,7 +208,59 @@ func (j *JobAdapter) buildJobObject(jobId string, image string, command []string
 		},
 	}
 
-	return job
+	return job, nil
+}
+
+func buildFrpcSidecar(port int, subdomain string) corev1.Container {
+	return corev1.Container{
+		Name:  "frpc",
+		Image: "snowdreamtech/frpc:0.61.0",
+		Args:  []string{"-c", "/etc/frp/frpc.toml"},
+		Resources: corev1.ResourceRequirements{
+			Requests: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("10m"),
+				corev1.ResourceMemory: resource.MustParse("32Mi"),
+			},
+			Limits: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("100m"),
+				corev1.ResourceMemory: resource.MustParse("64Mi"),
+			},
+		},
+		VolumeMounts: []corev1.VolumeMount{
+			{
+				Name:      "frpc-config",
+				MountPath: "/etc/frp",
+				ReadOnly:  true,
+			},
+		},
+	}
+}
+
+// createFrpcConfigMap creates a ConfigMap with the frpc configuration
+func (j *JobAdapter) createFrpcConfigMap(jobId string, config string) error {
+	ctx := context.Background()
+
+	configMap := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      fmt.Sprintf("frpc-%s", jobId),
+			Namespace: j.namespace,
+			Labels: map[string]string{
+				"app.kubernetes.io/managed-by": "vm-orchestration-service",
+				"uvacompute.io/job-id":         jobId,
+			},
+		},
+		Data: map[string]string{
+			"frpc.toml": config,
+		},
+	}
+
+	_, err := j.client.CoreV1().ConfigMaps(j.namespace).Create(ctx, configMap, metav1.CreateOptions{})
+	if err != nil {
+		log.Printf("WARNING: Failed to create frpc ConfigMap for job %s: %v", jobId, err)
+		return err
+	}
+
+	return nil
 }
 
 func (j *JobAdapter) watchJobStatus(ctx context.Context, jobId string, statusCallback structs.JobStatusCallback) {
@@ -216,7 +297,6 @@ func (j *JobAdapter) checkJobStatus(ctx context.Context, jobId string) (structs.
 		return structs.JOB_STATUS_PENDING, nil, "", "", false
 	}
 
-	// Get pod to extract nodeId
 	pods, err := j.client.CoreV1().Pods(j.namespace).List(ctx, metav1.ListOptions{
 		LabelSelector: fmt.Sprintf("uvacompute.io/job-id=%s", jobId),
 	})
@@ -250,7 +330,6 @@ func (j *JobAdapter) checkJobStatus(ctx context.Context, jobId string) (structs.
 				reason := containerStatus.State.Waiting.Reason
 				message := containerStatus.State.Waiting.Message
 
-				// Error states that indicate permanent failures
 				switch reason {
 				case "CrashLoopBackOff":
 					exitCode := 1
@@ -273,8 +352,6 @@ func (j *JobAdapter) checkJobStatus(ctx context.Context, jobId string) (structs.
 				}
 			}
 		}
-		// If pod is pending but no container status yet, check if it's been scheduled to a node
-		// If scheduled, it's likely waiting for image pull to start
 		if nodeId != "" {
 			return structs.JOB_STATUS_PULLING, nil, "", nodeId, false
 		}

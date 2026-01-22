@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { authClient } from "@/lib/auth-client";
-import { fetchMutation, fetchQuery } from "convex/nextjs";
+import { fetchAction, fetchMutation, fetchQuery } from "convex/nextjs";
 import { api } from "../../../../../convex/_generated/api";
 import { createAuthHeaders } from "@/lib/orchestration-auth";
 import {
@@ -63,6 +63,14 @@ export async function DELETE(
           vmId,
           status: "stopped",
         });
+        try {
+          await fetchAction(api.endpoints.release, {
+            type: "vm",
+            resourceId: vmId,
+          });
+        } catch (endpointError) {
+          console.error("Warning: Failed to release endpoint:", endpointError);
+        }
         return NextResponse.json(
           {
             status: "deletion_success",
@@ -109,6 +117,14 @@ export async function DELETE(
           vmId,
           status: "stopped",
         });
+        try {
+          await fetchAction(api.endpoints.release, {
+            type: "vm",
+            resourceId: vmId,
+          });
+        } catch (endpointError) {
+          console.error("Warning: Failed to release endpoint:", endpointError);
+        }
       } catch (convexError: any) {
         console.error(
           "Warning: Failed to mark VM as deleted in Convex:",
