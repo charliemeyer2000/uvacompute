@@ -1,6 +1,7 @@
 import { mutation, query, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
 import { VM_STATUSES } from "./schema";
+import { api } from "./_generated/api";
 
 export const create = mutation({
   args: {
@@ -13,6 +14,9 @@ export const create = mutation({
     gpus: v.number(),
     gpuType: v.string(),
     hours: v.number(),
+    exposePort: v.optional(v.number()),
+    exposeSubdomain: v.optional(v.string()),
+    exposeUrl: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const now = Date.now();
@@ -27,10 +31,13 @@ export const create = mutation({
       disk: args.disk,
       gpus: args.gpus,
       gpuType: args.gpuType,
-      status: "creating", // Start with "creating" so UI shows VM immediately
+      status: "creating",
       hours: args.hours,
       createdAt: now,
       expiresAt,
+      exposePort: args.exposePort,
+      exposeSubdomain: args.exposeSubdomain,
+      exposeUrl: args.exposeUrl,
     });
 
     return vmDocId;
@@ -76,6 +83,13 @@ export const updateStatus = mutation({
 
     if (args.status === "stopped") {
       updates.deletedAt = Date.now();
+
+      if (vm.exposeSubdomain) {
+        await ctx.scheduler.runAfter(0, api.endpoints.release, {
+          type: "vm",
+          resourceId: args.vmId,
+        });
+      }
     }
 
     await ctx.db.patch(vm._id, updates);

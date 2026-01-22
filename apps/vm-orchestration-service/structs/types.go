@@ -60,6 +60,8 @@ type VMCreationRequest struct {
 	SSHPublicKeys   []string `json:"sshPublicKeys,omitempty"`
 	StartupScript   *string  `json:"startupScript,omitempty" validate:"omitempty,max=1048576"`
 	CloudInitConfig *string  `json:"cloudInitConfig,omitempty" validate:"omitempty,max=102400"`
+	Expose          *int    `json:"expose,omitempty" validate:"omitempty,min=1,max=65535"`
+	ExposeSubdomain *string `json:"exposeSubdomain,omitempty"`
 }
 
 const (
@@ -253,6 +255,7 @@ const (
 )
 
 type JobCreationRequest struct {
+	JobId   string            `json:"jobId,omitempty"`         // Pre-generated job ID from frontend (optional for backwards compat)
 	UserId  string            `json:"userId" validate:"required"`
 	Image   string            `json:"image" validate:"required"`
 	Command []string          `json:"command,omitempty"`
@@ -262,6 +265,9 @@ type JobCreationRequest struct {
 	Ram     *int              `json:"ram,omitempty" validate:"omitempty,min=1,max=64"`
 	Gpus    *int              `json:"gpus,omitempty" validate:"omitempty,min=0,max=1"`
 	Disk    *int              `json:"disk,omitempty" validate:"omitempty,min=0,max=100"`
+	// Ephemeral endpoint fields (--expose flag)
+	Expose          *int    `json:"expose,omitempty" validate:"omitempty,min=1,max=65535"`
+	ExposeSubdomain *string `json:"exposeSubdomain,omitempty"`
 }
 
 type JobCreationResponse struct {

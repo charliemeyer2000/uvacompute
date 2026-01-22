@@ -8,12 +8,11 @@ import {
   NODE_CONFIG_FILE,
   NODE_STATE_FILE,
   PREPARE_STATE_FILE,
-  INSTALL_SCRIPT_URL,
   PROD_SITE_URL,
   DEV_SITE_URL,
 } from "./lib/constants";
 import { theme } from "./lib/theme";
-import { loadToken, getBaseUrl } from "./lib/utils";
+import { loadToken } from "./lib/utils";
 import yaml from "js-yaml";
 
 interface RemoteNode {
@@ -1017,17 +1016,9 @@ async function nodeUninstall(): Promise<void> {
       rmSync(NODE_CONFIG_DIR, { recursive: true, force: true });
     }
 
-    // Remove /opt/uvacompute directory (agent mode config)
     spinner.text = "Removing uvacompute config...";
-    if (existsSync("/opt/uvacompute")) {
-      await runCommand("rm", ["-rf", "/opt/uvacompute"], { sudo: true });
-    }
-
-    // Also remove old /opt/vm-orchestration-service if it exists (legacy)
-    if (existsSync("/opt/vm-orchestration-service")) {
-      await runCommand("rm", ["-rf", "/opt/vm-orchestration-service"], {
-        sudo: true,
-      });
+    if (existsSync("/etc/uvacompute")) {
+      await runCommand("rm", ["-rf", "/etc/uvacompute"], { sudo: true });
     }
 
     spinner.succeed("Node uninstalled successfully");

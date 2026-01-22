@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { fetchMutation, fetchQuery } from "convex/nextjs";
 import { api } from "../../../../../convex/_generated/api";
 import { z } from "zod";
+import crypto from "crypto";
 
 const DO_VPS_HOST = "***REDACTED_IP***";
 const DEFAULT_TUNNEL_USER = "root";
@@ -17,6 +18,7 @@ const BootstrapRequestSchema = z.object({
   ram: z.number().optional(),
   gpus: z.number().optional(),
   gpuType: z.string().optional(),
+  gpuMode: z.enum(["nvidia", "vfio"]).optional(),
   supportsVMs: z.boolean().optional(),
   supportsJobs: z.boolean().optional(),
 });
@@ -26,7 +28,6 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const data = BootstrapRequestSchema.parse(body);
 
-    // Validate the token
     const tokenValidation = await fetchQuery(api.nodeTokens.validateToken, {
       token: data.token,
     });
@@ -38,13 +39,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Consume the token
     const { assignedPort } = await fetchMutation(api.nodeTokens.consumeToken, {
       token: data.token,
       nodeId: data.nodeId,
     });
 
-    // Register the node with owner from token creator
+    // Generate per-node secret for node API authentication
+    const nodeSecret = crypto.randomBytes(32).toString("hex");
+
     await fetchMutation(api.nodes.register, {
       nodeId: data.nodeId,
       name: data.name,
@@ -53,16 +55,17 @@ export async function POST(request: NextRequest) {
       tunnelUser: DEFAULT_TUNNEL_USER,
       kubeconfigPath: DEFAULT_KUBECONFIG_PATH,
       sshPublicKey: data.sshPublicKey,
+      nodeSecret: nodeSecret,
       ownerId: tokenValidation.createdBy,
       cpus: data.cpus,
       ram: data.ram,
       gpus: data.gpus,
       gpuType: data.gpuType,
+      gpuMode: data.gpuMode,
       supportsVMs: data.supportsVMs,
       supportsJobs: data.supportsJobs,
     });
 
-    // Get k3s agent token from environment
     const k3sAgentToken = process.env.K3S_AGENT_TOKEN;
     if (!k3sAgentToken) {
       console.error("K3S_AGENT_TOKEN environment variable not set");
@@ -72,7 +75,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get vmproxy public key - this allows the hub to SSH to nodes for VM access
     const vmproxyPublicKey = process.env.VMPROXY_PUBLIC_KEY;
     if (!vmproxyPublicKey) {
       console.error("VMPROXY_PUBLIC_KEY environment variable not set");
@@ -82,12 +84,23 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get hub kubeconfig (base64 encoded) - nodes need this to talk to k8s API
     const hubKubeconfig = process.env.HUB_KUBECONFIG_B64;
     if (!hubKubeconfig) {
       console.error("HUB_KUBECONFIG_B64 environment variable not set");
       return NextResponse.json(
         { error: "Server configuration error: kubeconfig not configured" },
+        { status: 500 },
+      );
+    }
+
+    const orchestrationSecret = process.env.ORCHESTRATION_SHARED_SECRET;
+    if (!orchestrationSecret) {
+      console.error("ORCHESTRATION_SHARED_SECRET environment variable not set");
+      return NextResponse.json(
+        {
+          error:
+            "Server configuration error: orchestration secret not configured",
+        },
         { status: 500 },
       );
     }
@@ -103,6 +116,8 @@ export async function POST(request: NextRequest) {
         k3sToken: k3sAgentToken,
         vmproxyPublicKey: vmproxyPublicKey,
         hubKubeconfig: hubKubeconfig,
+        orchestrationSecret: orchestrationSecret,
+        nodeSecret: nodeSecret,
       },
       { status: 200 },
     );
