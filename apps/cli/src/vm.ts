@@ -20,7 +20,7 @@ import {
   formatSectionHeader,
   formatDetail,
   formatCommand,
-  formatAge,
+  formatExpiresAt,
   renderTable,
   formatStatusBullet,
 } from "./lib/theme";
@@ -908,12 +908,12 @@ async function listVMs(): Promise<void> {
     );
 
     console.log();
-    const headers = ["Age", "VM", "Resources", "Status"];
+    const headers = ["Expires", "VM", "Resources", "Status"];
     const rows = sorted.map((vm) => {
       const nameDisplay = vm.name ? vm.name : "(unnamed)";
       const vmLabel = `${nameDisplay} ${theme.muted(vm.vmId)}`;
       return [
-        formatAge(new Date(vm.createdAt)),
+        formatExpiresAt(vm.expiresAt),
         vmLabel,
         formatResources(vm),
         formatStatus(vm.status),
