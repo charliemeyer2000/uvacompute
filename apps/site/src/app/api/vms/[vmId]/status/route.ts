@@ -67,12 +67,13 @@ export async function GET(
     );
 
     if (!response.ok) {
-      // Orchestration doesn't know about this VM - fall back to Convex status
       if (response.status === 404) {
         return NextResponse.json(
           {
             status: vm.status,
             msg: getStatusMessage(vm.status),
+            ...(vm.status === "ready" &&
+              vm.exposeUrl && { exposeUrl: vm.exposeUrl }),
           },
           { status: 200 },
         );
@@ -89,7 +90,14 @@ export async function GET(
 
     const rawData = await response.json();
     const data = VMStatusResponseSchema.parse(rawData);
-    return NextResponse.json(data, { status: 200 });
+
+    const responseData = {
+      ...data,
+      ...(data.status === "ready" &&
+        vm.exposeUrl && { exposeUrl: vm.exposeUrl }),
+    };
+
+    return NextResponse.json(responseData, { status: 200 });
   } catch (error: any) {
     console.error("Error getting VM status:", error);
     return NextResponse.json(

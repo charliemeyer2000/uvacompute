@@ -13,7 +13,7 @@ set -euo pipefail
 # Configuration
 NVIDIA_DEVICE_PLUGIN_VERSION="v0.17.0"
 SITE_URL="${SITE_URL:-https://uvacompute.com}"
-SERVICE_DIR="/opt/uvacompute"
+SERVICE_DIR="/etc/uvacompute"
 SSH_KEY_PATH="/root/.ssh/id_ed25519_uvacompute"
 REGISTRATION_TOKEN=""
 NONINTERACTIVE="${NONINTERACTIVE:-false}"
@@ -187,6 +187,7 @@ register_node() {
     log_info "  GPUs: ${gpus}"
     log_info "  GPU Type: ${gpu_type}"
 
+    local gpu_mode="nvidia"
     local response
     response=$(curl -sf -X POST "${SITE_URL}/api/nodes/bootstrap" \
         -H "Content-Type: application/json" \
@@ -199,6 +200,7 @@ register_node() {
             \"ram\": ${ram},
             \"gpus\": ${gpus},
             \"gpuType\": \"${gpu_type}\",
+            \"gpuMode\": \"${gpu_mode}\",
             \"storage\": ${STORAGE_ALLOCATION_GB},
             \"storageType\": \"${STORAGE_TYPE}\",
             \"supportsVMs\": true,
@@ -225,6 +227,8 @@ register_node() {
     K3S_TOKEN=$(echo "${response}" | jq -r '.k3sToken')
     VMPROXY_PUBLIC_KEY=$(echo "${response}" | jq -r '.vmproxyPublicKey')
     HUB_KUBECONFIG_B64=$(echo "${response}" | jq -r '.hubKubeconfig')
+    ORCHESTRATION_SECRET=$(echo "${response}" | jq -r '.orchestrationSecret')
+    NODE_SECRET=$(echo "${response}" | jq -r '.nodeSecret')
 
     if [[ -z "${K3S_URL}" || "${K3S_URL}" == "null" ]]; then
         die "Invalid response from bootstrap API: missing k3sUrl"
@@ -241,6 +245,27 @@ register_node() {
     if [[ -z "${HUB_KUBECONFIG_B64}" || "${HUB_KUBECONFIG_B64}" == "null" ]]; then
         die "Invalid response from bootstrap API: missing hubKubeconfig"
     fi
+
+    if [[ -z "${ORCHESTRATION_SECRET}" || "${ORCHESTRATION_SECRET}" == "null" ]]; then
+        die "Invalid response from bootstrap API: missing orchestrationSecret"
+    fi
+
+    if [[ -z "${NODE_SECRET}" || "${NODE_SECRET}" == "null" ]]; then
+        die "Invalid response from bootstrap API: missing nodeSecret"
+    fi
+
+    # Store secrets for API authentication
+    mkdir -p /etc/uvacompute
+
+    # Store per-node secret for node-specific API calls (preferred)
+    echo "${NODE_SECRET}" > /etc/uvacompute/node-secret
+    chmod 600 /etc/uvacompute/node-secret
+    log_info "Node secret stored at /etc/uvacompute/node-secret"
+
+    # Store orchestration secret for legacy compatibility
+    echo "${ORCHESTRATION_SECRET}" > /etc/uvacompute/orchestration-secret
+    chmod 600 /etc/uvacompute/orchestration-secret
+    log_info "Orchestration secret stored at /etc/uvacompute/orchestration-secret"
 
     log_success "Node registered successfully!"
     log_info "  Tunnel Host: ${TUNNEL_HOST}"
@@ -673,6 +698,8 @@ generate_gpu_scripts() {
     local audio_pci="${GPU_AUDIO_PCI:-}"
     local gpu_devid="${GPU_DEVICE_ID}"
     local audio_devid="${GPU_AUDIO_DEVICE_ID:-}"
+    local node_id
+    node_id=$(hostname)
 
     # gpu-mode-nvidia script
     cat > /usr/local/bin/gpu-mode-nvidia <<SCRIPT
@@ -683,6 +710,130 @@ set -e
 
 GPU_PCI="${gpu_pci}"
 AUDIO_PCI="${audio_pci}"
+NODE_ID="${node_id}"
+SITE_URL="${SITE_URL}"
+NODE_SECRET_FILE="/etc/uvacompute/node-secret"
+LEGACY_SECRET_FILE="/etc/uvacompute/orchestration-secret"
+
+# Helper: Sign request with per-node HMAC-SHA256
+# Payload format: nodeId:timestamp:body (for node auth)
+# Returns: auth_type:timestamp:signature
+sign_node_request() {
+    local body="\$1"
+    local timestamp=\$(date +%s)
+    local secret
+
+    # Try per-node secret first (preferred)
+    if [[ -f "\${NODE_SECRET_FILE}" ]]; then
+        secret=\$(cat "\${NODE_SECRET_FILE}")
+        # Node-specific payload format includes nodeId
+        local payload="\${NODE_ID}:\${timestamp}:\${body}"
+        local signature=\$(echo -n "\${payload}" | openssl dgst -sha256 -hmac "\${secret}" | awk '{print \$2}')
+        echo "node:\${timestamp}:\${signature}"
+    # Fall back to legacy shared secret
+    elif [[ -f "\${LEGACY_SECRET_FILE}" ]]; then
+        secret=\$(cat "\${LEGACY_SECRET_FILE}")
+        local payload="\${timestamp}:\${body}"
+        local signature=\$(echo -n "\${payload}" | openssl dgst -sha256 -hmac "\${secret}" | awk '{print \$2}')
+        echo "shared:\${timestamp}:\${signature}"
+    else
+        echo ""
+        return
+    fi
+}
+
+# Helper: Check for active GPU workloads
+check_gpu_workloads() {
+    local auth=\$(sign_node_request "")
+    if [[ -z "\${auth}" ]]; then
+        echo "Warning: No authentication secret found, skipping workload check"
+        return 0
+    fi
+
+    local auth_type=\$(echo "\${auth}" | cut -d: -f1)
+    local timestamp=\$(echo "\${auth}" | cut -d: -f2)
+    local signature=\$(echo "\${auth}" | cut -d: -f3)
+
+    local response
+    if [[ "\${auth_type}" == "node" ]]; then
+        # Node-specific auth with X-Node-Id header
+        response=\$(curl -sf -X GET "\${SITE_URL}/api/nodes/\${NODE_ID}/gpu-mode" \
+            -H "X-Node-Id: \${NODE_ID}" \
+            -H "X-Timestamp: \${timestamp}" \
+            -H "X-Signature: \${signature}" 2>&1) || {
+            echo "Warning: Could not check workloads (API may be unavailable)"
+            return 0
+        }
+    else
+        # Legacy shared secret auth (no X-Node-Id)
+        response=\$(curl -sf -X GET "\${SITE_URL}/api/nodes/\${NODE_ID}/gpu-mode" \
+            -H "X-Timestamp: \${timestamp}" \
+            -H "X-Signature: \${signature}" 2>&1) || {
+            echo "Warning: Could not check workloads (API may be unavailable)"
+            return 0
+        }
+    fi
+
+    local can_switch=\$(echo "\${response}" | jq -r '.canSwitch // true')
+    local gpu_vm_count=\$(echo "\${response}" | jq -r '.gpuVmCount // 0')
+    local gpu_job_count=\$(echo "\${response}" | jq -r '.gpuJobCount // 0')
+
+    if [[ "\${can_switch}" != "true" ]]; then
+        echo "✗ Cannot switch GPU mode: \${gpu_vm_count} GPU VM(s) and \${gpu_job_count} GPU job(s) active"
+        echo "  Please stop all GPU workloads before switching modes"
+        return 1
+    fi
+    return 0
+}
+
+# Helper: Report GPU mode to database
+report_gpu_mode() {
+    local mode="\$1"
+    local verified="\$2"
+
+    local body="{\"gpuMode\":\"\${mode}\",\"verified\":\${verified}}"
+    local auth=\$(sign_node_request "\${body}")
+    if [[ -z "\${auth}" ]]; then
+        echo "Warning: No authentication secret found, skipping mode report"
+        return 0
+    fi
+
+    local auth_type=\$(echo "\${auth}" | cut -d: -f1)
+    local timestamp=\$(echo "\${auth}" | cut -d: -f2)
+    local signature=\$(echo "\${auth}" | cut -d: -f3)
+
+    local response
+    if [[ "\${auth_type}" == "node" ]]; then
+        # Node-specific auth with X-Node-Id header
+        response=\$(curl -sf -X POST "\${SITE_URL}/api/nodes/\${NODE_ID}/gpu-mode" \
+            -H "Content-Type: application/json" \
+            -H "X-Node-Id: \${NODE_ID}" \
+            -H "X-Timestamp: \${timestamp}" \
+            -H "X-Signature: \${signature}" \
+            -d "\${body}" 2>&1) || {
+            if [[ "\${verified}" == "true" ]]; then
+                echo "Warning: Could not report GPU mode to database"
+            fi
+            return 0
+        }
+    else
+        # Legacy shared secret auth (no X-Node-Id)
+        response=\$(curl -sf -X POST "\${SITE_URL}/api/nodes/\${NODE_ID}/gpu-mode" \
+            -H "Content-Type: application/json" \
+            -H "X-Timestamp: \${timestamp}" \
+            -H "X-Signature: \${signature}" \
+            -d "\${body}" 2>&1) || {
+            if [[ "\${verified}" == "true" ]]; then
+                echo "Warning: Could not report GPU mode to database"
+            fi
+            return 0
+        }
+    fi
+    return 0
+}
+
+echo "Checking for active GPU workloads..."
+check_gpu_workloads || exit 1
 
 echo "Switching GPU to nvidia mode..."
 
@@ -714,15 +865,17 @@ echo "\${GPU_PCI}" > /sys/bus/pci/drivers_probe 2>/dev/null || true
 
 sleep 2
 
-# Verify
+# Verify and report with verification status
 if nvidia-smi > /dev/null 2>&1; then
     echo "✓ GPU is now in nvidia mode"
     nvidia-smi --query-gpu=name,driver_version --format=csv,noheader
     # Update Kubernetes label
     kubectl label node \$(hostname) uvacompute.com/gpu-mode=nvidia --overwrite 2>/dev/null || \
         echo "Note: Could not update Kubernetes label (kubectl may not be configured)"
+    report_gpu_mode "nvidia" "true"
 else
     echo "✗ Failed to switch to nvidia mode"
+    report_gpu_mode "nvidia" "false"
     exit 1
 fi
 SCRIPT
@@ -739,6 +892,130 @@ GPU_PCI="${gpu_pci}"
 AUDIO_PCI="${audio_pci}"
 GPU_DEVID="${gpu_devid}"
 AUDIO_DEVID="${audio_devid}"
+NODE_ID="${node_id}"
+SITE_URL="${SITE_URL}"
+NODE_SECRET_FILE="/etc/uvacompute/node-secret"
+LEGACY_SECRET_FILE="/etc/uvacompute/orchestration-secret"
+
+# Helper: Sign request with per-node HMAC-SHA256
+# Payload format: nodeId:timestamp:body (for node auth)
+# Returns: auth_type:timestamp:signature
+sign_node_request() {
+    local body="\$1"
+    local timestamp=\$(date +%s)
+    local secret
+
+    # Try per-node secret first (preferred)
+    if [[ -f "\${NODE_SECRET_FILE}" ]]; then
+        secret=\$(cat "\${NODE_SECRET_FILE}")
+        # Node-specific payload format includes nodeId
+        local payload="\${NODE_ID}:\${timestamp}:\${body}"
+        local signature=\$(echo -n "\${payload}" | openssl dgst -sha256 -hmac "\${secret}" | awk '{print \$2}')
+        echo "node:\${timestamp}:\${signature}"
+    # Fall back to legacy shared secret
+    elif [[ -f "\${LEGACY_SECRET_FILE}" ]]; then
+        secret=\$(cat "\${LEGACY_SECRET_FILE}")
+        local payload="\${timestamp}:\${body}"
+        local signature=\$(echo -n "\${payload}" | openssl dgst -sha256 -hmac "\${secret}" | awk '{print \$2}')
+        echo "shared:\${timestamp}:\${signature}"
+    else
+        echo ""
+        return
+    fi
+}
+
+# Helper: Check for active GPU workloads
+check_gpu_workloads() {
+    local auth=\$(sign_node_request "")
+    if [[ -z "\${auth}" ]]; then
+        echo "Warning: No authentication secret found, skipping workload check"
+        return 0
+    fi
+
+    local auth_type=\$(echo "\${auth}" | cut -d: -f1)
+    local timestamp=\$(echo "\${auth}" | cut -d: -f2)
+    local signature=\$(echo "\${auth}" | cut -d: -f3)
+
+    local response
+    if [[ "\${auth_type}" == "node" ]]; then
+        # Node-specific auth with X-Node-Id header
+        response=\$(curl -sf -X GET "\${SITE_URL}/api/nodes/\${NODE_ID}/gpu-mode" \
+            -H "X-Node-Id: \${NODE_ID}" \
+            -H "X-Timestamp: \${timestamp}" \
+            -H "X-Signature: \${signature}" 2>&1) || {
+            echo "Warning: Could not check workloads (API may be unavailable)"
+            return 0
+        }
+    else
+        # Legacy shared secret auth (no X-Node-Id)
+        response=\$(curl -sf -X GET "\${SITE_URL}/api/nodes/\${NODE_ID}/gpu-mode" \
+            -H "X-Timestamp: \${timestamp}" \
+            -H "X-Signature: \${signature}" 2>&1) || {
+            echo "Warning: Could not check workloads (API may be unavailable)"
+            return 0
+        }
+    fi
+
+    local can_switch=\$(echo "\${response}" | jq -r '.canSwitch // true')
+    local gpu_vm_count=\$(echo "\${response}" | jq -r '.gpuVmCount // 0')
+    local gpu_job_count=\$(echo "\${response}" | jq -r '.gpuJobCount // 0')
+
+    if [[ "\${can_switch}" != "true" ]]; then
+        echo "✗ Cannot switch GPU mode: \${gpu_vm_count} GPU VM(s) and \${gpu_job_count} GPU job(s) active"
+        echo "  Please stop all GPU workloads before switching modes"
+        return 1
+    fi
+    return 0
+}
+
+# Helper: Report GPU mode to database
+report_gpu_mode() {
+    local mode="\$1"
+    local verified="\$2"
+
+    local body="{\"gpuMode\":\"\${mode}\",\"verified\":\${verified}}"
+    local auth=\$(sign_node_request "\${body}")
+    if [[ -z "\${auth}" ]]; then
+        echo "Warning: No authentication secret found, skipping mode report"
+        return 0
+    fi
+
+    local auth_type=\$(echo "\${auth}" | cut -d: -f1)
+    local timestamp=\$(echo "\${auth}" | cut -d: -f2)
+    local signature=\$(echo "\${auth}" | cut -d: -f3)
+
+    local response
+    if [[ "\${auth_type}" == "node" ]]; then
+        # Node-specific auth with X-Node-Id header
+        response=\$(curl -sf -X POST "\${SITE_URL}/api/nodes/\${NODE_ID}/gpu-mode" \
+            -H "Content-Type: application/json" \
+            -H "X-Node-Id: \${NODE_ID}" \
+            -H "X-Timestamp: \${timestamp}" \
+            -H "X-Signature: \${signature}" \
+            -d "\${body}" 2>&1) || {
+            if [[ "\${verified}" == "true" ]]; then
+                echo "Warning: Could not report GPU mode to database"
+            fi
+            return 0
+        }
+    else
+        # Legacy shared secret auth (no X-Node-Id)
+        response=\$(curl -sf -X POST "\${SITE_URL}/api/nodes/\${NODE_ID}/gpu-mode" \
+            -H "Content-Type: application/json" \
+            -H "X-Timestamp: \${timestamp}" \
+            -H "X-Signature: \${signature}" \
+            -d "\${body}" 2>&1) || {
+            if [[ "\${verified}" == "true" ]]; then
+                echo "Warning: Could not report GPU mode to database"
+            fi
+            return 0
+        }
+    fi
+    return 0
+}
+
+echo "Checking for active GPU workloads..."
+check_gpu_workloads || exit 1
 
 echo "Switching GPU to vfio mode..."
 
@@ -774,15 +1051,17 @@ fi
 
 sleep 1
 
-# Verify
+# Verify and report with verification status
 if lspci -nnk -s \${GPU_PCI} | grep -q "vfio-pci"; then
     echo "✓ GPU is now in vfio mode (ready for VM passthrough)"
     lspci -nnk -s \${GPU_PCI} | grep -E "VGA|driver"
     # Update Kubernetes label
     kubectl label node \$(hostname) uvacompute.com/gpu-mode=vfio --overwrite 2>/dev/null || \
         echo "Note: Could not update Kubernetes label (kubectl may not be configured)"
+    report_gpu_mode "vfio" "true"
 else
     echo "✗ Failed to switch to vfio mode"
+    report_gpu_mode "vfio" "false"
     exit 1
 fi
 SCRIPT
@@ -1109,9 +1388,121 @@ print_summary() {
     echo
 }
 
+# Call unregister API to remove node from database
+call_unregister_api() {
+    log_info "Notifying hub of node removal..."
+
+    # Read node ID from config
+    local node_id
+    if [[ -f "${SERVICE_DIR}/node-config.yaml" ]]; then
+        node_id=$(grep "^nodeId:" "${SERVICE_DIR}/node-config.yaml" 2>/dev/null | awk '{print $2}')
+    fi
+
+    if [[ -z "${node_id}" ]]; then
+        node_id=$(hostname)
+        log_warn "Could not read nodeId from config, using hostname: ${node_id}"
+    fi
+
+    # Try node secret first (preferred), fall back to orchestration secret
+    local node_secret_file="/etc/uvacompute/node-secret"
+    local legacy_secret_file="/etc/uvacompute/orchestration-secret"
+    local use_node_auth=false
+    local secret=""
+
+    if [[ -f "${node_secret_file}" ]]; then
+        secret=$(cat "${node_secret_file}")
+        use_node_auth=true
+    elif [[ -f "${legacy_secret_file}" ]]; then
+        secret=$(cat "${legacy_secret_file}")
+    fi
+
+    if [[ -z "${secret}" ]]; then
+        log_warn "No authentication secret found, skipping API notification"
+        return 0
+    fi
+
+    # Sign request with HMAC-SHA256
+    local body=""
+    local timestamp
+    timestamp=$(date +%s)
+
+    local payload signature
+    if [[ "${use_node_auth}" == "true" ]]; then
+        # Node-specific payload format includes nodeId
+        payload="${node_id}:${timestamp}:${body}"
+    else
+        # Legacy shared secret payload
+        payload="${timestamp}:${body}"
+    fi
+    signature=$(echo -n "${payload}" | openssl dgst -sha256 -hmac "${secret}" | awk '{print $2}')
+
+    # Call DELETE API
+    local http_code
+    if [[ "${use_node_auth}" == "true" ]]; then
+        # Node-specific auth with X-Node-Id header
+        http_code=$(curl -sf -w "%{http_code}" -o /tmp/unregister_response.json \
+            -X DELETE "${SITE_URL}/api/nodes/${node_id}" \
+            -H "X-Node-Id: ${node_id}" \
+            -H "X-Timestamp: ${timestamp}" \
+            -H "X-Signature: ${signature}" 2>&1) || http_code="000"
+    else
+        # Legacy shared secret auth (no X-Node-Id)
+        http_code=$(curl -sf -w "%{http_code}" -o /tmp/unregister_response.json \
+            -X DELETE "${SITE_URL}/api/nodes/${node_id}" \
+            -H "X-Timestamp: ${timestamp}" \
+            -H "X-Signature: ${signature}" 2>&1) || http_code="000"
+    fi
+
+    case "${http_code}" in
+        200)
+            local vms_deleted jobs_cancelled
+            vms_deleted=$(jq -r '.vmsDeleted // 0' /tmp/unregister_response.json 2>/dev/null || echo "0")
+            jobs_cancelled=$(jq -r '.jobsCancelled // 0' /tmp/unregister_response.json 2>/dev/null || echo "0")
+            log_success "Node unregistered from hub (${vms_deleted} VMs stopped, ${jobs_cancelled} jobs cancelled)"
+            ;;
+        404)
+            log_info "Node not found in hub database (already removed or never registered)"
+            ;;
+        000)
+            log_warn "Could not reach hub API (network error). Node entry may remain in database."
+            ;;
+        *)
+            log_warn "API returned status ${http_code}. Node entry may remain in database."
+            ;;
+    esac
+
+    rm -f /tmp/unregister_response.json
+    return 0
+}
+
 # Uninstall node
 uninstall_node() {
+    local force=false
+    if [[ "${1:-}" == "--force" || "${1:-}" == "-f" ]]; then
+        force=true
+    fi
+
+    # Confirmation prompt unless --force is used
+    if [[ "${force}" != "true" && "${NONINTERACTIVE}" != "true" ]]; then
+        echo ""
+        echo -e "${YELLOW}${BOLD}WARNING: This will uninstall UVACompute from this node.${NC}"
+        echo ""
+        echo "This will:"
+        echo "  • Remove this node from the cluster"
+        echo "  • Stop all VMs and jobs running on this node"
+        echo "  • Delete all VM storage data at /var/lib/uvacompute"
+        echo "  • Remove k3s, SSH tunnel, and GPU scripts"
+        echo ""
+        read -rp "Are you sure you want to continue? [y/N] " confirm
+        if [[ "${confirm}" != "y" && "${confirm}" != "Y" ]]; then
+            log_info "Uninstall cancelled"
+            exit 0
+        fi
+    fi
+
     log_step "Uninstalling UVACompute node"
+
+    call_unregister_api
 
     # Stop services
     log_info "Stopping services..."
@@ -1124,15 +1515,9 @@ uninstall_node() {
         /usr/local/bin/k3s-agent-uninstall.sh
     fi
 
-    # Clean up storage
-    if [[ -f "${SERVICE_DIR}/storage-config.yaml" ]]; then
-        local storage_path
-        storage_path=$(grep "storagePath:" "${SERVICE_DIR}/storage-config.yaml" 2>/dev/null | awk '{print $2}')
-        if [[ -n "${storage_path}" && -d "${storage_path}" ]]; then
-            log_info "Cleaning up storage at ${storage_path}..."
-            rm -rf "${storage_path}"
-        fi
-    fi
+    # Force remove entire storage directory
+    log_info "Removing storage directory..."
+    rm -rf /var/lib/uvacompute
 
     # Remove GPU scripts
     log_info "Removing GPU scripts..."
@@ -1146,6 +1531,11 @@ uninstall_node() {
     # Remove SSH tunnel service
     rm -f /etc/systemd/system/uvacompute-tunnel.service
     systemctl daemon-reload
+
+    # Remove secrets
+    log_info "Removing authentication secrets..."
+    rm -f /etc/uvacompute/node-secret
+    rm -f /etc/uvacompute/orchestration-secret
 
     # Remove config directories
     log_info "Removing configuration directories..."
@@ -1166,7 +1556,6 @@ uninstall_node() {
     rm -f /root/.kube/config
 
     log_success "Node uninstalled successfully"
-    log_warn "Note: Node entry may still exist in cluster. Use admin cleanup if needed."
     log_info "To re-register: curl -fsSL https://uvacompute.com/install-node.sh | sudo bash -s -- --token YOUR_TOKEN"
 }
 
@@ -1175,7 +1564,21 @@ parse_args() {
     # Check for uninstall command first
     if [[ "${1:-}" == "uninstall" ]]; then
         check_root
-        uninstall_node
+        # Check for --force flag
+        local force_flag=""
+        shift
+        while [[ $# -gt 0 ]]; do
+            case $1 in
+                --force|-f)
+                    force_flag="--force"
+                    shift
+                    ;;
+                *)
+                    shift
+                    ;;
+            esac
+        done
+        uninstall_node "${force_flag}"
         exit 0
     fi
 
@@ -1212,12 +1615,14 @@ parse_args() {
                 echo "  --token TOKEN    Registration token for platform enrollment (required)"
                 echo "  --noninteractive, -y  Non-interactive mode (use defaults)"
                 echo "  --storage GB     Storage allocation in GB (default: auto)"
+                echo "  --force, -f      Skip confirmation prompts (for uninstall)"
                 echo "  --help, -h       Show this help message"
                 echo ""
                 echo "Examples:"
                 echo "  curl -fsSL https://uvacompute.com/install-node.sh | sudo bash -s -- --token abc123"
                 echo "  curl -fsSL https://uvacompute.com/install-node.sh | sudo bash -s -- --token abc123 --noninteractive"
                 echo "  curl -fsSL https://uvacompute.com/install-node.sh | sudo bash -s uninstall"
+                echo "  curl -fsSL https://uvacompute.com/install-node.sh | sudo bash -s uninstall --force"
                 exit 0
                 ;;
             *)

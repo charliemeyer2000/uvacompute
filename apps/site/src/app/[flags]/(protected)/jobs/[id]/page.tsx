@@ -40,6 +40,8 @@ import {
   Pause,
   Play,
   Database,
+  ExternalLink,
+  Globe,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -142,6 +144,7 @@ export default function JobDetailPage() {
   const [isPaused, setIsPaused] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [endpointCopied, setEndpointCopied] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
@@ -160,6 +163,7 @@ export default function JobDetailPage() {
     ? STREAMABLE_STATUSES.includes(jobStatus)
     : false;
   const isWaiting = jobStatus ? WAITING_STATUSES.includes(jobStatus) : false;
+  const hasEndpoint = job?.status === "running" && job?.exposeUrl;
 
   const isActiveRef = useRef(isActive);
   isActiveRef.current = isActive;
@@ -455,6 +459,21 @@ export default function JobDetailPage() {
     }
   };
 
+  const handleCopyEndpoint = async () => {
+    if (endpointCopied || !job?.exposeUrl) return;
+
+    try {
+      await navigator.clipboard.writeText(job.exposeUrl);
+      setEndpointCopied(true);
+      toast.success("endpoint url copied", {
+        description: "paste it into your browser to access",
+      });
+      setTimeout(() => setEndpointCopied(false), 2000);
+    } catch {
+      toast.error("failed to copy");
+    }
+  };
+
   // Handle scroll to detect manual scrolling
   const handleScroll = useCallback(() => {
     if (!logContainerRef.current) return;
@@ -642,6 +661,46 @@ export default function JobDetailPage() {
             error
           </p>
           <p className="text-sm text-red-700">{job.errorMessage}</p>
+        </div>
+      )}
+
+      {/* Endpoint (if exposed and running) */}
+      {hasEndpoint && (
+        <div className="bg-white border border-gray-200 border-l-4 border-l-orange-accent p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <Globe className="h-4 w-4 text-orange-accent" />
+            <p className="text-xs text-gray-400 uppercase tracking-wide">
+              endpoint
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="flex-1 bg-gray-50 border border-gray-200 px-3 py-2 font-mono text-sm text-gray-700 truncate">
+              {job.exposeUrl}
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleCopyEndpoint}
+              className="h-9"
+            >
+              {endpointCopied ? (
+                <Check className="h-4 w-4 text-green-600" />
+              ) : (
+                <Copy className="h-4 w-4" />
+              )}
+            </Button>
+            <Button variant="outline" size="sm" asChild className="h-9">
+              <a href={job.exposeUrl} target="_blank" rel="noopener noreferrer">
+                <ExternalLink className="h-4 w-4" />
+              </a>
+            </Button>
+          </div>
+          {job.exposePort && (
+            <p className="text-xs text-gray-400 mt-2">
+              port {job.exposePort} exposed via {job.exposeSubdomain}
+              .uvacompute.com
+            </p>
+          )}
         </div>
       )}
 

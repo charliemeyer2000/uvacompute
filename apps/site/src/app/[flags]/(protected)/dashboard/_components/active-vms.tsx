@@ -40,7 +40,14 @@ import {
   deleteVm,
   extendVm,
 } from "@/lib/vm-utils";
-import { MoreVertical, Loader2, Copy, Check, Monitor } from "lucide-react";
+import {
+  MoreVertical,
+  Loader2,
+  Copy,
+  Check,
+  Monitor,
+  Globe,
+} from "lucide-react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 
@@ -138,6 +145,11 @@ function VMCard({ vm, isActive }: { vm: VM; isActive: boolean }) {
               <span className="text-xs text-gray-600">
                 {formatStatus(vm.status)}
               </span>
+              {vm.status === "ready" && vm.exposeUrl && (
+                <span title="Endpoint exposed">
+                  <Globe className="h-3.5 w-3.5 text-orange-accent" />
+                </span>
+              )}
             </div>
             {isActive && (
               <div onClick={(e) => e.preventDefault()}>
@@ -243,6 +255,17 @@ function VMCard({ vm, isActive }: { vm: VM; isActive: boolean }) {
             <div className="flex justify-between">
               <span className="text-gray-400">deleted</span>
               <span className="text-gray-600">{formatDate(vm.deletedAt)}</span>
+            </div>
+          )}
+          {vm.status === "ready" && vm.exposeUrl && (
+            <div className="flex justify-between">
+              <span className="text-gray-400">endpoint</span>
+              <span
+                className="text-orange-accent font-medium truncate max-w-[150px]"
+                title={vm.exposeUrl}
+              >
+                {vm.exposeSubdomain}.uvacompute.com
+              </span>
             </div>
           )}
         </div>

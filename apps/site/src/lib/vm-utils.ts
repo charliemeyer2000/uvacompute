@@ -17,6 +17,9 @@ export interface VM {
   expiresAt: number;
   deletedAt?: number;
   nodeId?: string;
+  exposePort?: number;
+  exposeSubdomain?: string;
+  exposeUrl?: string;
 }
 
 export function formatDate(timestamp: number): string {

@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verifyRequest } from "@/lib/orchestration-auth";
+import {
+  verifyRequest,
+  verifyNodeRequest,
+  isNodeAuthRequest,
+} from "@/lib/orchestration-auth";
 import { api } from "../../../../../convex/_generated/api";
 import { fetchMutation, fetchQuery } from "convex/nextjs";
 import { z } from "zod";
@@ -15,17 +19,28 @@ const SetStatusSchema = z.object({
 
 const UpdateSchema = z.union([HeartbeatSchema, SetStatusSchema]);
 
+async function verifyAuth(
+  request: NextRequest,
+  body: string,
+  nodeId: string,
+): Promise<boolean> {
+  if (isNodeAuthRequest(request)) {
+    return verifyNodeRequest(request, body, nodeId);
+  }
+  return verifyRequest(request, body);
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ nodeId: string }> },
 ) {
-  const body = "";
-  if (!verifyRequest(request, body)) {
+  const { nodeId } = await params;
+
+  if (!(await verifyAuth(request, "", nodeId))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   try {
-    const { nodeId } = await params;
     const node = await fetchQuery(api.nodes.getByNodeId, { nodeId });
 
     if (!node) {
@@ -46,13 +61,14 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ nodeId: string }> },
 ) {
+  const { nodeId } = await params;
   const body = await request.text();
-  if (!verifyRequest(request, body)) {
+
+  if (!(await verifyAuth(request, body, nodeId))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   try {
-    const { nodeId } = await params;
     const requestData = JSON.parse(body);
     const data = UpdateSchema.parse(requestData);
 
@@ -76,15 +92,32 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ nodeId: string }> },
 ) {
-  const body = "";
-  if (!verifyRequest(request, body)) {
+  const { nodeId } = await params;
+
+  if (!(await verifyAuth(request, "", nodeId))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   try {
-    const { nodeId } = await params;
+    const node = await fetchQuery(api.nodes.getByNodeId, { nodeId });
+    if (!node) {
+      return NextResponse.json(
+        { success: true, vmsDeleted: 0, jobsCancelled: 0 },
+        { status: 200 },
+      );
+    }
+
+    const cleanup = await fetchMutation(api.nodes.forceCleanup, { nodeId });
     await fetchMutation(api.nodes.unregister, { nodeId });
-    return NextResponse.json({ success: true }, { status: 200 });
+
+    return NextResponse.json(
+      {
+        success: true,
+        vmsDeleted: cleanup.vmsDeleted,
+        jobsCancelled: cleanup.jobsCancelled,
+      },
+      { status: 200 },
+    );
   } catch (error: any) {
     console.error("Failed to unregister node:", error);
     return NextResponse.json(
