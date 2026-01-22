@@ -155,6 +155,7 @@ func main() {
 			CreateVM:  handlers.CreateVMHandler,
 			GetStatus: handlers.GetVMStatusHandler,
 			DeleteVM:  handlers.DeleteVMHandler,
+			ExtendVM:  handlers.ExtendVMHandler,
 		},
 		structs.JobHandlers{
 			CreateJob:  handlers.CreateJobHandler,
