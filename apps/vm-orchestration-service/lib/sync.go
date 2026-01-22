@@ -31,7 +31,10 @@ func SyncFromConvex(vmManager *structs.VMManager, vmProvider structs.VMProvider,
 	orphanedCount := 0
 
 	for _, cvm := range convexVMs {
-		if _, exists := currentVMs[cvm.VMId]; exists {
+		if existingVM, exists := currentVMs[cvm.VMId]; exists {
+			if cvm.ExpiresAt > 0 && existingVM.Status == structs.VM_STATUS_READY {
+				vmManager.StartExpirationTimer(cvm.VMId, cvm.ExpiresAt)
+			}
 			continue
 		}
 
@@ -75,6 +78,7 @@ func SyncFromConvex(vmManager *structs.VMManager, vmProvider structs.VMProvider,
 			GPUType:      structs.GPUType(cvm.GpuType),
 			Status:       status,
 			NodeId:       nodeId,
+			ExpiresAt:    cvm.ExpiresAt,
 		}
 
 		vmManager.AddVMFromExternal(cvm.VMId, vmState)

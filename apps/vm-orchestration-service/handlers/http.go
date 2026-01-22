@@ -128,3 +128,66 @@ func DeleteVMHandler(app *structs.App, w http.ResponseWriter, r *http.Request, v
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(resp)
 }
+
+func ExtendVMHandler(app *structs.App, w http.ResponseWriter, r *http.Request, vmId string) {
+	var req structs.VMExtendRequest
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		resp := structs.VMExtendResponse{
+			Status: structs.VM_EXTEND_FAILED_VALIDATION,
+			VMId:   vmId,
+			Msg:    err.Error(),
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(resp)
+		return
+	}
+
+	validate := validator.New()
+	if err := validate.Struct(&req); err != nil {
+		resp := structs.VMExtendResponse{
+			Status: structs.VM_EXTEND_FAILED_VALIDATION,
+			VMId:   vmId,
+			Msg:    err.Error(),
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(resp)
+		return
+	}
+
+	expiresAt, err := app.VMManager.ExtendVM(vmId, req.Hours)
+	if err != nil {
+		statusCode := http.StatusInternalServerError
+		status := structs.VM_EXTEND_FAILED_INTERNAL
+
+		if strings.Contains(err.Error(), "not found") {
+			statusCode = http.StatusNotFound
+			status = structs.VM_EXTEND_FAILED_NOT_FOUND
+		} else if strings.Contains(err.Error(), "expired") || strings.Contains(err.Error(), "not running") {
+			statusCode = http.StatusBadRequest
+			status = structs.VM_EXTEND_FAILED_VALIDATION
+		}
+
+		resp := structs.VMExtendResponse{
+			Status: status,
+			VMId:   vmId,
+			Msg:    err.Error(),
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(statusCode)
+		json.NewEncoder(w).Encode(resp)
+		return
+	}
+
+	resp := structs.VMExtendResponse{
+		Status:    structs.VM_EXTEND_SUCCESS,
+		VMId:      vmId,
+		ExpiresAt: expiresAt,
+		Msg:       "VM expiration extended",
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(resp)
+}
