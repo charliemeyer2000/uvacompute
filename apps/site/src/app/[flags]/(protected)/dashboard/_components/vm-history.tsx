@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useQuery } from "convex/react";
 import { api } from "../../../../../../convex/_generated/api";
 import { authClient } from "@/lib/auth-client";
@@ -45,8 +46,9 @@ function getStatusDotColor(status: string): string {
 
 function VMCard({ vm }: { vm: VM }) {
   return (
-    <div
-      className={`bg-white border border-gray-200 border-l-4 ${getStatusBorderColor(vm.status)} p-5 hover:border-gray-300 transition-colors`}
+    <Link
+      href={`/vms/${vm.vmId}`}
+      className={`block bg-white border border-gray-200 border-l-4 ${getStatusBorderColor(vm.status)} p-5 hover:border-gray-300 transition-colors`}
     >
       <div className="flex justify-between items-start mb-3">
         <div className="flex-1 min-w-0">
@@ -108,7 +110,7 @@ function VMCard({ vm }: { vm: VM }) {
           </div>
         )}
       </div>
-    </div>
+    </Link>
   );
 }
 
