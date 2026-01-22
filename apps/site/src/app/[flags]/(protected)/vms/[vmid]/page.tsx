@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useQuery } from "convex/react";
 import { api } from "../../../../../../convex/_generated/api";
@@ -20,6 +20,10 @@ import {
   formatDate,
   formatTimeRemaining,
   formatStatus,
+  getStatusDotColor,
+  getStatusTextColor,
+  getSshCommand,
+  deleteVm,
 } from "@/lib/vm-utils";
 import {
   ArrowLeft,
@@ -42,53 +46,17 @@ const ACTIVE_STATUSES = [
   "ready",
 ];
 
-function getStatusDotColor(status: string): string {
-  switch (status) {
-    case "ready":
-      return "bg-green-500";
-    case "creating":
-    case "pending":
-    case "booting":
-    case "provisioning":
-      return "bg-blue-500";
-    case "failed":
-    case "offline":
-      return "bg-red-500";
-    case "stopping":
-      return "bg-yellow-500";
-    default:
-      return "bg-gray-400";
-  }
-}
-
-function getStatusTextColor(status: string): string {
-  switch (status) {
-    case "ready":
-      return "text-green-600";
-    case "creating":
-    case "pending":
-    case "booting":
-    case "provisioning":
-      return "text-blue-600";
-    case "failed":
-    case "offline":
-      return "text-red-600";
-    case "stopping":
-      return "text-yellow-600";
-    default:
-      return "text-gray-500";
-  }
-}
-
 export default function VMDetailPage() {
+  const router = useRouter();
   const params = useParams();
   const vmId = params.vmid as string;
 
   const { data: session } = authClient.useSession();
-  const vm = useQuery(api.vms.getByVmId, vmId ? { vmId } : "skip") as
-    | VM
-    | null
-    | undefined;
+  const userId = session?.user?.id;
+  const vm = useQuery(
+    api.vms.getByVmId,
+    vmId && userId ? { vmId, userId } : "skip",
+  ) as VM | null | undefined;
 
   const [sshCopied, setSshCopied] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -97,13 +65,11 @@ export default function VMDetailPage() {
   const isActive = vm?.status ? ACTIVE_STATUSES.includes(vm.status) : false;
   const isReady = vm?.status === "ready";
 
-  async function handleCopySSH() {
+  async function handleCopySSH(): Promise<void> {
     if (sshCopied || !vm) return;
 
-    const sshCommand = `uva vm ssh ${vm.name || vm.vmId}`;
-
     try {
-      await navigator.clipboard.writeText(sshCommand);
+      await navigator.clipboard.writeText(getSshCommand(vm));
       setSshCopied(true);
       toast.success("ssh command copied", {
         description: "paste it into your terminal to connect",
@@ -114,31 +80,24 @@ export default function VMDetailPage() {
     }
   }
 
-  async function handleDelete() {
+  async function handleDelete(): Promise<void> {
     if (!vm) return;
     setIsDeleting(true);
 
-    try {
-      const response = await fetch(`/api/vms/${vm.vmId}`, {
-        method: "DELETE",
-      });
-      const data = await response.json();
+    const result = await deleteVm(vm.vmId);
 
-      if (!response.ok || data.status !== "deletion_success") {
-        throw new Error(data.msg || "failed to delete vm");
-      }
-
+    if (result.success) {
       toast.success("vm deleted", {
         description: `${vm.name || vm.vmId} has been deleted`,
       });
-      setShowDeleteDialog(false);
-    } catch (error) {
+      router.push("/dashboard");
+    } else {
       toast.error("deletion failed", {
-        description: error instanceof Error ? error.message : "unknown error",
+        description: result.error,
       });
-    } finally {
-      setIsDeleting(false);
     }
+
+    setIsDeleting(false);
   }
 
   if (vm === undefined) {

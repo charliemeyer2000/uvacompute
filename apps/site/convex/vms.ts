@@ -158,12 +158,17 @@ export const listInactiveByUser = query({
 export const getByVmId = query({
   args: {
     vmId: v.string(),
+    userId: v.string(),
   },
   handler: async (ctx, args) => {
     const vm = await ctx.db
       .query("vms")
       .withIndex("by_vmId", (q) => q.eq("vmId", args.vmId))
       .first();
+
+    if (!vm || vm.userId !== args.userId) {
+      return null;
+    }
 
     return vm;
   },

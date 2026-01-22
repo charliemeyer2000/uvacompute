@@ -47,14 +47,11 @@ export async function GET(
     const { vmId } = await params;
     const vm = await fetchQuery(api.vms.getByVmId, {
       vmId,
+      userId: session.user.id,
     });
 
     if (!vm) {
       return NextResponse.json({ error: "VM not found" }, { status: 404 });
-    }
-
-    if (vm.userId !== session.user.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 
     if (vm.status !== "ready") {
