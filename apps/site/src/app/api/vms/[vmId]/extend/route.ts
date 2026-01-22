@@ -48,6 +48,17 @@ export async function POST(
       );
     }
 
+    if (vm.status !== "ready") {
+      return NextResponse.json(
+        {
+          status: "extend_failed_validation",
+          vmId,
+          msg: "VM is not running",
+        },
+        { status: 400 },
+      );
+    }
+
     const requestBody = JSON.stringify(body);
     const authHeaders = createAuthHeaders(
       "POST",
