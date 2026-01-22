@@ -84,16 +84,9 @@ export default function VMsDocsPage() {
           </div>
 
           <div>
-            <h4 className="font-medium mb-2">get vm details</h4>
+            <h4 className="font-medium mb-2">check vm status</h4>
             <div className="bg-gray-50 border border-gray-200 p-4">
-              <code className="text-sm text-black">uva vm get my-vm</code>
-            </div>
-          </div>
-
-          <div>
-            <h4 className="font-medium mb-2">stop a vm</h4>
-            <div className="bg-gray-50 border border-gray-200 p-4">
-              <code className="text-sm text-black">uva vm stop my-vm</code>
+              <code className="text-sm text-black">uva vm status my-vm</code>
             </div>
           </div>
 
@@ -124,6 +117,17 @@ export default function VMsDocsPage() {
             <tbody>
               <tr>
                 <td className="p-3 border-b border-gray-200">
+                  <code>-h, --hours</code>
+                </td>
+                <td className="p-3 border-b border-gray-200">
+                  duration in hours (required)
+                </td>
+                <td className="p-3 border-b border-gray-200">
+                  <code>-h 2</code>
+                </td>
+              </tr>
+              <tr>
+                <td className="p-3 border-b border-gray-200">
                   <code>-n, --name</code>
                 </td>
                 <td className="p-3 border-b border-gray-200">vm name</td>
@@ -133,13 +137,68 @@ export default function VMsDocsPage() {
               </tr>
               <tr>
                 <td className="p-3 border-b border-gray-200">
-                  <code>-h, --hours</code>
+                  <code>-c, --cpus</code>
                 </td>
                 <td className="p-3 border-b border-gray-200">
-                  duration in hours
+                  number of CPUs (default: 1)
                 </td>
                 <td className="p-3 border-b border-gray-200">
-                  <code>-h 2</code>
+                  <code>-c 4</code>
+                </td>
+              </tr>
+              <tr>
+                <td className="p-3 border-b border-gray-200">
+                  <code>-r, --ram</code>
+                </td>
+                <td className="p-3 border-b border-gray-200">
+                  RAM in GB (default: 8)
+                </td>
+                <td className="p-3 border-b border-gray-200">
+                  <code>-r 16</code>
+                </td>
+              </tr>
+              <tr>
+                <td className="p-3 border-b border-gray-200">
+                  <code>-d, --disk</code>
+                </td>
+                <td className="p-3 border-b border-gray-200">
+                  disk size in GB (default: 64)
+                </td>
+                <td className="p-3 border-b border-gray-200">
+                  <code>-d 128</code>
+                </td>
+              </tr>
+              <tr>
+                <td className="p-3 border-b border-gray-200">
+                  <code>-g, --gpus</code>
+                </td>
+                <td className="p-3 border-b border-gray-200">
+                  number of GPUs (default: 0)
+                </td>
+                <td className="p-3 border-b border-gray-200">
+                  <code>-g 1</code>
+                </td>
+              </tr>
+              <tr>
+                <td className="p-3 border-b border-gray-200">
+                  <code>-t, --gpu-type</code>
+                </td>
+                <td className="p-3 border-b border-gray-200">
+                  GPU type (default: 5090)
+                </td>
+                <td className="p-3 border-b border-gray-200">
+                  <code>-t 5090</code>
+                </td>
+              </tr>
+              <tr>
+                <td className="p-3 border-b border-gray-200">
+                  <code>-e, --expose</code>
+                </td>
+                <td className="p-3 border-b border-gray-200">
+                  expose port via HTTPS endpoint
+                </td>
+                <td className="p-3 border-b border-gray-200">
+                  <code>-e 8000</code>
                 </td>
               </tr>
             </tbody>

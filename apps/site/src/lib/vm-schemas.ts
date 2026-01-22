@@ -36,6 +36,7 @@ export const VMStatusResponseSchema = z.object({
   status: VMStatusEnum,
   msg: z.string(),
   info: z.any().optional(),
+  exposeUrl: z.string().optional(),
 });
 
 export type VMStatusResponse = z.infer<typeof VMStatusResponseSchema>;
@@ -87,6 +88,12 @@ export const VMCreationRequestSchema = z.object({
   cloudInitConfig: z
     .string()
     .max(102400, "Cloud-init config must be less than 100KB")
+    .optional(),
+  expose: z
+    .number()
+    .int()
+    .min(1, "Port must be at least 1")
+    .max(65535, "Port must be at most 65535")
     .optional(),
 });
 

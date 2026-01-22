@@ -1,7 +1,7 @@
 import { mutation, query, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
 import { authComponent } from "./auth";
-import { internal } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 
 export const register = mutation({
   args: {
@@ -12,11 +12,13 @@ export const register = mutation({
     tunnelUser: v.optional(v.string()),
     kubeconfigPath: v.optional(v.string()),
     sshPublicKey: v.optional(v.string()),
+    nodeSecret: v.optional(v.string()),
     ownerId: v.optional(v.string()),
     cpus: v.optional(v.number()),
     ram: v.optional(v.number()),
     gpus: v.optional(v.number()),
     gpuType: v.optional(v.string()),
+    gpuMode: v.optional(v.union(v.literal("nvidia"), v.literal("vfio"))),
     supportsVMs: v.optional(v.boolean()),
     supportsJobs: v.optional(v.boolean()),
   },
@@ -35,12 +37,15 @@ export const register = mutation({
         tunnelUser: args.tunnelUser,
         kubeconfigPath: args.kubeconfigPath,
         sshPublicKey: args.sshPublicKey,
+        nodeSecret: args.nodeSecret ?? existing.nodeSecret,
         status: "online",
         lastHeartbeat: now,
         cpus: args.cpus,
         ram: args.ram,
         gpus: args.gpus,
         gpuType: args.gpuType,
+        gpuMode:
+          args.gpuMode ?? (args.gpus && args.gpus > 0 ? "nvidia" : undefined),
         supportsVMs: args.supportsVMs,
         supportsJobs: args.supportsJobs,
         ...(args.ownerId && !existing.ownerId ? { ownerId: args.ownerId } : {}),
@@ -56,6 +61,7 @@ export const register = mutation({
       tunnelUser: args.tunnelUser,
       kubeconfigPath: args.kubeconfigPath,
       sshPublicKey: args.sshPublicKey,
+      nodeSecret: args.nodeSecret,
       ownerId: args.ownerId,
       status: "online",
       lastHeartbeat: now,
@@ -64,6 +70,8 @@ export const register = mutation({
       ram: args.ram,
       gpus: args.gpus,
       gpuType: args.gpuType,
+      gpuMode:
+        args.gpuMode ?? (args.gpus && args.gpus > 0 ? "nvidia" : undefined),
       supportsVMs: args.supportsVMs ?? true,
       supportsJobs: args.supportsJobs ?? true,
     });
@@ -472,6 +480,13 @@ export const forceCleanup = mutation({
           deletedAt: now,
         });
         vmsDeleted++;
+
+        if (vm.exposeSubdomain) {
+          await ctx.scheduler.runAfter(0, api.endpoints.release, {
+            type: "vm",
+            resourceId: vm.vmId,
+          });
+        }
       }
     }
 
@@ -486,9 +501,150 @@ export const forceCleanup = mutation({
           completedAt: now,
         });
         jobsCancelled++;
+
+        if (job.exposeSubdomain) {
+          await ctx.scheduler.runAfter(0, api.endpoints.release, {
+            type: "job",
+            resourceId: job.jobId,
+          });
+        }
       }
     }
 
     return { vmsDeleted, jobsCancelled };
+  },
+});
+
+export const getActiveGpuWorkloads = query({
+  args: {
+    nodeId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const node = await ctx.db
+      .query("nodes")
+      .withIndex("by_nodeId", (q) => q.eq("nodeId", args.nodeId))
+      .first();
+
+    if (!node) {
+      throw new Error(`Node ${args.nodeId} not found`);
+    }
+
+    if (!node.gpus || node.gpus === 0) {
+      return {
+        gpuVms: [],
+        gpuJobs: [],
+        canSwitch: true,
+        currentMode: node.gpuMode,
+      };
+    }
+
+    const vms = await ctx.db
+      .query("vms")
+      .withIndex("by_nodeId", (q) => q.eq("nodeId", args.nodeId))
+      .collect();
+
+    const jobs = await ctx.db
+      .query("jobs")
+      .withIndex("by_nodeId", (q) => q.eq("nodeId", args.nodeId))
+      .collect();
+
+    const activeGpuVms = vms.filter(
+      (vm) =>
+        vm.gpus > 0 &&
+        vm.status !== "stopped" &&
+        vm.status !== "failed" &&
+        vm.status !== "offline",
+    );
+
+    const activeGpuJobs = jobs.filter(
+      (job) =>
+        job.gpus > 0 &&
+        job.status !== "completed" &&
+        job.status !== "failed" &&
+        job.status !== "cancelled",
+    );
+
+    return {
+      gpuVms: activeGpuVms,
+      gpuJobs: activeGpuJobs,
+      canSwitch: activeGpuVms.length === 0 && activeGpuJobs.length === 0,
+      currentMode: node.gpuMode,
+    };
+  },
+});
+
+export const setGpuMode = mutation({
+  args: {
+    nodeId: v.string(),
+    gpuMode: v.union(v.literal("nvidia"), v.literal("vfio")),
+  },
+  handler: async (ctx, args) => {
+    const node = await ctx.db
+      .query("nodes")
+      .withIndex("by_nodeId", (q) => q.eq("nodeId", args.nodeId))
+      .first();
+
+    if (!node) {
+      throw new Error(`Node ${args.nodeId} not found`);
+    }
+
+    if (!node.gpus || node.gpus === 0) {
+      throw new Error(`Node ${args.nodeId} does not have a GPU`);
+    }
+
+    const vms = await ctx.db
+      .query("vms")
+      .withIndex("by_nodeId", (q) => q.eq("nodeId", args.nodeId))
+      .collect();
+
+    const jobs = await ctx.db
+      .query("jobs")
+      .withIndex("by_nodeId", (q) => q.eq("nodeId", args.nodeId))
+      .collect();
+
+    const activeGpuVms = vms.filter(
+      (vm) =>
+        vm.gpus > 0 &&
+        vm.status !== "stopped" &&
+        vm.status !== "failed" &&
+        vm.status !== "offline",
+    );
+
+    const activeGpuJobs = jobs.filter(
+      (job) =>
+        job.gpus > 0 &&
+        job.status !== "completed" &&
+        job.status !== "failed" &&
+        job.status !== "cancelled",
+    );
+
+    if (activeGpuVms.length > 0) {
+      throw new Error(
+        `Cannot switch GPU mode: ${activeGpuVms.length} active GPU VM(s) on node`,
+      );
+    }
+
+    if (activeGpuJobs.length > 0) {
+      throw new Error(
+        `Cannot switch GPU mode: ${activeGpuJobs.length} active GPU job(s) on node`,
+      );
+    }
+
+    await ctx.db.patch(node._id, {
+      gpuMode: args.gpuMode,
+    });
+
+    return { success: true, gpuMode: args.gpuMode };
+  },
+});
+
+export const getNodeSecret = query({
+  args: { nodeId: v.string() },
+  handler: async (ctx, args) => {
+    const node = await ctx.db
+      .query("nodes")
+      .withIndex("by_nodeId", (q) => q.eq("nodeId", args.nodeId))
+      .first();
+    return node?.nodeSecret ?? null;
   },
 });

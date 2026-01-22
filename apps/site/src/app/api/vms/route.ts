@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { authClient } from "@/lib/auth-client";
-import { fetchMutation, fetchQuery } from "convex/nextjs";
+import { fetchMutation, fetchQuery, fetchAction } from "convex/nextjs";
 import { api } from "../../../../convex/_generated/api";
 import { createAuthHeaders } from "@/lib/orchestration-auth";
 import {
@@ -8,6 +8,11 @@ import {
   VMCreationResponseSchema,
 } from "@/lib/vm-schemas";
 import { randomUUID } from "crypto";
+
+interface EndpointReservation {
+  subdomain: string;
+  exposeUrl: string;
+}
 
 const VM_ORCHESTRATION_SERVICE_URL =
   process.env.VM_ORCHESTRATION_SERVICE_URL || "http://localhost:8080";
@@ -56,8 +61,8 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Generate vmId upfront so we can create Convex record immediately
   const vmId = randomUUID();
+  let endpointReservation: EndpointReservation | null = null;
 
   try {
     const rawBody = await request.json();
@@ -72,7 +77,25 @@ export async function POST(request: NextRequest) {
       console.warn(`User ${session.user.id} has no SSH keys configured`);
     }
 
-    // Create Convex record FIRST with "creating" status so it shows up in UI immediately
+    if (body.expose) {
+      try {
+        endpointReservation = await fetchAction(api.endpoints.reserve, {
+          type: "vm",
+          resourceId: vmId,
+          port: body.expose,
+        });
+      } catch (endpointError: any) {
+        console.error("Failed to reserve endpoint subdomain:", endpointError);
+        return NextResponse.json(
+          {
+            status: "internal_error",
+            msg: "Failed to reserve endpoint subdomain.",
+          },
+          { status: 500 },
+        );
+      }
+    }
+
     try {
       await fetchMutation(api.vms.create, {
         userId: session.user.id,
@@ -84,9 +107,22 @@ export async function POST(request: NextRequest) {
         gpus: body.gpus || 0,
         gpuType: body["gpu-type"] || "5090",
         hours: body.hours,
+        exposePort: body.expose,
+        exposeSubdomain: endpointReservation?.subdomain,
+        exposeUrl: endpointReservation?.exposeUrl,
       });
     } catch (convexError: any) {
       console.error("Failed to create VM record in Convex:", convexError);
+      if (endpointReservation) {
+        try {
+          await fetchAction(api.endpoints.release, {
+            type: "vm",
+            resourceId: vmId,
+          });
+        } catch {
+          // Ignore release error
+        }
+      }
       return NextResponse.json(
         {
           status: "internal_error",
@@ -96,14 +132,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Now call orchestration service with the pre-generated vmId
     const vmCreationRequest = {
       ...body,
-      vmId, // Pass the pre-generated vmId
+      vmId,
       userId: session.user.id,
       sshPublicKeys,
       ...(body.startupScript && { startupScript: body.startupScript }),
       ...(body.cloudInitConfig && { cloudInitConfig: body.cloudInitConfig }),
+      ...(body.expose && { expose: body.expose }),
+      ...(endpointReservation && {
+        exposeSubdomain: endpointReservation.subdomain,
+      }),
     };
 
     const requestBody = JSON.stringify(vmCreationRequest);
@@ -124,7 +163,6 @@ export async function POST(request: NextRequest) {
         `Orchestration service error: ${response.status} ${errorText}`,
       );
 
-      // Mark VM as failed in Convex since orchestration failed
       try {
         await fetchMutation(api.vms.updateStatus, {
           vmId,
@@ -132,6 +170,17 @@ export async function POST(request: NextRequest) {
         });
       } catch (updateError: any) {
         console.error("Failed to mark VM as failed in Convex:", updateError);
+      }
+
+      if (endpointReservation) {
+        try {
+          await fetchAction(api.endpoints.release, {
+            type: "vm",
+            resourceId: vmId,
+          });
+        } catch {
+          // Ignore release error
+        }
       }
 
       return NextResponse.json(
@@ -148,7 +197,6 @@ export async function POST(request: NextRequest) {
     const rawData = await response.json();
     const data = VMCreationResponseSchema.parse(rawData);
 
-    // If orchestration returned a failure status (validation, resources), mark as failed
     if (data.status !== "success") {
       try {
         await fetchMutation(api.vms.updateStatus, {
@@ -159,21 +207,37 @@ export async function POST(request: NextRequest) {
         console.error("Failed to mark VM as failed in Convex:", updateError);
       }
 
+      if (endpointReservation) {
+        try {
+          await fetchAction(api.endpoints.release, {
+            type: "vm",
+            resourceId: vmId,
+          });
+        } catch {
+          // Ignore release error
+        }
+      }
+
       return NextResponse.json(
         { ...data, vmId },
         { status: data.status === "resources_unavailable" ? 409 : 400 },
       );
     }
 
-    // Success - orchestration accepted the request and will update status via callbacks
     return NextResponse.json(
-      { status: "success", vmId, msg: "VM creation started" },
+      {
+        status: "success",
+        vmId,
+        msg: "VM creation started",
+        ...(endpointReservation && {
+          exposeUrl: endpointReservation.exposeUrl,
+        }),
+      },
       { status: 200 },
     );
   } catch (error: any) {
     console.error("Error creating VM:", error);
 
-    // If we already created the Convex record, mark it as failed
     try {
       await fetchMutation(api.vms.updateStatus, {
         vmId,
@@ -181,6 +245,17 @@ export async function POST(request: NextRequest) {
       });
     } catch {
       // Ignore - record might not exist if the error was before Convex insert
+    }
+
+    if (endpointReservation) {
+      try {
+        await fetchAction(api.endpoints.release, {
+          type: "vm",
+          resourceId: vmId,
+        });
+      } catch {
+        // Ignore release error
+      }
     }
 
     if (error.name === "ZodError") {

@@ -198,10 +198,21 @@ ssh root@24.199.85.26 "ssh -p TUNNEL_PORT localhost hostname"
 
 ## File Locations
 
-| File                | Location                           | Description            |
-| ------------------- | ---------------------------------- | ---------------------- |
-| Node config         | `/opt/uvacompute/node-config.yaml` | Node registration info |
-| Node labels         | `/opt/uvacompute/node-labels.yaml` | Labels to apply        |
-| Kubeconfig          | `/root/.kube/config`               | Cluster access         |
-| SSH key             | `/root/.ssh/id_ed25519_uvacompute` | Tunnel SSH key         |
-| Orchestrator binary | `/root/vm-orchestration-service`   | On hub                 |
+### Node Configuration
+
+| File                 | Location                               | Description              |
+| -------------------- | -------------------------------------- | ------------------------ |
+| Node config          | `/etc/uvacompute/node-config.yaml`     | Node registration info   |
+| Node labels          | `/etc/uvacompute/node-labels.yaml`     | Kubernetes labels        |
+| Storage config       | `/etc/uvacompute/storage-config.yaml`  | VM storage settings      |
+| Orchestration secret | `/etc/uvacompute/orchestration-secret` | API auth for GPU scripts |
+| Kubeconfig           | `/root/.kube/config`                   | Cluster access           |
+| SSH key              | `/root/.ssh/id_ed25519_uvacompute`     | Tunnel SSH key           |
+
+### Hub Configuration (Platform Internal)
+
+| File                  | Location                              | Description              |
+| --------------------- | ------------------------------------- | ------------------------ |
+| VM proxy script       | `/usr/local/bin/uvacompute-vm-proxy`  | SSH VM access proxy      |
+| Key sync script       | `/usr/local/bin/uvacompute-sync-keys` | Node key synchronization |
+| Orchestration service | `/opt/vm-orchestration-service/`      | Service binary + config  |
