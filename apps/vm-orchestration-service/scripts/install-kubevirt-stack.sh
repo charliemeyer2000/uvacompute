@@ -146,6 +146,62 @@ install_cdi() {
     kubectl get cdi -n cdi
 }
 
+install_cdi_proxy() {
+    # CDI importer pods on worker nodes may have network issues (transparent proxies, etc.)
+    # This installs tinyproxy on the hub and configures CDI to route imports through it
+    log "Installing tinyproxy for CDI imports..."
+
+    apt-get update -qq
+    apt-get install -y -qq tinyproxy
+
+    # Get the hub's IP address (first non-localhost IPv4)
+    local hub_ip
+    hub_ip=$(hostname -I | awk '{print $1}')
+
+    # Configure tinyproxy to allow connections from anywhere
+    # This is safe because:
+    # 1. Worker nodes connect via SSH tunnel with various source IPs
+    # 2. The proxy is only used for pulling VM images (read-only)
+    # 3. The hub should have proper firewall rules
+    cat > /etc/tinyproxy/tinyproxy.conf << 'TINYPROXY_EOF'
+User tinyproxy
+Group tinyproxy
+Port 8888
+Timeout 600
+DefaultErrorFile "/usr/share/tinyproxy/default.html"
+StatFile "/usr/share/tinyproxy/stats.html"
+LogFile "/var/log/tinyproxy/tinyproxy.log"
+LogLevel Info
+PidFile "/run/tinyproxy/tinyproxy.pid"
+MaxClients 100
+Allow 0.0.0.0/0
+ViaProxyName "tinyproxy"
+ConnectPort 443
+ConnectPort 563
+TINYPROXY_EOF
+
+    systemctl enable tinyproxy
+    systemctl restart tinyproxy
+
+    log "Tinyproxy installed and running on port 8888"
+
+    # Configure CDI to use this proxy for imports
+    log "Configuring CDI to use proxy at ${hub_ip}:8888..."
+
+    kubectl patch cdi cdi --type=merge -p "{
+        \"spec\": {
+            \"config\": {
+                \"importProxy\": {
+                    \"HTTPProxy\": \"http://${hub_ip}:8888\",
+                    \"HTTPSProxy\": \"http://${hub_ip}:8888\"
+                }
+            }
+        }
+    }"
+
+    log "CDI proxy configured"
+}
+
 install_local_path_provisioner() {
     log "Installing local-path-provisioner..."
 
@@ -297,6 +353,9 @@ print_summary() {
         echo "  kubectl get cdi -n cdi"
         echo "  kubectl get pods -n cdi"
         echo ""
+        echo "CDI proxy (tinyproxy) running on port 8888"
+        echo "  This allows worker nodes to pull VM images even with network restrictions"
+        echo ""
     fi
     if [[ "$INSTALL_LOCAL_PATH" == "true" ]]; then
         echo "To check storage:"
@@ -424,6 +483,7 @@ main() {
 
     if [[ "$INSTALL_CDI" == "true" ]]; then
         install_cdi
+        install_cdi_proxy
     fi
 
     if [[ "$INSTALL_LOCAL_PATH" == "true" ]]; then

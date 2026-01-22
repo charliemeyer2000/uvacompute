@@ -212,10 +212,10 @@ func (k *KubeVirtAdapter) buildVMObject(vmId string, cpus, ram, disk, gpus int, 
 		"volumes": []interface{}{
 			map[string]interface{}{
 				"name": "rootdisk",
-				// Use containerDisk for now - CDI/DataVolume has TLS issues from pod network
-				// TODO: Switch to DataVolumeTemplates when network issues are resolved
-				"containerDisk": map[string]interface{}{
-					"image": image,
+				// Using DataVolume for resizable disks via CDI
+				// CDI importer uses proxy configured in CDI CR for TLS connectivity
+				"dataVolume": map[string]interface{}{
+					"name": fmt.Sprintf("%s-rootdisk", vmId),
 				},
 			},
 			map[string]interface{}{
@@ -265,10 +265,31 @@ func (k *KubeVirtAdapter) buildVMObject(vmId string, cpus, ram, disk, gpus int, 
 			},
 			"spec": map[string]interface{}{
 				"running": true,
-				// NOTE: Using containerDisk instead of DataVolumeTemplates due to TLS issues
-				// from pod network on worker nodes. DataVolumeTemplates would allow resizable
-				// disks but CDI importer pods can't make outbound TLS connections.
-				// TODO: Fix network/TLS issue and switch to DataVolumeTemplates
+				// DataVolumeTemplates for resizable disks - CDI pulls the VM image
+				// and creates a PVC with the user-specified size
+				"dataVolumeTemplates": []interface{}{
+					map[string]interface{}{
+						"metadata": map[string]interface{}{
+							"name": fmt.Sprintf("%s-rootdisk", vmId),
+						},
+						"spec": map[string]interface{}{
+							"pvc": map[string]interface{}{
+								"accessModes": []interface{}{k.config.StorageAccessMode},
+								"resources": map[string]interface{}{
+									"requests": map[string]interface{}{
+										"storage": fmt.Sprintf("%dGi", disk),
+									},
+								},
+								"storageClassName": k.config.DefaultStorageClass,
+							},
+							"source": map[string]interface{}{
+								"registry": map[string]interface{}{
+									"url": k.config.VMImageSourceURL,
+								},
+							},
+						},
+					},
+				},
 				"template": map[string]interface{}{
 					"metadata": map[string]interface{}{
 						"labels": map[string]interface{}{
