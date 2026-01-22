@@ -105,7 +105,7 @@ kubectl taint nodes $(hostname) node-role.kubernetes.io/control-plane=:NoSchedul
 # Step 6: Create service directories
 log_info "Creating service directories..."
 mkdir -p /opt/vm-orchestration-service
-mkdir -p /opt/uvacompute
+mkdir -p /etc/uvacompute
 
 # Print summary
 echo ""

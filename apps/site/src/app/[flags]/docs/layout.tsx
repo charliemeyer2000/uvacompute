@@ -16,6 +16,7 @@ const docNavItems = [
   { href: "/docs/vms", label: "virtual machines" },
   { href: "/docs/jobs", label: "container jobs" },
   { href: "/docs/nodes", label: "node management" },
+  { href: "/docs/configuration", label: "configuration" },
 ];
 
 function NavLink({
@@ -72,11 +73,12 @@ export default function DocsLayout({
 
   const firstName = user?.name ? user.name.split(" ")[0].toLowerCase() : "";
 
-  // Check which doc section we're on for the sidebar
-  const isOnDocsRoot = pathname === "/docs" || pathname?.endsWith("/docs");
-  const isOnVmsDocs = pathname?.includes("/docs/vms");
-  const isOnJobsDocs = pathname?.includes("/docs/jobs");
-  const isOnNodesDocs = pathname?.includes("/docs/nodes");
+  function isActiveDocSection(href: string): boolean {
+    if (href === "/docs") {
+      return pathname === "/docs" || pathname?.endsWith("/docs") || false;
+    }
+    return pathname?.includes(href) ?? false;
+  }
 
   return (
     <main className="max-w-7xl mx-auto px-8 py-8 min-h-screen font-mono">
@@ -191,34 +193,21 @@ export default function DocsLayout({
           {/* Sidebar Navigation */}
           <nav className="w-48 flex-shrink-0">
             <ul className="space-y-1">
-              {docNavItems.map((item) => {
-                let isActive = false;
-                if (item.href === "/docs") {
-                  isActive = isOnDocsRoot;
-                } else if (item.href === "/docs/vms") {
-                  isActive = isOnVmsDocs ?? false;
-                } else if (item.href === "/docs/jobs") {
-                  isActive = isOnJobsDocs ?? false;
-                } else if (item.href === "/docs/nodes") {
-                  isActive = isOnNodesDocs ?? false;
-                }
-
-                return (
-                  <li key={item.href}>
-                    <Link
-                      href={item.href}
-                      className={cn(
-                        "block py-2 px-3 text-sm border-l-2 transition-colors",
-                        isActive
-                          ? "border-orange-accent bg-orange-accent/5 text-black font-medium"
-                          : "border-transparent text-gray-500 hover:border-gray-300 hover:text-black",
-                      )}
-                    >
-                      {item.label}
-                    </Link>
-                  </li>
-                );
-              })}
+              {docNavItems.map((item) => (
+                <li key={item.href}>
+                  <Link
+                    href={item.href}
+                    className={cn(
+                      "block py-2 px-3 text-sm border-l-2 transition-colors",
+                      isActiveDocSection(item.href)
+                        ? "border-orange-accent bg-orange-accent/5 text-black font-medium"
+                        : "border-transparent text-gray-500 hover:border-gray-300 hover:text-black",
+                    )}
+                  >
+                    {item.label}
+                  </Link>
+                </li>
+              ))}
             </ul>
           </nav>
 

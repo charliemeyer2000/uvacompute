@@ -36,7 +36,13 @@ import {
   formatDuration,
   isJobCancellable,
 } from "@/lib/job-utils";
-import { MoreVertical, Loader2, Container, ExternalLink } from "lucide-react";
+import {
+  MoreVertical,
+  Loader2,
+  Container,
+  ExternalLink,
+  Globe,
+} from "lucide-react";
 import { toast } from "sonner";
 
 function getStatusBorderColor(status: string): string {
@@ -130,6 +136,11 @@ function JobCard({ job }: { job: Job }) {
               <span className="text-xs text-gray-600">
                 {formatJobStatus(job.status)}
               </span>
+              {job.status === "running" && job.exposeUrl && (
+                <span title="Endpoint exposed">
+                  <Globe className="h-3.5 w-3.5 text-orange-accent" />
+                </span>
+              )}
             </div>
             <DropdownMenu modal={false}>
               <DropdownMenuTrigger asChild>
@@ -217,6 +228,17 @@ function JobCard({ job }: { job: Job }) {
               <span className="text-gray-400">running for</span>
               <span className="text-black font-medium">
                 {formatDuration(job.startedAt)}
+              </span>
+            </div>
+          )}
+          {job.status === "running" && job.exposeUrl && (
+            <div className="flex justify-between">
+              <span className="text-gray-400">endpoint</span>
+              <span
+                className="text-orange-accent font-medium truncate max-w-[150px]"
+                title={job.exposeUrl}
+              >
+                {job.exposeSubdomain}.uvacompute.com
               </span>
             </div>
           )}
@@ -403,7 +425,7 @@ export default function ActiveJobs() {
           </p>
           <div className="bg-gray-50 border border-gray-200 px-3 py-2 inline-block">
             <code className="text-xs text-gray-600">
-              uva run alpine echo hello
+              uva jobs run alpine echo hello
             </code>
           </div>
         </div>

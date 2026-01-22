@@ -173,7 +173,7 @@ function getCommandNames(program: Command): string[] {
 function getSubcommandNames(program: Command, commandName: string): string[] {
   const command = program.commands.find((cmd) => cmd.name() === commandName);
   if (!command) return [];
-  return command.commands.map((cmd) => cmd.name());
+  return command.commands.flatMap((cmd) => [cmd.name(), ...cmd.aliases()]);
 }
 
 function getCommandOptions(
@@ -186,9 +186,9 @@ function getCommandOptions(
 
   let targetCommand = command;
   if (subcommandName) {
-    const subcommand = command.commands.find(
-      (cmd) => cmd.name() === subcommandName,
-    );
+    const subcommand =
+      command.commands.find((cmd) => cmd.name() === subcommandName) ||
+      command.commands.find((cmd) => cmd.aliases().includes(subcommandName));
     if (!subcommand) return [];
     targetCommand = subcommand;
   }
@@ -226,12 +226,6 @@ function needsSSHKeyCompletion(
   return args.length > 0;
 }
 
-function needsJobCompletion(commandObj: Command): boolean {
-  // Job commands (logs, cancel) are top-level commands that take jobId argument
-  const commandName = commandObj.name();
-  return commandName === "logs" || commandName === "cancel";
-}
-
 function needsNodeCompletion(
   commandObj: Command,
   subcommandObj: Command,
@@ -241,6 +235,24 @@ function needsNodeCompletion(
   const subcommandName = subcommandObj.name();
   // These subcommands take optional or required nodeId
   return ["status", "pause", "resume", "workloads"].includes(subcommandName);
+}
+
+function needsJobSubcommandCompletion(
+  commandObj: Command,
+  subcommandObj: Command,
+): boolean {
+  if (commandObj.name() !== "jobs") return false;
+  return ["logs", "cancel"].includes(subcommandObj.name());
+}
+
+function findSubcommand(
+  commandObj: Command,
+  subcommandName: string,
+): Command | undefined {
+  return (
+    commandObj.commands.find((cmd) => cmd.name() === subcommandName) ||
+    commandObj.commands.find((cmd) => cmd.aliases().includes(subcommandName))
+  );
 }
 
 function truncateVmId(vmId: string): string {
@@ -529,9 +541,7 @@ export async function handleCompletion(): Promise<void> {
       process.exit(0);
     }
 
-    const subcommandObj = commandObj.commands.find(
-      (cmd) => cmd.name() === subcommand,
-    );
+    const subcommandObj = findSubcommand(commandObj, subcommand);
 
     if (!subcommandObj) {
       const subcommands = getSubcommandNames(cachedProgram, command);
@@ -563,6 +573,14 @@ export async function handleCompletion(): Promise<void> {
       }
     }
 
+    if (needsJobSubcommandCompletion(commandObj, subcommandObj)) {
+      if (!lastPartial.startsWith("-")) {
+        const jobs = await fetchJobsForCompletion(subcommandObj.name());
+        log(jobs.filter((job) => job.startsWith(lastPartial)));
+        process.exit(0);
+      }
+    }
+
     if (lastPartial.startsWith("-")) {
       const options = getCommandOptions(cachedProgram, command, subcommand);
       log(options.filter((opt) => opt.startsWith(lastPartial)));
@@ -574,15 +592,6 @@ export async function handleCompletion(): Promise<void> {
       const statusValues = getJobStatusValues();
       log(statusValues.filter((val) => val.startsWith(lastPartial)));
       process.exit(0);
-    }
-
-    // Handle job completion for top-level commands (logs, cancel)
-    if (needsJobCompletion(commandObj)) {
-      if (!lastPartial.startsWith("-")) {
-        const jobs = await fetchJobsForCompletion(command);
-        log(jobs.filter((job) => job.startsWith(lastPartial)));
-        process.exit(0);
-      }
     }
 
     // Handle options for commands without subcommands

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { authClient } from "@/lib/auth-client";
-import { fetchMutation, fetchQuery } from "convex/nextjs";
+import { fetchMutation, fetchQuery, fetchAction } from "convex/nextjs";
 import { api } from "../../../../convex/_generated/api";
 import { createAuthHeaders } from "@/lib/orchestration-auth";
 import {
@@ -10,6 +10,11 @@ import {
 
 const VM_ORCHESTRATION_SERVICE_URL =
   process.env.VM_ORCHESTRATION_SERVICE_URL || "http://localhost:8080";
+
+interface EndpointReservation {
+  subdomain: string;
+  exposeUrl: string;
+}
 
 export async function GET(request: NextRequest) {
   const { data: session, error } = await authClient.getSession({
@@ -53,13 +58,40 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  const jobId = crypto.randomUUID();
+  let endpointReservation: EndpointReservation | null = null;
+
   try {
     const rawBody = await request.json();
     const body = JobCreationRequestSchema.parse(rawBody);
 
+    if (body.expose) {
+      try {
+        endpointReservation = await fetchAction(api.endpoints.reserve, {
+          type: "job",
+          resourceId: jobId,
+          port: body.expose,
+        });
+      } catch (endpointError: unknown) {
+        console.error("Failed to reserve endpoint subdomain:", endpointError);
+        return NextResponse.json(
+          {
+            status: "internal_error",
+            msg: "Failed to reserve endpoint subdomain.",
+          },
+          { status: 500 },
+        );
+      }
+    }
+
     const jobCreationRequest = {
       ...body,
+      jobId,
       userId: session.user.id,
+      ...(body.expose && { expose: body.expose }),
+      ...(endpointReservation && {
+        exposeSubdomain: endpointReservation.subdomain,
+      }),
     };
 
     const requestBody = JSON.stringify(jobCreationRequest);
@@ -79,6 +111,18 @@ export async function POST(request: NextRequest) {
       console.error(
         `Orchestration service error: ${response.status} ${errorText}`,
       );
+
+      if (endpointReservation) {
+        try {
+          await fetchAction(api.endpoints.release, {
+            type: "job",
+            resourceId: jobId,
+          });
+        } catch {
+          // Ignore release error
+        }
+      }
+
       return NextResponse.json(
         {
           error: `Orchestration service error: ${response.status}`,
@@ -91,7 +135,7 @@ export async function POST(request: NextRequest) {
     const rawData = await response.json();
     const data = JobCreationResponseSchema.parse(rawData);
 
-    if (response.ok && data.status === "success" && data.jobId) {
+    if (data.status === "success" && data.jobId) {
       try {
         await fetchMutation(api.jobs.create, {
           userId: session.user.id,
@@ -104,6 +148,9 @@ export async function POST(request: NextRequest) {
           ram: body.ram ?? 4,
           gpus: body.gpus ?? 0,
           disk: body.disk ?? 0,
+          exposePort: body.expose,
+          exposeSubdomain: endpointReservation?.subdomain,
+          exposeUrl: endpointReservation?.exposeUrl,
         });
       } catch (convexError: unknown) {
         console.error(
@@ -131,6 +178,17 @@ export async function POST(request: NextRequest) {
           );
         }
 
+        if (endpointReservation) {
+          try {
+            await fetchAction(api.endpoints.release, {
+              type: "job",
+              resourceId: data.jobId,
+            });
+          } catch {
+            // Ignore release error
+          }
+        }
+
         return NextResponse.json(
           {
             status: "internal_error",
@@ -139,11 +197,35 @@ export async function POST(request: NextRequest) {
           { status: 500 },
         );
       }
+    } else if (endpointReservation) {
+      try {
+        await fetchAction(api.endpoints.release, {
+          type: "job",
+          resourceId: jobId,
+        });
+      } catch {
+        // Ignore release error
+      }
     }
 
-    return NextResponse.json(data, { status: response.status });
+    const responseData = endpointReservation
+      ? { ...data, exposeUrl: endpointReservation.exposeUrl }
+      : data;
+
+    return NextResponse.json(responseData, { status: response.status });
   } catch (error: unknown) {
     console.error("Error creating job:", error);
+
+    if (endpointReservation) {
+      try {
+        await fetchAction(api.endpoints.release, {
+          type: "job",
+          resourceId: jobId,
+        });
+      } catch {
+        // Ignore release error
+      }
+    }
 
     if (error instanceof Error && error.name === "ZodError") {
       return NextResponse.json(

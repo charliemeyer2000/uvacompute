@@ -57,6 +57,7 @@ export const VMCreationRequestSchema = z.object({
     .string()
     .max(102400, "Cloud-init config must be less than 100KB")
     .optional(),
+  expose: z.number().int().min(1).max(65535).optional(),
 });
 
 const VMCreationStatusEnum = z.enum([
@@ -70,6 +71,7 @@ export const VMCreationResponseSchema = z.object({
   status: VMCreationStatusEnum,
   vmId: z.string().optional(),
   msg: z.string(),
+  exposeUrl: z.string().optional(),
 });
 
 const VMDeletionStatusEnum = z.enum([
@@ -121,6 +123,7 @@ export const VMStatusResponseSchema = z.object({
   status: VMStatusEnum,
   msg: z.string(),
   info: z.any().optional(),
+  exposeUrl: z.string().optional(),
 });
 
 export const SSHKeySchema = z.object({
@@ -163,6 +166,9 @@ export const VMInfoSchema = z.object({
   expiresAt: z.number(),
   deletedAt: z.number().optional(),
   orchestrationResponse: z.any().optional(),
+  exposePort: z.number().optional(),
+  exposeSubdomain: z.string().optional(),
+  exposeUrl: z.string().optional(),
 });
 
 export const VMListResponseSchema = z.object({
@@ -266,12 +272,14 @@ export const JobCreationRequestSchema = z.object({
   ram: z.number().int().min(1).max(64).optional(),
   gpus: z.number().int().min(0).max(1).optional(),
   disk: z.number().int().min(0).max(100).optional(),
+  expose: z.number().int().min(1).max(65535).optional(),
 });
 
 export const JobCreationResponseSchema = z.object({
   status: JobCreationStatusEnum,
   jobId: z.string().optional(),
   msg: z.string(),
+  exposeUrl: z.string().optional(),
 });
 
 const JobCancellationStatusEnum = z.enum([
@@ -292,6 +300,7 @@ export const JobStatusResponseSchema = z.object({
   msg: z.string(),
   exitCode: z.number().optional(),
   errorMessage: z.string().optional(),
+  exposeUrl: z.string().optional(),
 });
 
 export const JobInfoSchema = z.object({
@@ -315,6 +324,9 @@ export const JobInfoSchema = z.object({
   completedAt: z.number().optional(),
   nodeId: z.string().optional(),
   logsUrl: z.string().optional(),
+  exposePort: z.number().optional(),
+  exposeSubdomain: z.string().optional(),
+  exposeUrl: z.string().optional(),
 });
 
 export const JobListResponseSchema = z.object({
