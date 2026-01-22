@@ -100,6 +100,10 @@ export const extend = mutation({
       throw new Error("VM not found");
     }
 
+    if (vm.status !== "ready") {
+      throw new Error("VM is not running");
+    }
+
     await ctx.db.patch(vm._id, {
       expiresAt: args.expiresAt,
     });
