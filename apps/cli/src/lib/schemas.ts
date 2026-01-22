@@ -84,6 +84,24 @@ export const VMDeletionResponseSchema = z.object({
   msg: z.string(),
 });
 
+const VMExtendStatusEnum = z.enum([
+  "extend_success",
+  "extend_failed_validation",
+  "extend_failed_not_found",
+  "extend_failed_internal",
+]);
+
+export const VMExtendRequestSchema = z.object({
+  hours: z.number().int().min(1),
+});
+
+export const VMExtendResponseSchema = z.object({
+  status: VMExtendStatusEnum,
+  vmId: z.string().optional(),
+  expiresAt: z.number().optional(),
+  msg: z.string(),
+});
+
 export const VMStatusEnum = z.enum([
   "not_found",
   "creating",
@@ -108,6 +126,7 @@ export const VM_STATUS_GROUPS = {
     "provisioning",
     "ready",
   ] as const,
+  EXTENDABLE: ["ready"] as const,
 } as const;
 
 export function isVMStatusInGroup(
