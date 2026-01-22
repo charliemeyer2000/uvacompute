@@ -77,15 +77,7 @@ export const VMCreationRequestSchema = z.object({
       message: "RAM must be a power of 2 (1, 2, 4, 8, 16, 32, 64)",
     })
     .optional(),
-  disk: z
-    .number()
-    .int()
-    .min(64)
-    .max(1000)
-    .refine((n) => n > 0 && (n & (n - 1)) === 0, {
-      message: "Disk must be a power of 2 (64, 128, 256, 512)",
-    })
-    .optional(),
+  disk: z.number().int().min(10).max(500).optional(),
   gpus: z.number().int().min(0).max(1).optional(),
   "gpu-type": z.enum(["5090"]).optional(),
   startupScript: z
