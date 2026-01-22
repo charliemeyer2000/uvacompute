@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useQuery } from "convex/react";
 import { api } from "../../../../../../convex/_generated/api";
 import { authClient } from "@/lib/auth-client";
@@ -138,8 +139,9 @@ function VMCard({ vm, isActive }: { vm: VM; isActive: boolean }) {
 
   return (
     <>
-      <div
-        className={`bg-white border border-gray-200 border-l-4 ${getStatusBorderColor(vm.status)} p-5 hover:border-gray-300 transition-colors`}
+      <Link
+        href={`/vms/${vm.vmId}`}
+        className={`block bg-white border border-gray-200 border-l-4 ${getStatusBorderColor(vm.status)} p-5 hover:border-gray-300 transition-colors`}
       >
         <div className="flex justify-between items-start mb-3">
           <div className="flex-1 min-w-0">
@@ -160,45 +162,47 @@ function VMCard({ vm, isActive }: { vm: VM; isActive: boolean }) {
               </span>
             </div>
             {isActive && (
-              <DropdownMenu modal={false}>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    className="h-6 w-6 cursor-pointer"
-                  >
-                    <MoreVertical className="h-4 w-4" />
-                    <span className="sr-only">open menu</span>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  {vm.status === "ready" && (
+              <div onClick={(e) => e.preventDefault()}>
+                <DropdownMenu modal={false}>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      className="h-6 w-6 cursor-pointer"
+                    >
+                      <MoreVertical className="h-4 w-4" />
+                      <span className="sr-only">open menu</span>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    {vm.status === "ready" && (
+                      <DropdownMenuItem
+                        onClick={handleCopySSH}
+                        className="cursor-pointer"
+                      >
+                        {sshCopied ? (
+                          <>
+                            <Check className="h-4 w-4 mr-2" />
+                            copied!
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="h-4 w-4 mr-2" />
+                            copy ssh command
+                          </>
+                        )}
+                      </DropdownMenuItem>
+                    )}
                     <DropdownMenuItem
-                      onClick={handleCopySSH}
+                      variant="destructive"
+                      onClick={() => setShowDeleteDialog(true)}
                       className="cursor-pointer"
                     >
-                      {sshCopied ? (
-                        <>
-                          <Check className="h-4 w-4 mr-2" />
-                          copied!
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="h-4 w-4 mr-2" />
-                          copy ssh command
-                        </>
-                      )}
+                      delete vm
                     </DropdownMenuItem>
-                  )}
-                  <DropdownMenuItem
-                    variant="destructive"
-                    onClick={() => setShowDeleteDialog(true)}
-                    className="cursor-pointer"
-                  >
-                    delete vm
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
             )}
           </div>
         </div>
@@ -256,7 +260,7 @@ function VMCard({ vm, isActive }: { vm: VM; isActive: boolean }) {
             </div>
           )}
         </div>
-      </div>
+      </Link>
 
       <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <DialogContent>
