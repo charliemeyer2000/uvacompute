@@ -1,4 +1,4 @@
-import { VMStatus } from "./vm-schemas";
+import { VMExtendResponseSchema, VMStatus } from "./vm-schemas";
 
 export interface VM {
   _id: string;
@@ -145,4 +145,34 @@ export async function deleteVm(
   }
 
   return { success: true };
+}
+
+export async function extendVm(
+  vmId: string,
+  hours: number,
+): Promise<{ success: boolean; expiresAt?: number; error?: string }> {
+  const response = await fetch(`/api/vms/${vmId}/extend`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ hours }),
+  });
+
+  const rawData = await response.json();
+
+  if (!response.ok) {
+    return {
+      success: false,
+      error: rawData.msg || rawData.error || "failed to extend vm",
+    };
+  }
+
+  const data = VMExtendResponseSchema.parse(rawData);
+
+  if (data.status !== "extend_success") {
+    return { success: false, error: data.msg || "failed to extend vm" };
+  }
+
+  return { success: true, expiresAt: data.expiresAt };
 }
