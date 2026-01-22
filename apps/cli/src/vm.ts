@@ -20,6 +20,9 @@ import {
   formatSectionHeader,
   formatDetail,
   formatCommand,
+  formatAge,
+  renderTable,
+  formatStatusBullet,
 } from "./lib/theme";
 import { type VMCreationRequest } from "./lib/types";
 import {
@@ -42,21 +45,6 @@ import {
 import yaml from "js-yaml";
 const BASE_URL = getBaseUrl();
 
-function stripAnsi(value: string): string {
-  return value.replace(/\x1b\[[0-9;]*m/g, "");
-}
-
-function formatAge(date: Date): string {
-  const diffMs = Date.now() - date.getTime();
-  if (diffMs < 0) return "0m";
-  const minutes = Math.floor(diffMs / 60000);
-  if (minutes < 60) return `${minutes}m`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h`;
-  const days = Math.floor(hours / 24);
-  return `${days}d`;
-}
-
 function formatResources(vm: {
   cpus: number;
   ram: number;
@@ -76,12 +64,12 @@ function formatStatus(status: string): string {
     "not_found",
   ]);
   if (expiredStatuses.has(status)) {
-    return `${theme.error("●")} Expired`;
+    return formatStatusBullet("error", "Expired");
   }
   if (status === "ready") {
-    return `${theme.success("●")} Ready`;
+    return formatStatusBullet("success", "Ready");
   }
-  return `${theme.warning("●")} Provisioning`;
+  return formatStatusBullet("warning", "Provisioning");
 }
 
 function getStatusMessage(status: string): string {
@@ -822,24 +810,7 @@ async function listVMs(): Promise<void> {
       ];
     });
 
-    const widths = headers.map((header, index) => {
-      const cellWidths = rows.map((row) => stripAnsi(row[index] ?? "").length);
-      return Math.max(header.length, ...cellWidths);
-    });
-
-    const renderRow = (cols: string[]) =>
-      cols
-        .map((col, index) => {
-          const padding = (widths[index] ?? 0) - stripAnsi(col).length;
-          return `${col}${" ".repeat(Math.max(0, padding + 2))}`;
-        })
-        .join("")
-        .trimEnd();
-
-    console.log(renderRow(headers.map((h) => theme.muted(h))));
-    for (const row of rows) {
-      console.log(renderRow(row));
-    }
+    renderTable(headers, rows);
     console.log();
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Unknown error";

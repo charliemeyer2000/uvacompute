@@ -3,10 +3,12 @@ import ora, { type Ora } from "ora";
 import { getBaseUrl, loadToken, checkServiceStatus } from "./lib/utils";
 import {
   theme,
-  jobStatusColors,
   formatSectionHeader,
   formatDetail,
   formatCommand,
+  formatAge,
+  renderTable,
+  formatStatusBullet,
 } from "./lib/theme";
 import {
   JobCreationResponseSchema,
@@ -19,6 +21,34 @@ import {
 import { ServiceUnavailableError } from "./lib/errors";
 
 const BASE_URL = getBaseUrl();
+
+function formatJobResources(job: {
+  cpus: number;
+  ram: number;
+  gpus: number;
+  disk?: number;
+}): string {
+  const gpuPart = job.gpus > 0 ? ` | ${job.gpus} GPU` : "";
+  const diskPart = job.disk ? ` | ${job.disk}GB scratch` : "";
+  return `${job.cpus} vCPU | ${job.ram}GB RAM${gpuPart}${diskPart}`;
+}
+
+function formatJobStatus(status: string): string {
+  const terminalStatuses = new Set(["failed", "cancelled"]);
+  const runningStatuses = new Set(["running", "pulling"]);
+  const label = status.charAt(0).toUpperCase() + status.slice(1);
+
+  if (status === "completed") {
+    return formatStatusBullet("success", label);
+  }
+  if (terminalStatuses.has(status)) {
+    return formatStatusBullet("error", label);
+  }
+  if (runningStatuses.has(status)) {
+    return formatStatusBullet("info", label);
+  }
+  return formatStatusBullet("warning", label);
+}
 
 function getJobStatusMessage(status: string): string {
   const messages: Record<string, string> = {
@@ -294,10 +324,7 @@ async function runJob(
   }
 }
 
-async function listJobs(options: {
-  all?: boolean;
-  status?: string;
-}): Promise<void> {
+async function listJobs(options: { all?: boolean }): Promise<void> {
   const spinner = ora("Fetching jobs...").start();
 
   try {
@@ -336,11 +363,7 @@ async function listJobs(options: {
 
     let filteredJobs = data.jobs;
 
-    if (options.status) {
-      filteredJobs = filteredJobs.filter(
-        (job) => job.status === options.status,
-      );
-    } else if (!options.all) {
+    if (!options.all) {
       filteredJobs = filteredJobs.filter((job) =>
         JOB_STATUS_GROUPS.ACTIVE.includes(
           job.status as (typeof JOB_STATUS_GROUPS.ACTIVE)[number],
@@ -358,52 +381,34 @@ async function listJobs(options: {
         );
       } else {
         console.log(theme.warning("\nNo active jobs found."));
-        console.log(theme.muted("Use 'uva jobs --all' to see all jobs\n"));
+        console.log(theme.muted("Use 'uva jobs ls --all' to see all jobs\n"));
       }
       return;
     }
 
-    if (options.all) {
-      console.log(formatSectionHeader("All Jobs"));
-    } else if (options.status) {
-      console.log(formatSectionHeader(`Jobs (${options.status})`));
-    } else {
-      console.log(formatSectionHeader("Active Jobs"));
-    }
+    const sorted = [...filteredJobs].sort(
+      (a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    );
+
     console.log();
+    const headers = ["Age", "Job", "Image", "Resources", "Status"];
+    const rows = sorted.map((job) => {
+      const nameDisplay = job.name ? job.name : "(unnamed)";
+      const jobLabel = `${nameDisplay} ${theme.muted(job.jobId.slice(0, 8))}`;
+      const imageShort =
+        job.image.length > 30 ? job.image.slice(0, 27) + "..." : job.image;
+      return [
+        formatAge(new Date(job.createdAt)),
+        jobLabel,
+        imageShort,
+        formatJobResources(job),
+        formatJobStatus(job.status),
+      ];
+    });
 
-    for (const job of filteredJobs) {
-      const statusColor =
-        jobStatusColors[job.status as keyof typeof jobStatusColors] ||
-        theme.muted;
-
-      const nameDisplay = job.name
-        ? theme.emphasis(job.name)
-        : theme.muted("(unnamed)");
-
-      console.log(`${nameDisplay} ${statusColor(`[${job.status}]`)}`);
-      console.log(theme.muted(`  Job ID: ${job.jobId}`));
-      console.log(theme.muted(`  Image: ${job.image}`));
-      console.log(
-        theme.muted(
-          `  Resources: ${job.cpus} vCPU | ${job.ram}GB RAM${job.gpus > 0 ? ` | ${job.gpus} GPU` : ""}${job.disk ? ` | ${job.disk}GB scratch` : ""}`,
-        ),
-      );
-      console.log(
-        theme.muted(`  Created: ${new Date(job.createdAt).toLocaleString()}`),
-      );
-      if (job.exitCode !== undefined) {
-        console.log(theme.muted(`  Exit Code: ${job.exitCode}`));
-      }
-      if (job.completedAt) {
-        console.log(
-          theme.muted(
-            `  Completed: ${new Date(job.completedAt).toLocaleString()}`,
-          ),
-        );
-      }
-      console.log();
-    }
+    renderTable(headers, rows);
+    console.log();
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Unknown error";
     spinner.fail(`Error: ${message}`);
@@ -699,14 +704,16 @@ export function registerJobCommands(program: Command) {
       },
     );
 
-  program
-    .command("jobs")
+  const jobs = program.command("jobs").description("Manage jobs");
+
+  jobs
+    .command("list")
+    .alias("ls")
     .description("List jobs")
     .option("-a, --all", "Show all jobs (including completed)")
-    .option("-s, --status <status>", "Filter by status")
     .action(listJobs);
 
-  program
+  jobs
     .command("logs")
     .description("Get job logs")
     .argument("<jobId>", "Job ID")
@@ -714,7 +721,7 @@ export function registerJobCommands(program: Command) {
     .option("--no-follow", "Don't follow log output (default behavior)")
     .action(getJobLogs);
 
-  program
+  jobs
     .command("cancel")
     .description("Cancel a running job")
     .argument("<jobId>", "Job ID to cancel")
