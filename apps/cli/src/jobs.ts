@@ -126,6 +126,7 @@ async function runJob(
     env?: string[];
     name?: string;
     follow?: boolean;
+    expose?: string;
   },
 ): Promise<void> {
   let spinner: Ora | null = null;
@@ -201,6 +202,15 @@ async function runJob(
       requestBody.env = envMap;
     }
 
+    if (options.expose) {
+      const port = parseInt(options.expose, 10);
+      if (isNaN(port) || port < 1 || port > 65535) {
+        spinner.fail("Invalid port number. Must be between 1 and 65535.");
+        process.exit(1);
+      }
+      requestBody.expose = port;
+    }
+
     let response: Response;
     try {
       response = await fetch(`${BASE_URL}/api/jobs`, {
@@ -262,6 +272,9 @@ async function runJob(
       console.log(formatDetail("Image", image));
       if (cmdArgs.length > 0) {
         console.log(formatDetail("Command", cmdArgs.join(" ")));
+      }
+      if (data.exposeUrl) {
+        console.log(formatDetail("Endpoint", data.exposeUrl));
       }
       console.log();
 
@@ -666,7 +679,9 @@ async function cancelJob(jobId: string): Promise<void> {
 }
 
 export function registerJobCommands(program: Command) {
-  program
+  const jobs = program.command("jobs").description("Manage container jobs");
+
+  jobs
     .command("run")
     .description("Run a container job")
     .argument("<image>", "Container image to run")
@@ -686,6 +701,10 @@ export function registerJobCommands(program: Command) {
     )
     .option("-n, --name <name>", "Job name (optional)")
     .option("--no-follow", "Don't stream logs after job starts")
+    .option(
+      "--expose <port>",
+      "Expose port via HTTPS endpoint (e.g., --expose 8000)",
+    )
     .action(
       (
         image: string,
@@ -698,13 +717,12 @@ export function registerJobCommands(program: Command) {
           env?: string[];
           name?: string;
           follow?: boolean;
+          expose?: string;
         },
       ) => {
         runJob(image, cmdArgs, options);
       },
     );
-
-  const jobs = program.command("jobs").description("Manage jobs");
 
   jobs
     .command("list")
@@ -716,7 +734,7 @@ export function registerJobCommands(program: Command) {
   jobs
     .command("logs")
     .description("Get job logs")
-    .argument("<jobId>", "Job ID")
+    .argument("<jobId>", "Job ID or name")
     .option("-t, --tail <lines>", "Show only the last N lines")
     .option("--no-follow", "Don't follow log output (default behavior)")
     .action(getJobLogs);
@@ -724,6 +742,6 @@ export function registerJobCommands(program: Command) {
   jobs
     .command("cancel")
     .description("Cancel a running job")
-    .argument("<jobId>", "Job ID to cancel")
+    .argument("<jobId>", "Job ID or name to cancel")
     .action(cancelJob);
 }

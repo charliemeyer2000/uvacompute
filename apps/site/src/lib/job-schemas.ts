@@ -40,6 +40,12 @@ export const JobCreationRequestSchema = z.object({
   ram: z.number().int().min(1).max(64).optional().default(4),
   gpus: z.number().int().min(0).max(1).optional().default(0),
   disk: z.number().int().min(0).max(100).optional().default(0),
+  expose: z
+    .number()
+    .int()
+    .min(1, "Port must be at least 1")
+    .max(65535, "Port must be at most 65535")
+    .optional(),
 });
 
 export type JobCreationRequest = z.infer<typeof JobCreationRequestSchema>;
@@ -67,6 +73,7 @@ export const JobStatusResponseSchema = z.object({
   msg: z.string(),
   exitCode: z.number().optional(),
   errorMessage: z.string().optional(),
+  exposeUrl: z.string().optional(),
 });
 
 export type JobStatusResponse = z.infer<typeof JobStatusResponseSchema>;

@@ -98,7 +98,7 @@ export default function JobsPage() {
           </p>
           <div className="bg-gray-50 border border-gray-200 px-4 py-3 inline-block mb-4">
             <code className="text-sm text-gray-700">
-              uva run alpine echo hello
+              uva jobs run alpine echo hello
             </code>
           </div>
           <div>
