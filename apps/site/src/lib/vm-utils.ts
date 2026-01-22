@@ -16,6 +16,7 @@ export interface VM {
   createdAt: number;
   expiresAt: number;
   deletedAt?: number;
+  nodeId?: string;
 }
 
 export function formatDate(timestamp: number): string {
