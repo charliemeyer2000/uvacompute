@@ -245,7 +245,33 @@ async function runJob(
     if (data.status === "success" && data.jobId) {
       spinner.text = getJobStatusMessage("pending");
 
-      const result = await pollJobStatus(data.jobId, token, spinner);
+      let result: {
+        status: JobStatus;
+        exitCode?: number;
+        errorMessage?: string;
+      };
+      try {
+        result = await pollJobStatus(data.jobId, token, spinner);
+      } catch (pollError: unknown) {
+        // If polling timed out, clean up the orphaned job record
+        if (
+          pollError instanceof Error &&
+          pollError.message.includes("Timeout waiting for job")
+        ) {
+          spinner.text = "Cleaning up timed-out job...";
+          try {
+            await fetch(`${BASE_URL}/api/jobs/${data.jobId}`, {
+              method: "DELETE",
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
+            });
+          } catch {
+            // Ignore cleanup errors - reconciler will handle it
+          }
+        }
+        throw pollError;
+      }
 
       if (result.status === "running") {
         spinner.succeed(theme.success("Job is running!"));

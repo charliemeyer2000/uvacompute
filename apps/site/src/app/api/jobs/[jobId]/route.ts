@@ -152,7 +152,13 @@ export async function DELETE(
       );
     }
 
-    const cancellableStatuses = ["pending", "scheduled", "pulling", "running"];
+    const cancellableStatuses = [
+      "creating",
+      "pending",
+      "scheduled",
+      "pulling",
+      "running",
+    ];
     if (!cancellableStatuses.includes(job.status)) {
       return NextResponse.json(
         {
@@ -171,6 +177,47 @@ export async function DELETE(
         headers: authHeaders,
       },
     );
+
+    // Handle 404 - job not found in orchestration service (orphaned DB record)
+    if (response.status === 404) {
+      console.log(
+        `Job ${jobId} not found in orchestration service - cleaning up orphaned DB entry`,
+      );
+      try {
+        await fetchMutation(api.jobs.cancel, {
+          jobId,
+          userId: session.user.id,
+        });
+        try {
+          await fetchAction(api.endpoints.release, {
+            type: "job",
+            resourceId: jobId,
+          });
+        } catch (endpointError) {
+          console.error("Warning: Failed to release endpoint:", endpointError);
+        }
+        return NextResponse.json(
+          {
+            status: "cancellation_success",
+            jobId,
+            msg: "Job was not found in orchestration service (possibly failed creation). Database entry has been cleaned up.",
+          },
+          { status: 200 },
+        );
+      } catch (convexError: unknown) {
+        console.error(
+          "Warning: Failed to mark orphaned job as cancelled in Convex:",
+          convexError,
+        );
+        return NextResponse.json(
+          {
+            status: "cancellation_failed_internal",
+            msg: "Job not found in orchestration and failed to clean up database entry",
+          },
+          { status: 500 },
+        );
+      }
+    }
 
     if (!response.ok) {
       const errorText = await response.text();
