@@ -20,14 +20,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 import { Button } from "@/components/ui/button";
 import {
   Job,
@@ -36,13 +29,7 @@ import {
   formatDuration,
   isJobCancellable,
 } from "@/lib/job-utils";
-import {
-  MoreVertical,
-  Loader2,
-  Container,
-  ExternalLink,
-  Globe,
-} from "lucide-react";
+import { MoreVertical, Container, ExternalLink, Globe } from "lucide-react";
 import { toast } from "sonner";
 
 function getStatusBorderColor(status: string): string {
@@ -245,40 +232,18 @@ function JobCard({ job }: { job: Job }) {
         </div>
       </Link>
 
-      <Dialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>cancel job</DialogTitle>
-            <DialogDescription>
-              are you sure you want to cancel {job.name || job.jobId}? this
-              action cannot be undone.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setShowCancelDialog(false)}
-              disabled={isCancelling}
-            >
-              keep running
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={handleCancel}
-              disabled={isCancelling}
-            >
-              {isCancelling ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  cancelling...
-                </>
-              ) : (
-                "cancel job"
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ConfirmationDialog
+        open={showCancelDialog}
+        onOpenChange={setShowCancelDialog}
+        title="cancel job"
+        description={`are you sure you want to cancel ${job.name || job.jobId}? this action cannot be undone.`}
+        confirmLabel="cancel job"
+        confirmingLabel="cancelling..."
+        cancelLabel="keep running"
+        onConfirm={handleCancel}
+        isConfirming={isCancelling}
+        variant="destructive"
+      />
     </>
   );
 }

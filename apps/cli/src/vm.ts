@@ -532,7 +532,25 @@ async function createVM(options: {
       }
 
       spinner.text = getStatusMessage("pending");
-      await pollVMStatus(data.vmId, token, spinner);
+      try {
+        await pollVMStatus(data.vmId, token, spinner);
+      } catch (pollError: unknown) {
+        // If polling timed out, clean up the orphaned VM record
+        if (pollError instanceof VMError && pollError.code === "TIMEOUT") {
+          spinner.text = "Cleaning up timed-out VM...";
+          try {
+            await fetch(`${BASE_URL}/api/vms/${data.vmId}`, {
+              method: "DELETE",
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
+            });
+          } catch {
+            // Ignore cleanup errors - reconciler will handle it
+          }
+        }
+        throw pollError;
+      }
 
       spinner.succeed(theme.success("VM created successfully!"));
       console.log(formatSectionHeader("VM Details"));

@@ -24,7 +24,7 @@ export const createAuth = (
 ) =>
   betterAuth({
     baseURL: siteUrl,
-    trustedOrigins: [siteUrl],
+    trustedOrigins: [siteUrl, "http://localhost:3000"],
     logger: {
       disabled: optionsOnly,
     },
