@@ -27,31 +27,8 @@ import {
   formatJobStatus,
   formatDuration,
 } from "@/lib/job-utils";
+import { getStatusBorderColor, getStatusDotColor } from "@/lib/status-colors";
 import { MoreVertical, ExternalLink, Archive } from "lucide-react";
-
-function getStatusBorderColor(status: string): string {
-  switch (status) {
-    case "completed":
-      return "border-l-green-500";
-    case "failed":
-      return "border-l-red-500";
-    case "cancelled":
-      return "border-l-gray-300";
-    default:
-      return "border-l-gray-300";
-  }
-}
-
-function getStatusDotColor(status: string): string {
-  switch (status) {
-    case "completed":
-      return "bg-green-500";
-    case "failed":
-      return "bg-red-500";
-    default:
-      return "bg-gray-400";
-  }
-}
 
 function JobCard({ job }: { job: Job }) {
   return (
