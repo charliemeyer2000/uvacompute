@@ -32,6 +32,20 @@ func SyncFromConvex(vmManager *structs.VMManager, vmProvider structs.VMProvider,
 
 	for _, cvm := range convexVMs {
 		if existingVM, exists := currentVMs[cvm.VMId]; exists {
+			// Check if backend status differs from current status - update if VM is running but not marked ready
+			backendStatus, err := vmProvider.GetVMStatus(cvm.VMId)
+			if err == nil && backendStatus == "Running" && existingVM.Status != structs.VM_STATUS_READY {
+				// VM is running in KubeVirt but not marked ready - update it
+				log.Printf("VM %s status mismatch (current: %s, backend: Running) - updating to ready", cvm.VMId, existingVM.Status)
+				vmManager.UpdateVMStatus(cvm.VMId, structs.VM_STATUS_READY, "")
+				nodeId := ""
+				if cvm.NodeId != nil {
+					nodeId = *cvm.NodeId
+				}
+				if notifyErr := callbackClient.NotifyVMStatusUpdate(cvm.VMId, string(structs.VM_STATUS_READY), nodeId); notifyErr != nil {
+					log.Printf("ERROR: Failed to notify site about VM %s status: %v", cvm.VMId, notifyErr)
+				}
+			}
 			if cvm.ExpiresAt > 0 &&
 				cvm.ExpiresAt > time.Now().UnixMilli() &&
 				existingVM.Status == structs.VM_STATUS_READY &&
