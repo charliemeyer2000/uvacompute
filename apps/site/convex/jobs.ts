@@ -225,6 +225,35 @@ export const listAll = query({
   },
 });
 
+export const listActive = query({
+  args: {},
+  handler: async (ctx) => {
+    const allJobs = await ctx.db.query("jobs").order("desc").collect();
+
+    const activeStatuses = ["pending", "scheduled", "pulling", "running"];
+
+    return allJobs
+      .filter((job) => activeStatuses.includes(job.status))
+      .map((job) => ({
+        jobId: job.jobId,
+        userId: job.userId,
+        name: job.name,
+        image: job.image,
+        command: job.command,
+        env: job.env,
+        cpus: job.cpus,
+        ram: job.ram,
+        gpus: job.gpus,
+        disk: job.disk,
+        status: job.status,
+        nodeId: job.nodeId,
+        createdAt: job.createdAt,
+        startedAt: job.startedAt,
+        logsStorageId: job.logsStorageId,
+      }));
+  },
+});
+
 export const markNodeOffline = internalMutation({
   args: {
     nodeId: v.string(),
