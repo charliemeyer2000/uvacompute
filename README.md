@@ -10,22 +10,32 @@ Hello contributor, text charlie. rough idea of what needs to be done can be foun
 - [x] need a man page
 - [x] auth flow gives you the code twice basically
 - [x] terminate instance on web ui
-- [ ] upgrade/downgrade vCPUs, storage
 - [x] allow BYO startup scripts
-- [ ] Run Docker container (via Kubernetes, probably)
-  - Live tail logs in CLI/UI (modal-style) in the CLI (and potentialyl UI)?
-  - need to add into the ui view vms/jobs
+- [x] Run Docker container (via Kubernetes)
+  - [x] Live tail logs in CLI
+  - [x] Add into the UI view for vms/jobs
+- [x] Can this be rearchitected without incus and only using k8s? (now uses KubeVirt)
+- [ ] upgrade/downgrade vCPUs, storage
 - [ ] o11y into how people r using it ++ some visualization of usage
 - [ ] When 2 GPUs are purchased, support 2 GPUs
 - [ ] modal notebooks implementation
 - [ ] support other computers joining uvacompute
-  - add some switch off/on supoprt easily
-- [ ] can this be rearchitected without incus and only using k8s?
+  - add some switch off/on support easily
 - [ ] make some market out of this (?)
 
 ## Infra
 
 ![Infrastructure Diagram](apps/site/public/infra.png)
+
+**Architecture Overview:**
+
+- **CLI** (`uva`) runs on user machines, authenticates via device flow, and communicates with the site API
+- **Site** (uvacompute.com) is a Next.js app on Vercel that serves the web UI and API gateway, backed by Convex for real-time data
+- **Status** (status.uvacompute.com) is a separate Next.js app showing uptime and cluster health, backed by Redis
+- **DO Droplet** (hub VPS) acts as an SSH proxy/tunnel endpoint for CLI access to VMs and handles endpoint exposure via Caddy
+- **Workstation Node** runs the vm-orchestration-service with k3s + KubeVirt for actual VM/job execution, connected via Tailscale
+
+Data flow: CLI → Site API (Vercel) → vm-orchestration-service (on workstation) → Kubernetes (KubeVirt VMs / Jobs)
 
 ## Setup
 
@@ -46,72 +56,98 @@ vc env pull --cwd apps/site # optional, pull preview/production with --environme
 npx convex dev
 ```
 
-#### `site`
+## Apps
 
-This is the main nextjs website. to run:
+### `site`
 
-- in one terminal, run `pnpm dev`
-- in another terminal, run `npx convex dev`
+Main Next.js website (uvacompute.com). Serves as the web UI and API gateway.
 
-should work fine reading from dev database.
+**Key features:**
+
+- Web dashboard for managing VMs and container jobs
+- API routes that proxy to the vm-orchestration-service
+- Device authorization flow for CLI authentication (via Better-Auth)
+- Real-time status updates via Convex
+- SSH key management
+
+**To run locally:**
+
+- In one terminal: `pnpm dev`
+- In another terminal: `npx convex dev`
 
 ### `status`
 
-This is the status page (status.uvacompute.com), just run with `pnpm dev` (goes to port 3001). this reads from prod status (i'm lazy).
+Status page (status.uvacompute.com). Shows infrastructure health and uptime.
+
+**Key features:**
+
+- Current system status (operational/degraded/down)
+- Response time tracking and uptime percentages
+- 30-day historical data
+- Cluster status from the main site API
+
+**To run locally:** `pnpm dev` (runs on port 3001, reads from prod Redis)
 
 ### `cli`
 
-The cli. to run locally, install `bun` then do `bun run index.ts [commands]`. this will run in development, but no VMs will be created unless you have the `vm-orchestration-service` running on port 8080
+The CLI tool (`uva`). TypeScript/Bun compiled to a standalone binary.
 
-also ensure you update the man page if you update the cli. pls don't be lazy.
+**Commands:**
+
+- `uva login` / `uva logout` - Authentication
+- `uva vm create/list/status/ssh/delete` - VM management
+- `uva jobs run/ls/logs/cancel` - Container job management
+- `uva ssh-keys add/list/remove` - SSH key management
+- `uva upgrade` / `uva uninstall` - CLI management
+
+**To run locally:** `bun run index.ts [commands]` (runs in dev mode, won't create real VMs unless vm-orchestration-service is running on port 8080)
+
+Also ensure you update the man page if you update the cli.
 
 ### `vm-orchestration-service`
 
-the main vm thingy. this should only really run on linux machines since it uses `incus`. if you wanna set this up on a linux box, you need to have installed
+Go service that orchestrates VM and job creation via Kubernetes.
 
-- `tailscaled` and be connected to my tailnet
-- `sshd` (should prolly ahve this by default)
-- `autossh`
-- `incus`
-- `ssh2inucs`
+**Key features:**
 
-other things for setup/general notes:
+- Creates VMs using KubeVirt (Kubernetes-native VMs)
+- Runs container jobs as Kubernetes Jobs with GPU support
+- Cloud-init integration for SSH keys and startup scripts
+- Health monitoring and reconciliation with Convex
+- FRPC integration for SSH tunneling through the hub
 
-- this kind of has a `dev` environment where it just skips incus calls, but it's not really reliable atm. maybe a nice story would be to have a good dev environment (both for mac and linux)
-- you need to have an ssh key in your root home that allows autossh to look for it.
-- for this to work via ssh to the digital ocean vps, we need to add your ssh key on your workstation to the VPS
+**Requirements on the workstation node:**
 
-install with `sudo make install`, read makefile for other commands
+- k3s with KubeVirt, GPU Operator, CDI installed (see Makefile)
+- Tailscale connected to the tailnet
+- SSH key for autossh tunnel to hub
+
+**To install:** `sudo make install` (see Makefile for other commands like `make install-kubevirt-stack`)
 
 ### The actual workstation
 
-if you wanna access the actual workstgation that is hosting the prod vm orchestration service, just ask charlie. you'll have to join his tailnet then all u gotta do is just do `ssh workstation` and you have a shell into it. really nice for debugging in prod (lol)
+If you wanna access the actual workstation that is hosting the prod vm orchestration service, just ask charlie. You'll have to join his tailnet then all u gotta do is just do `ssh workstation` and you have a shell into it.
 
-## General development "flow" [as of right now]
+## Examples
 
-So let's say i wanna add a feature that tests the entire stack (cli, ui, and the actual vm orchestration service). currently we kinda just test in prod. let's work thru an example here where i add a new command to the cli. Let's say this is adding support for upgrading/downgrading a VM. here's roughly what it would look like.
+See the `examples/` directory for usage examples:
 
-- Make your changes and ship a PR, wait for reviewers.
-- on the workstation, check out that branch and `sudo make install` the `vm-orchestration-service` since you made changes to it
-- merge the PR when ready, then go into GitHub actions, look at the "release" action for releasing a new version of the CLI, then release.
-- Install new version of cli
-- test the commands
-- debug via `ssh workstation` and tailing logs for the service and the Vercel logs.
-
-_as you can tell we kinda do need a better dev setup here.
-_
+- `examples/JOBS.md` - Container job examples including GPU tests, vLLM servers, etc.
 
 ## Build & Deploy
 
-- `apps/site` is a Next.js app that is deployed automatically to Vercel
-- `apps/status` is a nextjs app that is deployed automatically to Vercel
-- `apps/cli` is a CLI application with bun that is built with `build-binary`.
-  - deployments are built on push/pr to main, but you manually make a release via the GitHub action.
-- `apps/vm-orchestration-service` can be installed with `sudo make install` in `apps/vm-orchestration-service` and can be restarted/logged with `systemctl` commands
-  - requires:
-    - tailscale connected to my tailnet
-    - autossh
-    - the ip of our VPS for ssh proxying
+- **`apps/site`** - Next.js app deployed automatically to Vercel on push to main
+- **`apps/status`** - Next.js app deployed automatically to Vercel on push to main
+- **`apps/cli`** - Bun CLI built with `build-binary`. Binaries are built on push/PR to main, but releases are made manually via the GitHub action
+- **`apps/vm-orchestration-service`** - Go service deployed to the workstation node:
+  - SSH into workstation: `ssh workstation`
+  - Pull latest: `cd ~/uvacompute && git pull`
+  - Reinstall: `cd apps/vm-orchestration-service && sudo make install`
+  - View logs: `journalctl -u vm-orchestration -f`
+  - Restart: `sudo systemctl restart vm-orchestration`
+- **DO Droplet (hub)** - Runs Caddy for endpoint exposure and SSH proxy:
+  - Deploy hub service: `make deploy-hub` (from vm-orchestration-service dir)
+  - SSH: `ssh root@24.199.85.26`
 
 ## Accounts
 
@@ -123,7 +159,7 @@ _
 - Inbound.new (for email forwarding) - using github:
   - for email forwarding from \*@inbound.new to my personal email charlie@charliemeyer.xyz
 - digital ocean using github email:
-  - $4/mo vps (SSH proxy for nodes)
+  - $12/mo vps (SSH proxy for nodes)
   - ip: 24.199.85.26
   - ssh: `ssh root@24.199.85.26`
   - password: `baked beans`
