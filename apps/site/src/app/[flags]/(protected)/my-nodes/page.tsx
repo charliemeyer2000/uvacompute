@@ -5,6 +5,7 @@ import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../../../convex/_generated/api";
 import { authClient } from "@/lib/auth-client";
 import { Button } from "@/components/ui/button";
+import { getStatusBorderColor, getStatusDotColor } from "@/lib/status-colors";
 import { ChevronDown, ChevronRight, Server, Pause, Play } from "lucide-react";
 import { toast } from "sonner";
 
@@ -29,32 +30,6 @@ interface Job {
   ram: number;
   gpus: number;
   status: string;
-}
-
-function getStatusBorderColor(status: string): string {
-  switch (status) {
-    case "online":
-      return "border-l-green-500";
-    case "draining":
-      return "border-l-yellow-500";
-    case "offline":
-      return "border-l-red-500";
-    default:
-      return "border-l-gray-300";
-  }
-}
-
-function getStatusDotColor(status: string): string {
-  switch (status) {
-    case "online":
-      return "bg-green-500";
-    case "draining":
-      return "bg-yellow-500";
-    case "offline":
-      return "bg-red-500";
-    default:
-      return "bg-gray-400";
-  }
 }
 
 export default function MyNodesPage() {
