@@ -204,6 +204,28 @@ type ActiveVMsResponse struct {
 	VMs []ConvexVM `json:"vms"`
 }
 
+type ConvexJob struct {
+	JobId         string            `json:"jobId"`
+	UserId        string            `json:"userId"`
+	Name          *string           `json:"name"`
+	Image         string            `json:"image"`
+	Command       []string          `json:"command"`
+	Env           map[string]string `json:"env"`
+	Cpus          int               `json:"cpus"`
+	Ram           int               `json:"ram"`
+	Gpus          int               `json:"gpus"`
+	Disk          int               `json:"disk"`
+	Status        string            `json:"status"`
+	NodeId        *string           `json:"nodeId"`
+	CreatedAt     int64             `json:"createdAt"`
+	StartedAt     *int64            `json:"startedAt"`
+	LogsStorageId *string           `json:"logsStorageId"`
+}
+
+type ActiveJobsResponse struct {
+	Jobs []ConvexJob `json:"jobs"`
+}
+
 // FetchActiveVMs retrieves active VMs from the site's Convex database
 func (c *CallbackClient) FetchActiveVMs() ([]ConvexVM, error) {
 	url := fmt.Sprintf("%s/api/vms/active", c.siteBaseUrl)
@@ -238,4 +260,40 @@ func (c *CallbackClient) FetchActiveVMs() ([]ConvexVM, error) {
 
 	log.Printf("Fetched %d active VMs from Convex", len(response.VMs))
 	return response.VMs, nil
+}
+
+// FetchActiveJobs retrieves active jobs from the site's Convex database
+func (c *CallbackClient) FetchActiveJobs() ([]ConvexJob, error) {
+	url := fmt.Sprintf("%s/api/jobs/active", c.siteBaseUrl)
+	timestamp := strconv.FormatInt(time.Now().Unix(), 10)
+
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("X-Timestamp", timestamp)
+	// For GET requests, body is empty
+	signature := c.signRequest(timestamp, "")
+	req.Header.Set("X-Signature", signature)
+
+	log.Printf("Fetching active jobs from Convex...")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch active jobs: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to fetch active jobs: %s", resp.Status)
+	}
+
+	var response ActiveJobsResponse
+	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	log.Printf("Fetched %d active jobs from Convex", len(response.Jobs))
+	return response.Jobs, nil
 }

@@ -133,6 +133,11 @@ func main() {
 		fmt.Printf("Warning: Failed to sync from Convex: %v\n", err)
 	}
 
+	// Sync jobs with Convex to recover jobs that may have been lost during restart
+	if err := lib.SyncJobsFromConvex(app.JobManager, jobAdapter, callbackClient); err != nil {
+		fmt.Printf("Warning: Failed to sync jobs from Convex: %v\n", err)
+	}
+
 	// Start the periodic reconciler
 	reconciler := lib.NewReconciler(lib.ReconcilerConfig{
 		VMManager:      app.VMManager,
