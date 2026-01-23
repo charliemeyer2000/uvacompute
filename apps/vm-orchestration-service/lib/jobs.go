@@ -493,6 +493,11 @@ func (j *JobAdapter) DeleteJob(jobId string) error {
 func (j *JobAdapter) GetJobStatus(jobId string) (structs.JobStatus, error) {
 	ctx := context.Background()
 
+	_, err := j.client.BatchV1().Jobs(j.namespace).Get(ctx, jobId, metav1.GetOptions{})
+	if err != nil {
+		return structs.JOB_STATUS_CANCELLED, err
+	}
+
 	status, _, _, _, _ := j.checkJobStatus(ctx, jobId)
 	return status, nil
 }
@@ -588,4 +593,8 @@ func (j *JobAdapter) EnsureNamespace() error {
 
 	log.Printf("Created namespace %s", j.namespace)
 	return nil
+}
+
+func (j *JobAdapter) WatchJobStatusRecovered(ctx context.Context, jobId string, statusCallback structs.JobStatusCallback) {
+	go j.watchJobStatus(ctx, jobId, statusCallback)
 }
