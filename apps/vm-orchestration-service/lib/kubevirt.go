@@ -226,18 +226,18 @@ func (k *KubeVirtAdapter) buildVMObject(vmId string, cpus, ram, disk, gpus int, 
 				},
 			},
 		},
-		// Readiness probe: check if SSH is ready (port 22)
-		// This indicates the VM has booted and basic services are up
-		// Note: exec probes require QEMU guest agent which may not be available
+		// Readiness probe: check if cloud-init is complete (port 9999)
+		// This port is only opened at the very end of cloud-init, ensuring all
+		// provisioning (including frpc for --expose VMs) is complete before READY
 		"readinessProbe": map[string]interface{}{
 			"tcpSocket": map[string]interface{}{
-				"port": int64(22),
+				"port": int64(9999),
 			},
-			"initialDelaySeconds": int64(30), // Wait 30s before first check (VM needs to boot)
-			"periodSeconds":       int64(10), // Check every 10 seconds
-			"timeoutSeconds":      int64(5),  // Timeout for each check
-			"failureThreshold":    int64(30), // Allow up to 5 minutes for boot (30 * 10s)
-			"successThreshold":    int64(1),  // One success is enough
+			"initialDelaySeconds": int64(30),  // Wait 30s before first check (VM needs to boot)
+			"periodSeconds":       int64(10),  // Check every 10 seconds
+			"timeoutSeconds":      int64(5),   // Timeout for each check
+			"failureThreshold":    int64(180), // Allow up to 30 minutes for provisioning (180 * 10s)
+			"successThreshold":    int64(1),   // One success is enough
 		},
 	}
 
@@ -738,8 +738,9 @@ func generateMIMEMultipart(sshConfig, startupScript, cloudInitConfig string, has
 	}
 
 	// Part 4: frpc configuration (for ephemeral endpoints - --expose flag)
+	// For VMs with --expose, include completion marker in frpc config (after verification)
 	if expose != nil && exposeSubdomain != nil {
-		frpcConfig := GenerateFrpcCloudInit(*expose, *exposeSubdomain)
+		frpcConfig := GenerateFrpcCloudInit(*expose, *exposeSubdomain, true)
 		parts = append(parts,
 			"--"+boundary,
 			"Content-Type: text/cloud-config; charset=\"us-ascii\"",
@@ -788,23 +789,28 @@ cd /root
 		)
 	}
 
-	// Part 7: Completion marker (always last - signals cloud-init finished)
-	// This creates a marker file that the readinessProbe checks for
-	completionMarker := `#cloud-config
+	// Part 7: Completion marker (only for VMs without --expose)
+	// For VMs with --expose, the completion marker is included in the frpc config
+	// after frpc verification succeeds, ensuring the endpoint is ready before READY status
+	if expose == nil {
+		completionMarker := `#cloud-config
 runcmd:
   - touch /var/run/uvacompute-provisioned
-  - echo "UVACompute provisioning complete at $(date)" >> /var/log/uvacompute-init.log`
+  - echo "UVACompute provisioning complete at $(date)" >> /var/log/uvacompute-init.log
+  - nohup nc -lk 9999 < /dev/null > /dev/null 2>&1 &
+  - echo "Readiness port 9999 listening" >> /var/log/uvacompute-init.log`
 
-	parts = append(parts,
-		"--"+boundary,
-		"Content-Type: text/cloud-config; charset=\"us-ascii\"",
-		"MIME-Version: 1.0",
-		"Content-Transfer-Encoding: 7bit",
-		"Content-Disposition: attachment; filename=\"completion-marker.cfg\"",
-		"Merge-Type: list(append)+dict(no_replace,recurse_list)+str()",
-		"",
-		completionMarker,
-	)
+		parts = append(parts,
+			"--"+boundary,
+			"Content-Type: text/cloud-config; charset=\"us-ascii\"",
+			"MIME-Version: 1.0",
+			"Content-Transfer-Encoding: 7bit",
+			"Content-Disposition: attachment; filename=\"completion-marker.cfg\"",
+			"Merge-Type: list(append)+dict(no_replace,recurse_list)+str()",
+			"",
+			completionMarker,
+		)
+	}
 
 	parts = append(parts, "--"+boundary+"--", "")
 

@@ -7,14 +7,7 @@ import { useQuery } from "convex/react";
 import { api } from "../../../../../../convex/_generated/api";
 import { authClient } from "@/lib/auth-client";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 import {
   Job,
   formatDate,
@@ -42,14 +35,15 @@ import {
   Database,
   ExternalLink,
   Globe,
+  Clipboard,
 } from "lucide-react";
 import { toast } from "sonner";
 
 // Jobs that are actively producing logs and can be streamed
-const STREAMABLE_STATUSES: JobStatus[] = ["pulling", "running"];
+const STREAMABLE_STATUSES: JobStatus[] = ["running"];
 
 // Jobs that are waiting to start (no logs yet)
-const WAITING_STATUSES: JobStatus[] = ["pending", "scheduled"];
+const WAITING_STATUSES: JobStatus[] = ["pending", "scheduled", "pulling"];
 
 // All active (non-terminal) jobs
 const ACTIVE_STATUSES: JobStatus[] = [
@@ -149,6 +143,7 @@ export default function JobDetailPage() {
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
   const [autoScroll, setAutoScroll] = useState(true);
+  const [copiedLineNumber, setCopiedLineNumber] = useState<number | null>(null);
 
   const logContainerRef = useRef<HTMLDivElement>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
@@ -156,6 +151,8 @@ export default function JobDetailPage() {
   const lastMessageTimeRef = useRef(Date.now());
   const heartbeatCheckIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const pausedLogsRef = useRef<string>("");
+  const isPausedRef = useRef(isPaused);
+  const autoScrollRef = useRef(autoScroll);
 
   const jobStatus = job?.status;
   const isActive = jobStatus ? ACTIVE_STATUSES.includes(jobStatus) : false;
@@ -170,10 +167,12 @@ export default function JobDetailPage() {
   const isStreamableRef = useRef(isStreamable);
   isStreamableRef.current = isStreamable;
 
-  const scrollToBottom = useCallback(() => {
-    if (logContainerRef.current && autoScroll) {
-      logContainerRef.current.scrollTop = logContainerRef.current.scrollHeight;
-    }
+  useEffect(() => {
+    isPausedRef.current = isPaused;
+  }, [isPaused]);
+
+  useEffect(() => {
+    autoScrollRef.current = autoScroll;
   }, [autoScroll]);
 
   // Parse logs into structured lines
@@ -269,11 +268,18 @@ export default function JobDetailPage() {
       reconnectAttemptsRef.current = 0;
       lastMessageTimeRef.current = Date.now();
 
-      if (isPaused) {
+      if (isPausedRef.current) {
         pausedLogsRef.current += event.data + "\n";
       } else {
         setLogs((prev) => prev + event.data + "\n");
-        setTimeout(scrollToBottom, 0);
+        if (autoScrollRef.current && logContainerRef.current) {
+          setTimeout(() => {
+            if (logContainerRef.current) {
+              logContainerRef.current.scrollTop =
+                logContainerRef.current.scrollHeight;
+            }
+          }, 0);
+        }
       }
     };
 
@@ -324,7 +330,7 @@ export default function JobDetailPage() {
       setIsStreaming(false);
       reconnectAttemptsRef.current = 0;
     });
-  }, [jobId, scrollToBottom, fetchLogs, isPaused]);
+  }, [jobId, fetchLogs]);
 
   const stopStreaming = useCallback(() => {
     if (eventSourceRef.current) {
@@ -345,14 +351,33 @@ export default function JobDetailPage() {
     if (pausedLogsRef.current) {
       setLogs((prev) => prev + pausedLogsRef.current);
       pausedLogsRef.current = "";
-      setTimeout(scrollToBottom, 0);
+      if (autoScrollRef.current && logContainerRef.current) {
+        setTimeout(() => {
+          if (logContainerRef.current) {
+            logContainerRef.current.scrollTop =
+              logContainerRef.current.scrollHeight;
+          }
+        }, 0);
+      }
     }
-  }, [scrollToBottom]);
+  }, []);
+
+  const startStreamingRef = useRef(startStreaming);
+  useEffect(() => {
+    startStreamingRef.current = startStreaming;
+  }, [startStreaming]);
+
+  const fetchLogsRef = useRef(fetchLogs);
+  useEffect(() => {
+    fetchLogsRef.current = fetchLogs;
+  }, [fetchLogs]);
 
   // Heartbeat detection
   useEffect(() => {
-    if (isStreaming && !isPaused) {
+    if (isStreaming) {
       heartbeatCheckIntervalRef.current = setInterval(() => {
+        if (isPausedRef.current) return;
+
         const timeSinceLastMessage = Date.now() - lastMessageTimeRef.current;
         if (timeSinceLastMessage > HEARTBEAT_TIMEOUT_MS) {
           if (eventSourceRef.current) {
@@ -360,11 +385,11 @@ export default function JobDetailPage() {
             eventSourceRef.current = null;
           }
           if (isStreamableRef.current) {
-            startStreaming();
+            startStreamingRef.current();
           } else {
             setIsStreaming(false);
             if (!isActiveRef.current) {
-              fetchLogs();
+              fetchLogsRef.current();
             }
           }
         }
@@ -377,7 +402,7 @@ export default function JobDetailPage() {
         heartbeatCheckIntervalRef.current = null;
       }
     };
-  }, [isStreaming, isPaused, startStreaming, fetchLogs]);
+  }, [isStreaming]);
 
   // Initialize logs based on job status
   useEffect(() => {
@@ -418,6 +443,18 @@ export default function JobDetailPage() {
       setTimeout(() => setCopied(false), 2000);
     } catch {
       toast.error("failed to copy logs");
+    }
+  };
+
+  const handleCopyLine = async (lineNumber: number, content: string) => {
+    if (copiedLineNumber === lineNumber) return;
+
+    try {
+      await navigator.clipboard.writeText(content);
+      setCopiedLineNumber(lineNumber);
+      setTimeout(() => setCopiedLineNumber(null), 1500);
+    } catch {
+      toast.error("failed to copy line");
     }
   };
 
@@ -816,9 +853,12 @@ export default function JobDetailPage() {
             {/* Auto-scroll toggle */}
             <button
               onClick={() => {
-                setAutoScroll(!autoScroll);
-                if (!autoScroll) {
-                  scrollToBottom();
+                const newValue = !autoScroll;
+                setAutoScroll(newValue);
+                autoScrollRef.current = newValue;
+                if (newValue && logContainerRef.current) {
+                  logContainerRef.current.scrollTop =
+                    logContainerRef.current.scrollHeight;
                 }
               }}
               className={`h-8 px-3 text-sm border transition-colors flex items-center gap-1.5 ${
@@ -861,11 +901,22 @@ export default function JobDetailPage() {
                   key={line.lineNumber}
                   className="flex hover:bg-gray-100 transition-colors group"
                 >
-                  {/* Line number */}
-                  <div className="w-14 flex-shrink-0 px-3 py-0.5 text-right text-gray-400 select-none border-r border-gray-200 bg-white group-hover:bg-gray-50 sticky left-0">
-                    {line.lineNumber}
+                  <div className="w-20 flex-shrink-0 px-2 py-0.5 text-right text-gray-400 select-none border-r border-gray-200 bg-white group-hover:bg-gray-50 sticky left-0 flex items-center justify-end gap-1">
+                    <button
+                      onClick={() =>
+                        handleCopyLine(line.lineNumber, line.content)
+                      }
+                      className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 hover:bg-gray-200 rounded"
+                      title="Copy line"
+                    >
+                      {copiedLineNumber === line.lineNumber ? (
+                        <Check className="h-3 w-3 text-green-600" />
+                      ) : (
+                        <Clipboard className="h-3 w-3 text-gray-400 hover:text-gray-600" />
+                      )}
+                    </button>
+                    <span className="w-6 text-right">{line.lineNumber}</span>
                   </div>
-                  {/* Log content */}
                   <div className="flex-1 px-4 py-0.5 text-gray-700 whitespace-pre-wrap break-all">
                     {searchQuery && line.content ? (
                       <HighlightedText
@@ -894,7 +945,9 @@ export default function JobDetailPage() {
                   <p className="text-xs text-gray-400">
                     {job.status === "pending"
                       ? "job is queued and will start soon"
-                      : "job is scheduled and starting up"}
+                      : job.status === "pulling"
+                        ? "pulling container image"
+                        : "job is scheduled and starting up"}
                   </p>
                 </>
               ) : isStreaming ? (
@@ -931,7 +984,11 @@ export default function JobDetailPage() {
               <button
                 onClick={() => {
                   setAutoScroll(true);
-                  scrollToBottom();
+                  autoScrollRef.current = true;
+                  if (logContainerRef.current) {
+                    logContainerRef.current.scrollTop =
+                      logContainerRef.current.scrollHeight;
+                  }
                 }}
                 className="text-orange-accent hover:underline"
               >
@@ -942,41 +999,18 @@ export default function JobDetailPage() {
         )}
       </div>
 
-      {/* Cancel Dialog */}
-      <Dialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>cancel job</DialogTitle>
-            <DialogDescription>
-              are you sure you want to cancel {job.name || job.jobId}? this
-              action cannot be undone.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setShowCancelDialog(false)}
-              disabled={isCancelling}
-            >
-              keep running
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={handleCancel}
-              disabled={isCancelling}
-            >
-              {isCancelling ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  cancelling...
-                </>
-              ) : (
-                "cancel job"
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ConfirmationDialog
+        open={showCancelDialog}
+        onOpenChange={setShowCancelDialog}
+        title="cancel job"
+        description={`are you sure you want to cancel ${job.name || job.jobId}? this action cannot be undone.`}
+        confirmLabel="cancel job"
+        confirmingLabel="cancelling..."
+        cancelLabel="keep running"
+        onConfirm={handleCancel}
+        isConfirming={isCancelling}
+        variant="destructive"
+      />
     </div>
   );
 }

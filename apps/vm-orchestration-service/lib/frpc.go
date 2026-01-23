@@ -19,9 +19,19 @@ func GetFRPAuthToken() string {
 	return token
 }
 
-// GenerateFrpcCloudInit generates cloud-init configuration for installing and running frpc
-func GenerateFrpcCloudInit(port int, subdomain string) string {
+// GenerateFrpcCloudInit generates cloud-init configuration for installing and running frpc.
+// If includeCompletionMarker is true, the completion marker is created after frpc verification.
+func GenerateFrpcCloudInit(port int, subdomain string, includeCompletionMarker bool) string {
 	authToken := GetFRPAuthToken()
+
+	completionRuncmd := ""
+	if includeCompletionMarker {
+		completionRuncmd = `
+  - touch /var/run/uvacompute-provisioned
+  - echo "UVACompute provisioning complete (with endpoint) at $(date)" >> /var/log/uvacompute-init.log
+  - nohup nc -lk 9999 < /dev/null > /dev/null 2>&1 &
+  - echo "Readiness port 9999 listening" >> /var/log/uvacompute-init.log`
+	}
 
 	return fmt.Sprintf(`#cloud-config
 # frpc installation and configuration for ephemeral endpoint
@@ -58,20 +68,103 @@ write_files:
       [Install]
       WantedBy=multi-user.target
 
+  - path: /usr/local/bin/install-frpc.sh
+    permissions: '0755'
+    content: |
+      #!/bin/bash
+      set -e
+      LOG="/var/log/uvacompute-init.log"
+      log() { echo "[$(date '+%%H:%%M:%%S')] [frpc] $1" >> $LOG; }
+
+      # Wait for network (up to 60s)
+      log "Waiting for network..."
+      for i in $(seq 1 30); do
+        if curl -sf --connect-timeout 2 https://github.com >/dev/null 2>&1; then
+          log "Network ready"
+          break
+        fi
+        if [ $i -eq 30 ]; then
+          log "ERROR: Network timeout after 60s"
+          exit 1
+        fi
+        sleep 2
+      done
+
+      # Download with retries
+      log "Downloading frpc v0.61.0..."
+      for i in $(seq 1 5); do
+        if wget -q --timeout=30 -O /tmp/frp.tar.gz \
+          https://github.com/fatedier/frp/releases/download/v0.61.0/frp_0.61.0_linux_amd64.tar.gz; then
+          log "Download successful"
+          break
+        fi
+        if [ $i -eq 5 ]; then
+          log "ERROR: Download failed after 5 attempts"
+          exit 1
+        fi
+        log "Download attempt $i failed, retrying in 5s..."
+        sleep 5
+      done
+
+      # Extract and install
+      log "Installing frpc..."
+      cd /tmp && tar -xzf frp.tar.gz
+      cp frp_0.61.0_linux_amd64/frpc /usr/local/bin/frpc
+      chmod +x /usr/local/bin/frpc
+      rm -rf frp_0.61.0_linux_amd64* frp.tar.gz
+
+      # Verify binary works
+      if /usr/local/bin/frpc --version >> $LOG 2>&1; then
+        log "frpc installed successfully"
+      else
+        log "ERROR: frpc binary verification failed"
+        exit 1
+      fi
+
+  - path: /usr/local/bin/verify-frpc.sh
+    permissions: '0755'
+    content: |
+      #!/bin/bash
+      LOG="/var/log/uvacompute-init.log"
+      log() { echo "[$(date '+%%H:%%M:%%S')] [frpc-verify] $1" >> $LOG; }
+
+      log "Waiting for frpc to connect to frps..."
+
+      # Wait up to 2 minutes for frpc to connect
+      for i in $(seq 1 24); do
+        # Check if service is running
+        if ! systemctl is-active --quiet frpc; then
+          log "Attempt $i/24: frpc service not running yet"
+          sleep 5
+          continue
+        fi
+
+        # Check for successful proxy registration in frpc logs
+        if journalctl -u frpc --no-pager -n 30 2>/dev/null | grep -q "start proxy success"; then
+          log "frpc connected successfully!"
+          exit 0
+        fi
+
+        log "Attempt $i/24: waiting for connection..."
+        sleep 5
+      done
+
+      log "ERROR: frpc failed to connect after 2 minutes"
+      log "frpc service status:"
+      systemctl status frpc --no-pager >> $LOG 2>&1 || true
+      log "Recent frpc logs:"
+      journalctl -u frpc --no-pager -n 20 >> $LOG 2>&1 || true
+      exit 1
+
 runcmd:
-  # Download and install frpc
   - mkdir -p /etc/frp
-  - cd /tmp && wget -q https://github.com/fatedier/frp/releases/download/v0.61.0/frp_0.61.0_linux_amd64.tar.gz
-  - cd /tmp && tar -xzf frp_0.61.0_linux_amd64.tar.gz
-  - cp /tmp/frp_0.61.0_linux_amd64/frpc /usr/local/bin/frpc
-  - chmod +x /usr/local/bin/frpc
-  - rm -rf /tmp/frp_0.61.0_linux_amd64*
-  # Enable and start frpc service
+  - /usr/local/bin/install-frpc.sh
   - systemctl daemon-reload
   - systemctl enable frpc
   - systemctl start frpc
-  - echo "frpc started for subdomain %s on port %d" >> /var/log/uvacompute-init.log
-`, FRPServerAddr, FRPServerPort, authToken, subdomain, port, subdomain, subdomain, port)
+  - /usr/local/bin/verify-frpc.sh
+  - echo "frpc started for subdomain %s on port %d" >> /var/log/uvacompute-init.log%s
+`, FRPServerAddr, FRPServerPort, authToken, subdomain, port, subdomain, subdomain, port, completionRuncmd)
 }
 
 // GenerateFrpcConfig generates just the frpc.toml configuration content
