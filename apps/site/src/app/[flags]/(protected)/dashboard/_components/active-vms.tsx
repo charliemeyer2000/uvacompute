@@ -34,12 +34,11 @@ import {
   formatDate,
   formatTimeRemaining,
   formatStatus,
-  getStatusBorderColor,
-  getStatusDotColor,
   getSshCommand,
   deleteVm,
   extendVm,
 } from "@/lib/vm-utils";
+import { getStatusBorderColor, getStatusDotColor } from "@/lib/status-colors";
 import {
   MoreVertical,
   Loader2,
