@@ -29,44 +29,9 @@ import {
   formatDuration,
   isJobCancellable,
 } from "@/lib/job-utils";
+import { getStatusBorderColor, getStatusDotColor } from "@/lib/status-colors";
 import { MoreVertical, Container, ExternalLink, Globe } from "lucide-react";
 import { toast } from "sonner";
-
-function getStatusBorderColor(status: string): string {
-  switch (status) {
-    case "running":
-    case "pulling":
-      return "border-l-blue-500";
-    case "pending":
-    case "scheduled":
-      return "border-l-yellow-500";
-    case "completed":
-      return "border-l-green-500";
-    case "failed":
-      return "border-l-red-500";
-    case "cancelled":
-      return "border-l-gray-300";
-    default:
-      return "border-l-gray-300";
-  }
-}
-
-function getStatusDotColor(status: string): string {
-  switch (status) {
-    case "running":
-    case "pulling":
-      return "bg-blue-500";
-    case "pending":
-    case "scheduled":
-      return "bg-yellow-500";
-    case "completed":
-      return "bg-green-500";
-    case "failed":
-      return "bg-red-500";
-    default:
-      return "bg-gray-400";
-  }
-}
 
 function JobCard({ job }: { job: Job }) {
   const [showCancelDialog, setShowCancelDialog] = useState(false);

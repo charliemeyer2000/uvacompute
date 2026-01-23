@@ -14,13 +14,8 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
-import {
-  VM,
-  formatDate,
-  formatStatus,
-  getStatusBorderColor,
-  getStatusDotColor,
-} from "@/lib/vm-utils";
+import { VM, formatDate, formatStatus } from "@/lib/vm-utils";
+import { getStatusBorderColor, getStatusDotColor } from "@/lib/status-colors";
 import { Archive } from "lucide-react";
 
 function VMCard({ vm }: { vm: VM }) {
