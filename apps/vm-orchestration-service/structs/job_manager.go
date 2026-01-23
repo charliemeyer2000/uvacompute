@@ -290,3 +290,27 @@ func (jm *JobManager) checkResourceAvailability(req JobCreationRequest) error {
 
 	return nil
 }
+
+func (jm *JobManager) ListAllJobs() map[string]JobState {
+	jm.mu.Lock()
+	defer jm.mu.Unlock()
+
+	result := make(map[string]JobState, len(jm.jobMap))
+	for k, v := range jm.jobMap {
+		result[k] = v
+	}
+	return result
+}
+
+func (jm *JobManager) AddJobFromExternal(jobId string, state JobState) bool {
+	jm.mu.Lock()
+	defer jm.mu.Unlock()
+
+	if _, exists := jm.jobMap[jobId]; exists {
+		return false
+	}
+
+	jm.jobMap[jobId] = state
+	log.Printf("Added job %s from external source (status: %s)", jobId, state.Status)
+	return true
+}
