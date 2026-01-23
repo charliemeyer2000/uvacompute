@@ -138,6 +138,7 @@ func (j *JobAdapter) buildJobObject(jobId string, image string, command []string
 	podSpec := corev1.PodSpec{
 		RestartPolicy: corev1.RestartPolicyNever,
 		Containers:    containers,
+		DNSPolicy:     corev1.DNSDefault, // Use node's DNS to avoid cluster DNS issues
 	}
 
 	// Add scratch volume if disk > 0
@@ -320,16 +321,66 @@ func (j *JobAdapter) checkJobStatus(ctx context.Context, jobId string) (structs.
 	}
 
 	if pod == nil {
+		// Check if pod hasn't been created due to scheduling issues
+		// This can happen when the job is created but no pod can be scheduled
 		return structs.JOB_STATUS_SCHEDULED, nil, "", "", false
 	}
 
 	switch pod.Status.Phase {
 	case corev1.PodPending:
-		for _, containerStatus := range pod.Status.ContainerStatuses {
+		// First check pod conditions for scheduling failures
+		for _, condition := range pod.Status.Conditions {
+			if condition.Type == corev1.PodScheduled && condition.Status == corev1.ConditionFalse {
+				if condition.Reason == "Unschedulable" {
+					exitCode := 1
+					return structs.JOB_STATUS_FAILED, &exitCode, "Pod unschedulable: " + condition.Message, nodeId, true
+				}
+			}
+		}
+
+		// Check init container statuses for failures
+		for _, containerStatus := range pod.Status.InitContainerStatuses {
 			if containerStatus.State.Waiting != nil {
 				reason := containerStatus.State.Waiting.Reason
 				message := containerStatus.State.Waiting.Message
 
+				// Check for fatal init container errors
+				switch reason {
+				case "CrashLoopBackOff", "RunContainerError", "StartError", "ContainerCannotRun":
+					exitCode := 1
+					return structs.JOB_STATUS_FAILED, &exitCode, "Init container failed: " + message, nodeId, true
+				case "CreateContainerConfigError", "CreateContainerError":
+					exitCode := 1
+					return structs.JOB_STATUS_FAILED, &exitCode, "Init container creation error: " + message, nodeId, true
+				case "InvalidImageName", "ErrImageNeverPull":
+					exitCode := 1
+					return structs.JOB_STATUS_FAILED, &exitCode, "Init container image error: " + message, nodeId, true
+				}
+			}
+			if containerStatus.State.Terminated != nil && containerStatus.State.Terminated.ExitCode != 0 {
+				exitCode := int(containerStatus.State.Terminated.ExitCode)
+				return structs.JOB_STATUS_FAILED, &exitCode, "Init container failed: " + containerStatus.State.Terminated.Message, nodeId, true
+			}
+		}
+
+		// Check main container statuses
+		for _, containerStatus := range pod.Status.ContainerStatuses {
+			// Check for terminated containers first - this catches immediate startup failures
+			// (e.g., "executable file not found in $PATH", command not found, etc.)
+			if containerStatus.State.Terminated != nil && containerStatus.State.Terminated.ExitCode != 0 {
+				exitCode := int(containerStatus.State.Terminated.ExitCode)
+				errorMsg := containerStatus.State.Terminated.Message
+				if errorMsg == "" {
+					errorMsg = containerStatus.State.Terminated.Reason
+				}
+				return structs.JOB_STATUS_FAILED, &exitCode, "Container failed: " + errorMsg, nodeId, true
+			}
+
+			if containerStatus.State.Waiting != nil {
+				reason := containerStatus.State.Waiting.Reason
+				message := containerStatus.State.Waiting.Message
+
+				// Fatal error states - these won't recover
 				switch reason {
 				case "CrashLoopBackOff":
 					exitCode := 1
@@ -340,30 +391,70 @@ func (j *JobAdapter) checkJobStatus(ctx context.Context, jobId string) (structs.
 				case "InvalidImageName":
 					exitCode := 1
 					return structs.JOB_STATUS_FAILED, &exitCode, "Invalid image name: " + message, nodeId, true
+				case "ErrImageNeverPull":
+					exitCode := 1
+					return structs.JOB_STATUS_FAILED, &exitCode, "Image not present and pull policy is Never: " + message, nodeId, true
+				case "RunContainerError":
+					exitCode := 1
+					return structs.JOB_STATUS_FAILED, &exitCode, "Container failed to start: " + message, nodeId, true
+				case "StartError":
+					exitCode := 1
+					return structs.JOB_STATUS_FAILED, &exitCode, "Container start error: " + message, nodeId, true
+				case "ContainerCannotRun":
+					exitCode := 1
+					return structs.JOB_STATUS_FAILED, &exitCode, "Container cannot run: " + message, nodeId, true
+				case "PreStartHookError":
+					exitCode := 1
+					return structs.JOB_STATUS_FAILED, &exitCode, "PreStart hook failed: " + message, nodeId, true
+				case "PostStartHookError":
+					exitCode := 1
+					return structs.JOB_STATUS_FAILED, &exitCode, "PostStart hook failed: " + message, nodeId, true
 				}
 
-				// Pulling/initialization states
+				// Pulling/initialization states - these are transient
 				// ContainerCreating: image pull or container setup in progress
 				// Pulling: explicit image pull
-				// ImagePullBackOff/ErrImagePull: pull failures (transient, will retry)
+				// ImagePullBackOff/ErrImagePull: pull failures (Kubernetes will retry)
 				// PodInitializing: init containers running
 				if reason == "ContainerCreating" || reason == "Pulling" || reason == "ImagePullBackOff" || reason == "ErrImagePull" || reason == "PodInitializing" {
 					return structs.JOB_STATUS_PULLING, nil, "", nodeId, false
 				}
+
+				// Unknown waiting reason - log it and treat as pulling if we have a node
+				log.Printf("Unknown container waiting reason for job %s: %s - %s", jobId, reason, message)
 			}
 		}
 		if nodeId != "" {
 			return structs.JOB_STATUS_PULLING, nil, "", nodeId, false
 		}
 		return structs.JOB_STATUS_SCHEDULED, nil, "", nodeId, false
+
 	case corev1.PodRunning:
+		// Check if any container has already terminated with an error
+		// This can happen briefly before the pod phase updates to Failed
+		for _, containerStatus := range pod.Status.ContainerStatuses {
+			if containerStatus.Name == "job" && containerStatus.State.Terminated != nil {
+				exitCode := int(containerStatus.State.Terminated.ExitCode)
+				if exitCode != 0 {
+					errorMsg := containerStatus.State.Terminated.Message
+					if errorMsg == "" {
+						errorMsg = containerStatus.State.Terminated.Reason
+					}
+					return structs.JOB_STATUS_FAILED, &exitCode, "Container failed: " + errorMsg, nodeId, true
+				}
+				// Container completed successfully
+				return structs.JOB_STATUS_COMPLETED, &exitCode, "", nodeId, true
+			}
+		}
 		return structs.JOB_STATUS_RUNNING, nil, "", nodeId, false
+
 	case corev1.PodSucceeded:
 		exitCode := 0
 		if len(pod.Status.ContainerStatuses) > 0 && pod.Status.ContainerStatuses[0].State.Terminated != nil {
 			exitCode = int(pod.Status.ContainerStatuses[0].State.Terminated.ExitCode)
 		}
 		return structs.JOB_STATUS_COMPLETED, &exitCode, "", nodeId, true
+
 	case corev1.PodFailed:
 		exitCode := 1
 		errorMsg := ""
@@ -372,8 +463,16 @@ func (j *JobAdapter) checkJobStatus(ctx context.Context, jobId string) (structs.
 			errorMsg = pod.Status.ContainerStatuses[0].State.Terminated.Message
 		}
 		return structs.JOB_STATUS_FAILED, &exitCode, errorMsg, nodeId, true
+
+	case corev1.PodUnknown:
+		// PodUnknown means the state of the pod could not be obtained,
+		// typically due to an error in communicating with the node
+		exitCode := 1
+		return structs.JOB_STATUS_FAILED, &exitCode, "Pod state unknown - node communication error", nodeId, true
 	}
 
+	// Fallback for any unhandled phase
+	log.Printf("Unknown pod phase for job %s: %s", jobId, pod.Status.Phase)
 	return structs.JOB_STATUS_PENDING, nil, "", nodeId, false
 }
 
