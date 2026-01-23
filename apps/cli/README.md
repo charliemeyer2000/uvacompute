@@ -139,6 +139,76 @@ uva vm ssh my-training-vm
 uva vm ssh abc-123-def
 ```
 
+### Jobs
+
+Run containerized workloads with optional GPU support. Jobs are ideal for batch processing, training runs, or running inference servers.
+
+#### Run a Job
+
+`uva jobs run [options] <image> -- [command...]`: run a container job
+
+**Options:**
+
+- `-g, --gpu`: Request a GPU (NVIDIA 5090)
+- `-c, --cpu <cpus>`: Number of CPUs (1-16, default: 1)
+- `-r, --ram <ram>`: RAM in GB (1-64, default: 4)
+- `-d, --disk <disk>`: Scratch disk in GB (0-100, mounted at /scratch)
+- `-e, --env <KEY=VALUE>`: Environment variable (repeatable)
+- `-n, --name <name>`: Job name (max 255 chars)
+- `--expose <port>`: Expose port via HTTPS endpoint (1-65535)
+- `--no-follow`: Don't stream logs after job starts
+
+> **Note:** Use `--` to separate CLI options from the container command, especially when the command has its own flags.
+
+**Examples:**
+
+```bash
+# Simple CPU job
+uva jobs run -n hello python:3.12-slim -- python -c "print('Hello!')"
+
+# GPU job with PyTorch
+uva jobs run -g -n gpu-test nvcr.io/nvidia/pytorch:25.11-py3 \
+  -- python -c "import torch; print('CUDA:', torch.cuda.is_available())"
+
+# Job with exposed endpoint (e.g., inference server)
+uva jobs run -g -c 4 -r 32 --expose 8000 -n api-server \
+  vllm/vllm-openai:latest \
+  -- vllm serve Qwen/Qwen2.5-7B-Instruct --host 0.0.0.0 --port 8000
+
+# Job with environment variables
+uva jobs run -g -e API_KEY=secret -n training nvcr.io/nvidia/pytorch:25.11-py3 \
+  -- python train.py
+```
+
+#### List Jobs
+
+`uva jobs ls`: list active jobs
+
+`uva jobs ls --all`: list all jobs including completed
+
+#### View Job Logs
+
+`uva jobs logs <jobId>`: stream logs from a job (follows by default)
+
+**Options:**
+
+- `--no-follow`: Print current logs and exit
+- `--tail <lines>`: Number of lines to show from the end
+
+**Examples:**
+
+```bash
+# Stream logs in real-time
+uva jobs logs abc123
+
+# Show last 100 lines and exit
+uva jobs logs abc123 --tail 100 --no-follow
+```
+
+#### Cancel a Job
+
+`uva jobs cancel <jobId>`: cancel a running job
+
 ### Planned Features (Not Yet Implemented)
 
 `uva vm extend [id]`: extend vm lifetime
@@ -146,8 +216,6 @@ uva vm ssh abc-123-def
 - `--hours / -h` (number): hours to extend for
 
 `uva k8s create`: create vcluster
-
-`uva job run [image url]`: run docker image
 
 ## Development
 
