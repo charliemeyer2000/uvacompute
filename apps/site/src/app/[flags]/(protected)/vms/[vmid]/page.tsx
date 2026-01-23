@@ -21,12 +21,11 @@ import {
   formatDate,
   formatTimeRemaining,
   formatStatus,
-  getStatusDotColor,
-  getStatusTextColor,
   getSshCommand,
   deleteVm,
   extendVm,
 } from "@/lib/vm-utils";
+import { getStatusDotColor, getStatusTextColor } from "@/lib/status-colors";
 import {
   ArrowLeft,
   Copy,
