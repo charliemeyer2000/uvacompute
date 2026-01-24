@@ -256,18 +256,32 @@ func (jm *JobManager) CancelJob(jobId string) error {
 		jm.mu.Unlock()
 		return fmt.Errorf("job %s is already in terminal state: %s", jobId, jobState.Status)
 	}
-
-	jobState.Status = JOB_STATUS_CANCELLED
-	jm.jobMap[jobId] = jobState
 	jm.mu.Unlock()
 
 	err := jm.jobProvider.DeleteJob(jobId)
 	if err != nil {
-		log.Printf("Warning: Failed to delete job %s from backend: %v", jobId, err)
+		log.Printf("ERROR: Failed to delete job %s from backend: %v", jobId, err)
+		return fmt.Errorf("failed to cancel job: %w", err)
 	}
+
+	jm.mu.Lock()
+	jobState, exists = jm.jobMap[jobId]
+	if !exists {
+		jm.mu.Unlock()
+		return nil
+	}
+	if jobState.Status == JOB_STATUS_COMPLETED || jobState.Status == JOB_STATUS_FAILED || jobState.Status == JOB_STATUS_CANCELLED {
+		jm.mu.Unlock()
+		log.Printf("Job %s reached terminal state %s before cancellation completed", jobId, jobState.Status)
+		return nil
+	}
+	jobState.Status = JOB_STATUS_CANCELLED
+	jm.jobMap[jobId] = jobState
+	jm.mu.Unlock()
 
 	if jm.callbackClient != nil {
 		go func() {
+			jm.archiveJobLogs(jobId)
 			if err := jm.callbackClient.NotifyJobStatusUpdate(jobId, string(JOB_STATUS_CANCELLED), nil, "", ""); err != nil {
 				log.Printf("ERROR: Failed to notify site about Job %s cancellation: %v", jobId, err)
 			}
