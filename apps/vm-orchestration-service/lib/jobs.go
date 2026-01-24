@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"time"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -75,7 +74,8 @@ func (j *JobAdapter) CreateJob(jobId string, image string, command []string, env
 		return fmt.Errorf("failed to create job: %w", err)
 	}
 
-	go j.watchJobStatus(ctx, jobId, statusCallback)
+	// Status updates are now handled by SharedInformers (see lib/informers.go)
+	// No need to spawn per-job polling goroutines
 
 	return nil
 }
@@ -264,28 +264,14 @@ func (j *JobAdapter) createFrpcConfigMap(jobId string, config string) error {
 	return nil
 }
 
-func (j *JobAdapter) watchJobStatus(ctx context.Context, jobId string, statusCallback structs.JobStatusCallback) {
-	ticker := time.NewTicker(2 * time.Second)
-	defer ticker.Stop()
-
-	timeout := time.After(24 * time.Hour)
-
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-timeout:
-			statusCallback(structs.JOB_STATUS_FAILED, nil, "job watcher timeout", "")
-			return
-		case <-ticker.C:
-			status, exitCode, errorMsg, nodeId, done := j.checkJobStatus(ctx, jobId)
-			if done {
-				statusCallback(status, exitCode, errorMsg, nodeId)
-				return
-			}
-			statusCallback(status, nil, "", nodeId)
-		}
-	}
+// watchJobStatus is deprecated - status updates are now handled by SharedInformers.
+// The checkJobStatus function is still used for on-demand status checks.
+// This function is kept for reference but is no longer called.
+func (j *JobAdapter) watchJobStatusDeprecated(ctx context.Context, jobId string, statusCallback structs.JobStatusCallback) {
+	// Deprecated: See lib/informers.go for event-driven status updates
+	_ = ctx
+	_ = jobId
+	_ = statusCallback
 }
 
 func (j *JobAdapter) checkJobStatus(ctx context.Context, jobId string) (structs.JobStatus, *int, string, string, bool) {
@@ -595,6 +581,8 @@ func (j *JobAdapter) EnsureNamespace() error {
 	return nil
 }
 
+// WatchJobStatusRecovered is deprecated - status updates are now handled by SharedInformers.
+// This function is kept for backward compatibility but does nothing.
 func (j *JobAdapter) WatchJobStatusRecovered(ctx context.Context, jobId string, statusCallback structs.JobStatusCallback) {
-	go j.watchJobStatus(ctx, jobId, statusCallback)
+	// No-op: Informers handle status updates now
 }

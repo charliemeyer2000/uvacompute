@@ -77,6 +77,7 @@ function formatStatus(status: string): string {
 function getStatusMessage(status: string): string {
   const messages: Record<string, string> = {
     not_found: "VM not found",
+    creating: "Creating VM...",
     pending: "Creating VM...",
     booting: "Booting VM...",
     provisioning: "Provisioning VM (running cloud-init)...",
