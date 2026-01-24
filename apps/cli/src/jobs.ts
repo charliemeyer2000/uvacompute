@@ -434,19 +434,28 @@ async function listJobs(options: { all?: boolean }): Promise<void> {
     );
 
     console.log();
-    const headers = ["Age", "Job", "Image", "Resources", "Status"];
+    const hasAnyExposeUrl = sorted.some((job) => job.exposeUrl);
+    const headers = hasAnyExposeUrl
+      ? ["Age", "Job", "Image", "Resources", "Status", "Endpoint"]
+      : ["Age", "Job", "Image", "Resources", "Status"];
     const rows = sorted.map((job) => {
       const nameDisplay = job.name ? job.name : "(unnamed)";
       const jobLabel = `${nameDisplay} ${theme.muted(job.jobId.slice(0, 8))}`;
       const imageShort =
         job.image.length > 30 ? job.image.slice(0, 27) + "..." : job.image;
-      return [
+      const row = [
         formatAge(new Date(job.createdAt)),
         jobLabel,
         imageShort,
         formatJobResources(job),
         formatJobStatus(job.status),
       ];
+      if (hasAnyExposeUrl) {
+        row.push(
+          job.exposeUrl ? theme.success(job.exposeUrl) : theme.muted("-"),
+        );
+      }
+      return row;
     });
 
     renderTable(headers, rows);
