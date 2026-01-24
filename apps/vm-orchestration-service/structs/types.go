@@ -304,10 +304,11 @@ type JobState struct {
 	Gpus    int               `json:"gpus"`
 	Disk    int               `json:"disk"`
 
-	Status       JobStatus `json:"status"`
-	ExitCode     *int      `json:"exitCode,omitempty"`
-	ErrorMessage string    `json:"errorMessage,omitempty"`
-	NodeId       string    `json:"nodeId,omitempty"`
+	Status           JobStatus  `json:"status"`
+	ExitCode         *int       `json:"exitCode,omitempty"`
+	ErrorMessage     string     `json:"errorMessage,omitempty"`
+	NodeId           string     `json:"nodeId,omitempty"`
+	PullingStartedAt *time.Time `json:"pullingStartedAt,omitempty"` // Track when PULLING started for timeout
 }
 
 type JobResourceLimits struct {
