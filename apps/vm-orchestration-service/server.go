@@ -142,6 +142,8 @@ func main() {
 	reconciler := lib.NewReconciler(lib.ReconcilerConfig{
 		VMManager:      app.VMManager,
 		VMProvider:     vmAdapter,
+		JobManager:     app.JobManager,
+		JobAdapter:     jobAdapter,
 		CallbackClient: callbackClient,
 		Interval:       5 * time.Minute,
 	})
