@@ -10,6 +10,8 @@ import (
 	"github.com/google/uuid"
 )
 
+const ImagePullTimeout = 15 * time.Minute
+
 type JobStatusCallback func(status JobStatus, exitCode *int, errorMsg string, nodeId string)
 
 type JobProvider interface {
@@ -119,6 +121,10 @@ func (jm *JobManager) GetJobLogs(jobId string) (io.ReadCloser, error) {
 		return nil, fmt.Errorf("job %s not found", jobId)
 	}
 
+	if jm.jobProvider == nil {
+		return nil, fmt.Errorf("job provider not available")
+	}
+
 	return jm.jobProvider.GetJobLogs(jobId)
 }
 
@@ -135,32 +141,46 @@ func (jm *JobManager) StreamJobLogs(jobId string) (io.ReadCloser, error) {
 		return nil, fmt.Errorf("job %s is in terminal state, use GetJobLogs instead", jobId)
 	}
 
+	if jm.jobProvider == nil {
+		return nil, fmt.Errorf("job provider not available")
+	}
+
 	return jm.jobProvider.StreamJobLogs(jobId)
 }
 
 func (jm *JobManager) UpdateJobStatus(jobId string, status JobStatus, exitCode *int, errorMessage string, nodeId string) {
 	jm.mu.Lock()
-	if jobState, exists := jm.jobMap[jobId]; exists {
-		jobState.Status = status
-		jobState.ExitCode = exitCode
-		jobState.ErrorMessage = errorMessage
-		if nodeId != "" {
-			jobState.NodeId = nodeId
-		}
-		jm.jobMap[jobId] = jobState
+	jobState, exists := jm.jobMap[jobId]
+	if !exists {
+		jm.mu.Unlock()
+		return
 	}
+
+	if jobState.Status == status {
+		if nodeId != "" && jobState.NodeId != nodeId {
+			jobState.NodeId = nodeId
+			jm.jobMap[jobId] = jobState
+		}
+		jm.mu.Unlock()
+		return
+	}
+
+	jobState.Status = status
+	jobState.ExitCode = exitCode
+	jobState.ErrorMessage = errorMessage
+	if nodeId != "" {
+		jobState.NodeId = nodeId
+	}
+	jm.jobMap[jobId] = jobState
 	jm.mu.Unlock()
 
 	isTerminal := status == JOB_STATUS_COMPLETED || status == JOB_STATUS_FAILED || status == JOB_STATUS_CANCELLED
 
 	if jm.callbackClient != nil {
 		go func() {
-			// For terminal states, archive logs FIRST before notifying status change
-			// This ensures logs are available when frontend receives status update
 			if isTerminal {
 				jm.archiveJobLogs(jobId)
 			}
-
 			if err := jm.callbackClient.NotifyJobStatusUpdate(jobId, string(status), exitCode, errorMessage, nodeId); err != nil {
 				log.Printf("ERROR: Failed to notify site about Job %s status update: %v", jobId, err)
 			}
@@ -257,19 +277,15 @@ func (jm *JobManager) CancelJob(jobId string) error {
 	return nil
 }
 
-// HandleJobEvent processes Job status updates from Kubernetes informers.
-// Unlike VMs, jobs don't have a long creation flow, so we process all events.
 func (jm *JobManager) HandleJobEvent(jobId string, status JobStatus, exitCode *int, errorMsg string, nodeId string) {
 	jm.mu.Lock()
 
 	jobState, exists := jm.jobMap[jobId]
 	if !exists {
 		jm.mu.Unlock()
-		// Job not tracked - ignore (Convex is source of truth for what we track)
 		return
 	}
 
-	// Don't overwrite terminal states
 	if jobState.Status == JOB_STATUS_COMPLETED ||
 		jobState.Status == JOB_STATUS_FAILED ||
 		jobState.Status == JOB_STATUS_CANCELLED {
@@ -277,8 +293,57 @@ func (jm *JobManager) HandleJobEvent(jobId string, status JobStatus, exitCode *i
 		return
 	}
 
-	// No change - skip (but update nodeId if changed)
+	// Prevent status regression
+	statusOrder := map[JobStatus]int{
+		JOB_STATUS_PENDING:   1,
+		JOB_STATUS_SCHEDULED: 2,
+		JOB_STATUS_PULLING:   3,
+		JOB_STATUS_RUNNING:   4,
+	}
+	currentOrder := statusOrder[jobState.Status]
+	newOrder := statusOrder[status]
+	if newOrder > 0 && currentOrder > 0 && newOrder < currentOrder {
+		if nodeId != "" && jobState.NodeId != nodeId {
+			jobState.NodeId = nodeId
+			jm.jobMap[jobId] = jobState
+		}
+		jm.mu.Unlock()
+		return
+	}
+
 	if jobState.Status == status {
+		if status == JOB_STATUS_PULLING {
+			if jobState.PullingStartedAt == nil {
+				now := time.Now()
+				jobState.PullingStartedAt = &now
+				jm.jobMap[jobId] = jobState
+			} else if time.Since(*jobState.PullingStartedAt) > ImagePullTimeout {
+				exitCode := 1
+				exitCodePtr := &exitCode
+				errorMessage := "Image pull timeout: unable to pull image after 15 minutes"
+				jobState.Status = JOB_STATUS_FAILED
+				jobState.ExitCode = exitCodePtr
+				jobState.ErrorMessage = errorMessage
+				if nodeId != "" {
+					jobState.NodeId = nodeId
+				}
+				jm.jobMap[jobId] = jobState
+				jm.mu.Unlock()
+
+				log.Printf("JobManager: HandleJobEvent %s: PULLING -> FAILED (image pull timeout)", jobId)
+
+				if jm.callbackClient != nil {
+					go func(exitCodePtr *int, errorMessage, nodeId string) {
+						jm.archiveJobLogs(jobId)
+						if err := jm.callbackClient.NotifyJobStatusUpdate(jobId, string(JOB_STATUS_FAILED), exitCodePtr, errorMessage, nodeId); err != nil {
+							log.Printf("ERROR: Failed to notify site about Job %s pull timeout: %v", jobId, err)
+						}
+					}(exitCodePtr, errorMessage, nodeId)
+				}
+				return
+			}
+		}
+
 		if nodeId != "" && jobState.NodeId != nodeId {
 			jobState.NodeId = nodeId
 			jm.jobMap[jobId] = jobState
@@ -289,6 +354,14 @@ func (jm *JobManager) HandleJobEvent(jobId string, status JobStatus, exitCode *i
 
 	oldStatus := jobState.Status
 	jobState.Status = status
+
+	if status == JOB_STATUS_PULLING && jobState.PullingStartedAt == nil {
+		now := time.Now()
+		jobState.PullingStartedAt = &now
+	}
+	if oldStatus == JOB_STATUS_PULLING && status != JOB_STATUS_PULLING {
+		jobState.PullingStartedAt = nil
+	}
 	if exitCode != nil {
 		jobState.ExitCode = exitCode
 	}
@@ -307,7 +380,6 @@ func (jm *JobManager) HandleJobEvent(jobId string, status JobStatus, exitCode *i
 
 	if jm.callbackClient != nil {
 		go func() {
-			// For terminal states, archive logs FIRST before notifying status change
 			if isTerminal {
 				jm.archiveJobLogs(jobId)
 			}
@@ -316,6 +388,42 @@ func (jm *JobManager) HandleJobEvent(jobId string, status JobStatus, exitCode *i
 				log.Printf("ERROR: Failed to notify site about Job %s status update from informer: %v", jobId, err)
 			}
 		}()
+	}
+}
+
+func (jm *JobManager) SetJobForTest(jobId string, status JobStatus, nodeId string) {
+	jm.mu.Lock()
+	defer jm.mu.Unlock()
+	jm.jobMap[jobId] = JobState{
+		Id:     jobId,
+		Status: status,
+		NodeId: nodeId,
+	}
+}
+
+func (jm *JobManager) GetJobStatusForTest(jobId string) JobStatus {
+	jm.mu.Lock()
+	defer jm.mu.Unlock()
+	if state, exists := jm.jobMap[jobId]; exists {
+		return state.Status
+	}
+	return ""
+}
+
+func (jm *JobManager) HasJob(jobId string) bool {
+	jm.mu.Lock()
+	defer jm.mu.Unlock()
+	_, exists := jm.jobMap[jobId]
+	return exists
+}
+
+func NewJobManagerForTest(callbackClient CallbackClient) *JobManager {
+	return &JobManager{
+		mu:             sync.Mutex{},
+		jobMap:         make(map[string]JobState),
+		limits:         JobResourceLimits{MaxCpus: 16, MaxRam: 64, MaxGpus: 1},
+		jobProvider:    nil,
+		callbackClient: callbackClient,
 	}
 }
 
