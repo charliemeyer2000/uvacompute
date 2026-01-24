@@ -185,7 +185,11 @@ func (vm *VMManager) handleExpiration(vmId string) {
 	vm.stopExpirationTimerLocked(vmId)
 	vm.mu.Unlock()
 
-	vm.vmProvider.DestroyVM(vmId)
+	err := vm.vmProvider.DestroyVM(vmId)
+	if err != nil {
+		log.Printf("ERROR: Failed to destroy expired VM %s: %v - reconciler will retry", vmId, err)
+		return
+	}
 
 	vm.mu.Lock()
 	delete(vm.vmMap, vmId)

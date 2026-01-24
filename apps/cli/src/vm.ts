@@ -74,6 +74,9 @@ function formatStatus(status: string): string {
   if (status === "ready") {
     return formatStatusBullet("success", "Ready");
   }
+  if (status === "stopping") {
+    return formatStatusBullet("warning", "Stopping");
+  }
   if (creatingStatuses.has(status)) {
     return formatStatusBullet("warning", "Creating");
   }
@@ -723,6 +726,11 @@ async function deleteVM(nameOrVmId: string): Promise<void> {
         deleteSpinner.succeed(
           theme.success(`VM ${vmId} deleted successfully!`),
         );
+      } else if (data.status === "deletion_pending") {
+        deleteSpinner.succeed(
+          theme.warning(`VM ${vmId} deletion in progress...`),
+        );
+        console.log(theme.muted("  The VM will be deleted automatically."));
       } else {
         deleteSpinner.fail(`VM deletion failed: ${data.msg}`);
       }

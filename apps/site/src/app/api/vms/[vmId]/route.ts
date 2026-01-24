@@ -45,18 +45,44 @@ export async function DELETE(
       );
     }
 
+    try {
+      await fetchMutation(api.vms.markStopping, {
+        vmId,
+        userId: session.user.id,
+      });
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : "Cannot delete VM";
+      return NextResponse.json(
+        {
+          status: "deletion_failed_not_deletable",
+          msg: message,
+        },
+        { status: 409 },
+      );
+    }
+
     const authHeaders = createAuthHeaders("DELETE", `/vms/${vmId}`, "");
-    const response = await fetch(
-      `${VM_ORCHESTRATION_SERVICE_URL}/vms/${vmId}`,
-      {
+    let response: Response;
+    try {
+      response = await fetch(`${VM_ORCHESTRATION_SERVICE_URL}/vms/${vmId}`, {
         method: "DELETE",
         headers: authHeaders,
-      },
-    );
+      });
+    } catch (networkError) {
+      console.error(`Network error deleting VM ${vmId}:`, networkError);
+      return NextResponse.json(
+        {
+          status: "deletion_pending",
+          vmId,
+          msg: "Deletion in progress - will be completed automatically",
+        },
+        { status: 202 },
+      );
+    }
 
     if (response.status === 404) {
       console.log(
-        `VM ${vmId} not found in orchestration service - cleaning up orphaned DB entry`,
+        `VM ${vmId} not found in orchestration service - marking as stopped`,
       );
       try {
         await fetchMutation(api.vms.updateStatus, {
@@ -75,21 +101,19 @@ export async function DELETE(
           {
             status: "deletion_success",
             vmId,
-            msg: "VM was not found in orchestration service (possibly failed creation). Database entry has been cleaned up.",
+            msg: "VM deleted",
           },
           { status: 200 },
         );
-      } catch (convexError: any) {
-        console.error(
-          "Warning: Failed to mark orphaned VM as deleted in Convex:",
-          convexError,
-        );
+      } catch (convexError: unknown) {
+        console.error("Failed to mark orphaned VM as stopped:", convexError);
         return NextResponse.json(
           {
-            status: "deletion_failed_internal",
-            msg: "VM not found in orchestration and failed to clean up database entry",
+            status: "deletion_pending",
+            vmId,
+            msg: "Deletion in progress - will be completed automatically",
           },
-          { status: 500 },
+          { status: 202 },
         );
       }
     }
@@ -97,14 +121,15 @@ export async function DELETE(
     if (!response.ok) {
       const errorText = await response.text();
       console.error(
-        `Orchestration service error: ${response.status} ${errorText}`,
+        `Orchestration service error for VM ${vmId}: ${response.status} ${errorText}`,
       );
       return NextResponse.json(
         {
-          status: "failed",
-          msg: `Orchestration service error: ${response.status}`,
+          status: "deletion_pending",
+          vmId,
+          msg: "Deletion in progress - will be completed automatically",
         },
-        { status: response.status },
+        { status: 202 },
       );
     }
 
@@ -125,30 +150,23 @@ export async function DELETE(
         } catch (endpointError) {
           console.error("Warning: Failed to release endpoint:", endpointError);
         }
-      } catch (convexError: any) {
+      } catch (convexError: unknown) {
         console.error(
-          "Warning: Failed to mark VM as deleted in Convex:",
+          "Warning: Failed to mark VM as stopped in Convex:",
           convexError,
-        );
-
-        return NextResponse.json(
-          {
-            status: "deletion_success",
-            vmId,
-            msg: "VM deleted from orchestration service, but database update failed. This will be corrected automatically.",
-          },
-          { status: 200 },
         );
       }
     }
 
     return NextResponse.json(data, { status: response.status });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error deleting VM:", error);
+    const message =
+      error instanceof Error ? error.message : "Failed to delete VM";
     return NextResponse.json(
       {
         status: "deletion_failed_internal",
-        msg: error.message || "Failed to delete VM",
+        msg: message,
       },
       { status: 500 },
     );
@@ -216,10 +234,10 @@ export async function GET(
     const data = VMStatusResponseSchema.parse(rawData);
 
     return NextResponse.json(data, { status: response.status });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error getting VM status:", error);
 
-    if (error.name === "ZodError") {
+    if (error instanceof Error && error.name === "ZodError") {
       return NextResponse.json(
         {
           status: "not_found",
@@ -229,10 +247,12 @@ export async function GET(
       );
     }
 
+    const message =
+      error instanceof Error ? error.message : "Failed to get VM status";
     return NextResponse.json(
       {
         status: "not_found",
-        msg: error.message || "Failed to get VM status",
+        msg: message,
       },
       { status: 500 },
     );

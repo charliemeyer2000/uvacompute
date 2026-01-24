@@ -47,6 +47,9 @@ function formatJobStatus(status: string): string {
   if (runningStatuses.has(status)) {
     return formatStatusBullet("info", label);
   }
+  if (status === "cancelling") {
+    return formatStatusBullet("warning", "Cancelling");
+  }
   return formatStatusBullet("warning", label);
 }
 
@@ -693,6 +696,11 @@ async function cancelJob(jobId: string): Promise<void> {
 
     if (data.status === "cancellation_success") {
       spinner.succeed(theme.success(`Job ${jobId} cancelled successfully!`));
+    } else if (data.status === "cancellation_pending") {
+      spinner.succeed(
+        theme.warning(`Job ${jobId} cancellation in progress...`),
+      );
+      console.log(theme.muted("  The job will be cancelled automatically."));
     } else {
       spinner.fail(`Job cancellation failed: ${data.msg}`);
       process.exit(1);
