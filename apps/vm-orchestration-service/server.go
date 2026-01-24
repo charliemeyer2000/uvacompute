@@ -138,17 +138,36 @@ func main() {
 		fmt.Printf("Warning: Failed to sync jobs from Convex: %v\n", err)
 	}
 
-	// Start the periodic reconciler
+	// Start the event-driven informer manager
+	// This handles real-time status updates for VMIs, Jobs, and Pods
+	informerManager, err := lib.NewInformerManager(lib.InformerConfig{
+		KubeconfigPath: kubeVirtConfig.KubeconfigPath,
+		Namespace:      kubeVirtConfig.Namespace,
+		ResyncPeriod:   15 * time.Minute,
+	}, app.VMManager, app.JobManager, callbackClient)
+	if err != nil {
+		fmt.Printf("Warning: Failed to create informer manager: %v\n", err)
+	} else {
+		// Start AFTER SyncFromConvex/SyncJobsFromConvex to avoid race conditions
+		if err := informerManager.Start(context.Background()); err != nil {
+			fmt.Printf("Warning: Failed to start informers: %v\n", err)
+		} else {
+			fmt.Println("Informer manager started - watching VMIs, Jobs, and Pods")
+		}
+	}
+
+	// Start the periodic reconciler as a backup consistency check
+	// Interval increased to 30 minutes since informers handle real-time updates
 	reconciler := lib.NewReconciler(lib.ReconcilerConfig{
 		VMManager:      app.VMManager,
 		VMProvider:     vmAdapter,
 		JobManager:     app.JobManager,
 		JobAdapter:     jobAdapter,
 		CallbackClient: callbackClient,
-		Interval:       5 * time.Minute,
+		Interval:       30 * time.Minute,
 	})
 	go reconciler.Start(context.Background())
-	fmt.Println("Reconciler started")
+	fmt.Println("Reconciler started (30 min backup interval)")
 
 	app.Router.Use(middleware.Logger)
 	app.Router.Use(middleware.RequestID)
