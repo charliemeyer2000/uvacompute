@@ -65,18 +65,28 @@ function formatStatus(status: string): string {
     "offline",
     "not_found",
   ]);
+  const creatingStatuses = new Set(["creating", "pending"]);
+  const provisioningStatuses = new Set(["booting", "provisioning"]);
+
   if (expiredStatuses.has(status)) {
     return formatStatusBullet("error", "Expired");
   }
   if (status === "ready") {
     return formatStatusBullet("success", "Ready");
   }
-  return formatStatusBullet("warning", "Provisioning");
+  if (creatingStatuses.has(status)) {
+    return formatStatusBullet("warning", "Creating");
+  }
+  if (provisioningStatuses.has(status)) {
+    return formatStatusBullet("warning", "Provisioning");
+  }
+  return formatStatusBullet("warning", status);
 }
 
 function getStatusMessage(status: string): string {
   const messages: Record<string, string> = {
     not_found: "VM not found",
+    creating: "Creating VM...",
     pending: "Creating VM...",
     booting: "Booting VM...",
     provisioning: "Provisioning VM (running cloud-init)...",
