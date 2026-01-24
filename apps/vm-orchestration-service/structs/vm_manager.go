@@ -425,12 +425,11 @@ func (vm *VMManager) HandleVMEvent(vmId string, status VMStatus, nodeId string) 
 		return
 	}
 
-	// Skip if VM is in creation flow - let CreateVM handle those transitions
 	if vmState.Status == VM_STATUS_CREATING ||
 		vmState.Status == VM_STATUS_PENDING ||
 		vmState.Status == VM_STATUS_BOOTING ||
 		vmState.Status == VM_STATUS_PROVISIONING {
-		if status != VM_STATUS_FAILED && status != VM_STATUS_OFFLINE {
+		if status != VM_STATUS_FAILED && status != VM_STATUS_OFFLINE && status != VM_STATUS_STOPPED {
 			vm.mu.Unlock()
 			return
 		}
