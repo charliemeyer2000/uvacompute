@@ -396,12 +396,10 @@ func (im *InformerManager) extractJobId(job *batchv1.Job) string {
 func (im *InformerManager) extractJobStatus(job *batchv1.Job) (structs.JobStatus, *int, string) {
 	for _, condition := range job.Status.Conditions {
 		if condition.Type == batchv1.JobComplete && condition.Status == corev1.ConditionTrue {
-			exitCode := 0
-			return structs.JOB_STATUS_COMPLETED, &exitCode, ""
+			return structs.JOB_STATUS_COMPLETED, nil, ""
 		}
 		if condition.Type == batchv1.JobFailed && condition.Status == corev1.ConditionTrue {
-			exitCode := 1
-			return structs.JOB_STATUS_FAILED, &exitCode, condition.Message
+			return structs.JOB_STATUS_FAILED, nil, condition.Message
 		}
 	}
 
@@ -458,6 +456,17 @@ func (im *InformerManager) extractPodJobId(pod *corev1.Pod) string {
 	return pod.Labels["uvacompute.io/job-id"]
 }
 
+const jobContainerName = "job"
+
+func findContainerStatus(statuses []corev1.ContainerStatus, name string) *corev1.ContainerStatus {
+	for i := range statuses {
+		if statuses[i].Name == name {
+			return &statuses[i]
+		}
+	}
+	return nil
+}
+
 func (im *InformerManager) handlePodEvent(pod *corev1.Pod) {
 	jobId := im.extractPodJobId(pod)
 	if jobId == "" {
@@ -488,17 +497,17 @@ func (im *InformerManager) extractPodStatus(pod *corev1.Pod, jobId string) (stru
 
 	case corev1.PodSucceeded:
 		exitCode := 0
-		if len(pod.Status.ContainerStatuses) > 0 && pod.Status.ContainerStatuses[0].State.Terminated != nil {
-			exitCode = int(pod.Status.ContainerStatuses[0].State.Terminated.ExitCode)
+		if cs := findContainerStatus(pod.Status.ContainerStatuses, jobContainerName); cs != nil && cs.State.Terminated != nil {
+			exitCode = int(cs.State.Terminated.ExitCode)
 		}
 		return structs.JOB_STATUS_COMPLETED, &exitCode, "", true
 
 	case corev1.PodFailed:
 		exitCode := 1
 		errorMsg := ""
-		if len(pod.Status.ContainerStatuses) > 0 && pod.Status.ContainerStatuses[0].State.Terminated != nil {
-			exitCode = int(pod.Status.ContainerStatuses[0].State.Terminated.ExitCode)
-			errorMsg = pod.Status.ContainerStatuses[0].State.Terminated.Message
+		if cs := findContainerStatus(pod.Status.ContainerStatuses, jobContainerName); cs != nil && cs.State.Terminated != nil {
+			exitCode = int(cs.State.Terminated.ExitCode)
+			errorMsg = cs.State.Terminated.Message
 		}
 		return structs.JOB_STATUS_FAILED, &exitCode, errorMsg, true
 
@@ -572,18 +581,17 @@ func (im *InformerManager) handlePendingPod(pod *corev1.Pod, jobId, nodeId strin
 }
 
 func (im *InformerManager) handleRunningPod(pod *corev1.Pod, jobId, nodeId string) (structs.JobStatus, *int, string, bool) {
-	for _, containerStatus := range pod.Status.ContainerStatuses {
-		if containerStatus.Name == "job" && containerStatus.State.Terminated != nil {
-			exitCode := int(containerStatus.State.Terminated.ExitCode)
-			if exitCode != 0 {
-				errorMsg := containerStatus.State.Terminated.Message
-				if errorMsg == "" {
-					errorMsg = containerStatus.State.Terminated.Reason
-				}
-				return structs.JOB_STATUS_FAILED, &exitCode, "Container failed: " + errorMsg, true
+	cs := findContainerStatus(pod.Status.ContainerStatuses, jobContainerName)
+	if cs != nil && cs.State.Terminated != nil {
+		exitCode := int(cs.State.Terminated.ExitCode)
+		if exitCode != 0 {
+			errorMsg := cs.State.Terminated.Message
+			if errorMsg == "" {
+				errorMsg = cs.State.Terminated.Reason
 			}
-			return structs.JOB_STATUS_COMPLETED, &exitCode, "", true
+			return structs.JOB_STATUS_FAILED, &exitCode, "Container failed: " + errorMsg, true
 		}
+		return structs.JOB_STATUS_COMPLETED, &exitCode, "", true
 	}
 
 	return structs.JOB_STATUS_RUNNING, nil, "", false
