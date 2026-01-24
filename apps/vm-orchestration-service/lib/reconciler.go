@@ -125,6 +125,49 @@ func (r *Reconciler) reconcile() {
 			log.Printf("Reconciler: failed to sync jobs from Convex: %v", err)
 		}
 	}
+
+	r.reconcileStoppingVMs()
+}
+
+func (r *Reconciler) reconcileStoppingVMs() {
+	if r.callbackClient == nil {
+		return
+	}
+
+	stoppingVMs, err := r.callbackClient.FetchActiveVMs()
+	if err != nil {
+		log.Printf("Reconciler: failed to fetch active VMs from Convex: %v", err)
+		return
+	}
+
+	stoppingCount := 0
+	for _, vm := range stoppingVMs {
+		if vm.Status != "stopping" {
+			continue
+		}
+
+		_, err := r.vmProvider.GetVMStatus(vm.VMId)
+		if err != nil {
+			log.Printf("Reconciler: VM %s is stopping but not in K8s, marking as stopped", vm.VMId)
+			if notifyErr := r.callbackClient.NotifyVMStatusUpdate(vm.VMId, "stopped", ""); notifyErr != nil {
+				log.Printf("ERROR: Failed to notify site about stopped VM %s: %v", vm.VMId, notifyErr)
+			}
+		} else {
+			log.Printf("Reconciler: retrying deletion of stopping VM %s", vm.VMId)
+			if deleteErr := r.vmProvider.DestroyVM(vm.VMId); deleteErr == nil {
+				if notifyErr := r.callbackClient.NotifyVMStatusUpdate(vm.VMId, "stopped", ""); notifyErr != nil {
+					log.Printf("ERROR: Failed to notify site about stopped VM %s: %v", vm.VMId, notifyErr)
+				}
+			} else {
+				log.Printf("ERROR: Failed to delete stopping VM %s: %v - will retry next sync", vm.VMId, deleteErr)
+			}
+		}
+		stoppingCount++
+	}
+
+	if stoppingCount > 0 {
+		log.Printf("Reconciler: processed %d stopping VMs", stoppingCount)
+	}
 }
 
 func mapKubeVirtStatusToVMStatus(status string) structs.VMStatus {

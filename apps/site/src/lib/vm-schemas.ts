@@ -26,6 +26,7 @@ export type VMCreationStatus = z.infer<typeof VMCreationStatusEnum>;
 
 export const VMDeletionStatusEnum = z.enum([
   "deletion_success",
+  "deletion_pending",
   "deletion_failed_internal",
   "deletion_failed_not_found",
 ]);

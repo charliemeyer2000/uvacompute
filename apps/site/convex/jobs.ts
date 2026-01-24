@@ -135,7 +135,13 @@ export const listActiveByUser = query({
       .order("desc")
       .collect();
 
-    const activeStatuses = ["pending", "scheduled", "pulling", "running"];
+    const activeStatuses = [
+      "pending",
+      "scheduled",
+      "pulling",
+      "running",
+      "cancelling",
+    ];
 
     return allJobs.filter((job) => activeStatuses.includes(job.status));
   },
@@ -196,7 +202,13 @@ export const cancel = mutation({
       throw new Error("Unauthorized: Job belongs to another user");
     }
 
-    const cancellableStatuses = ["pending", "scheduled", "pulling", "running"];
+    const cancellableStatuses = [
+      "pending",
+      "scheduled",
+      "pulling",
+      "running",
+      "cancelling",
+    ];
     if (!cancellableStatuses.includes(job.status)) {
       throw new Error(`Cannot cancel job in status: ${job.status}`);
     }
@@ -218,6 +230,44 @@ export const cancel = mutation({
   },
 });
 
+export const markCancelling = mutation({
+  args: {
+    jobId: v.string(),
+    userId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const job = await ctx.db
+      .query("jobs")
+      .withIndex("by_jobId", (q) => q.eq("jobId", args.jobId))
+      .first();
+
+    if (!job) {
+      throw new Error(`Job ${args.jobId} not found`);
+    }
+
+    if (job.userId !== args.userId) {
+      throw new Error("Unauthorized: Job belongs to another user");
+    }
+
+    const cancellableStatuses = [
+      "pending",
+      "scheduled",
+      "pulling",
+      "running",
+      "cancelling",
+    ];
+    if (!cancellableStatuses.includes(job.status)) {
+      throw new Error(`Cannot cancel job in status: ${job.status}`);
+    }
+
+    if (job.status !== "cancelling") {
+      await ctx.db.patch(job._id, { status: "cancelling" });
+    }
+
+    return job._id;
+  },
+});
+
 export const listAll = query({
   args: {},
   handler: async (ctx) => {
@@ -230,7 +280,13 @@ export const listActive = query({
   handler: async (ctx) => {
     const allJobs = await ctx.db.query("jobs").order("desc").collect();
 
-    const activeStatuses = ["pending", "scheduled", "pulling", "running"];
+    const activeStatuses = [
+      "pending",
+      "scheduled",
+      "pulling",
+      "running",
+      "cancelling",
+    ];
 
     return allJobs
       .filter((job) => activeStatuses.includes(job.status))

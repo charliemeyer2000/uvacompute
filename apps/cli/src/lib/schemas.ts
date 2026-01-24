@@ -76,6 +76,7 @@ export const VMCreationResponseSchema = z.object({
 
 const VMDeletionStatusEnum = z.enum([
   "deletion_success",
+  "deletion_pending",
   "deletion_failed_internal",
   "deletion_failed_not_found",
 ]);
@@ -120,7 +121,14 @@ export type VMStatus = z.infer<typeof VMStatusEnum>;
 
 export const VM_STATUS_GROUPS = {
   READY: ["ready"] as const,
-  ACTIVE: ["creating", "pending", "booting", "provisioning", "ready"] as const,
+  ACTIVE: [
+    "creating",
+    "pending",
+    "booting",
+    "provisioning",
+    "ready",
+    "stopping",
+  ] as const,
   DELETABLE: [
     "creating",
     "pending",
@@ -258,12 +266,13 @@ export const JobStatusEnum = z.enum([
   "completed",
   "failed",
   "cancelled",
+  "cancelling",
   "node_offline",
 ]);
 export type JobStatus = z.infer<typeof JobStatusEnum>;
 
 export const JOB_STATUS_GROUPS = {
-  ACTIVE: ["pending", "scheduled", "pulling", "running"] as const,
+  ACTIVE: ["pending", "scheduled", "pulling", "running", "cancelling"] as const,
   TERMINAL: ["completed", "failed", "cancelled", "node_offline"] as const,
   CANCELLABLE: ["pending", "scheduled", "pulling", "running"] as const,
 } as const;
@@ -303,6 +312,7 @@ export const JobCreationResponseSchema = z.object({
 
 const JobCancellationStatusEnum = z.enum([
   "cancellation_success",
+  "cancellation_pending",
   "cancellation_failed_internal",
   "cancellation_failed_not_found",
   "cancellation_failed_not_cancellable",
