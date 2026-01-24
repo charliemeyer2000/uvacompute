@@ -23,8 +23,6 @@ import (
 	"vm-orchestration-service/structs"
 )
 
-// InformerManager handles Kubernetes watch events for VMIs, Jobs, and Pods
-// using SharedInformers for efficient, event-driven status updates.
 type InformerManager struct {
 	dynamicFactory dynamicinformer.DynamicSharedInformerFactory
 	typedFactory   informers.SharedInformerFactory
@@ -40,14 +38,12 @@ type InformerManager struct {
 	started        bool
 }
 
-// InformerConfig contains configuration for creating an InformerManager.
 type InformerConfig struct {
 	KubeconfigPath string
 	Namespace      string
 	ResyncPeriod   time.Duration // Default: 15 minutes
 }
 
-// NewInformerManager creates a new InformerManager with the given configuration.
 func NewInformerManager(config InformerConfig, vmManager *structs.VMManager, jobManager *structs.JobManager, callbackClient structs.CallbackClient) (*InformerManager, error) {
 	var restConfig *rest.Config
 	var err error
@@ -82,24 +78,20 @@ func NewInformerManager(config InformerConfig, vmManager *structs.VMManager, job
 		resyncPeriod = 15 * time.Minute
 	}
 
-	// Create dynamic informer factory for KubeVirt CRDs (VMI)
 	dynamicFactory := dynamicinformer.NewFilteredDynamicSharedInformerFactory(
 		dynamicClient,
 		resyncPeriod,
 		config.Namespace,
 		func(options *metav1.ListOptions) {
-			// Only watch VMIs managed by our service
 			options.LabelSelector = "app.kubernetes.io/managed-by=vm-orchestration-service"
 		},
 	)
 
-	// Create typed informer factory for Jobs and Pods
 	typedFactory := informers.NewSharedInformerFactoryWithOptions(
 		typedClient,
 		resyncPeriod,
 		informers.WithNamespace(config.Namespace),
 		informers.WithTweakListOptions(func(options *metav1.ListOptions) {
-			// Only watch resources with our job label
 			options.LabelSelector = "uvacompute.io/job-id"
 		}),
 	)
@@ -115,8 +107,6 @@ func NewInformerManager(config InformerConfig, vmManager *structs.VMManager, job
 	}, nil
 }
 
-// Start begins watching for Kubernetes events. This method blocks until
-// the cache is synced, then returns. Events are processed in the background.
 func (im *InformerManager) Start(ctx context.Context) error {
 	im.mu.Lock()
 	if im.started {
@@ -126,7 +116,6 @@ func (im *InformerManager) Start(ctx context.Context) error {
 	im.started = true
 	im.mu.Unlock()
 
-	// Set up VMI informer
 	vmiGVR := schema.GroupVersionResource{
 		Group:    "kubevirt.io",
 		Version:  "v1",
@@ -139,7 +128,6 @@ func (im *InformerManager) Start(ctx context.Context) error {
 		DeleteFunc: im.onVMIDelete,
 	})
 
-	// Set up Job informer
 	im.jobInformer = im.typedFactory.Batch().V1().Jobs().Informer()
 	im.jobInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    im.onJobAdd,
@@ -147,7 +135,6 @@ func (im *InformerManager) Start(ctx context.Context) error {
 		DeleteFunc: im.onJobDelete,
 	})
 
-	// Set up Pod informer for more granular job status
 	im.podInformer = im.typedFactory.Core().V1().Pods().Informer()
 	im.podInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    im.onPodAdd,
@@ -155,11 +142,9 @@ func (im *InformerManager) Start(ctx context.Context) error {
 		DeleteFunc: im.onPodDelete,
 	})
 
-	// Start the factories
 	im.dynamicFactory.Start(im.stopCh)
 	im.typedFactory.Start(im.stopCh)
 
-	// Wait for cache sync
 	log.Printf("Informers: Waiting for cache sync...")
 
 	syncCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
@@ -199,7 +184,6 @@ func (im *InformerManager) Start(ctx context.Context) error {
 	return nil
 }
 
-// Stop shuts down the informers.
 func (im *InformerManager) Stop() {
 	im.mu.Lock()
 	defer im.mu.Unlock()
@@ -212,8 +196,6 @@ func (im *InformerManager) Stop() {
 	im.started = false
 	log.Printf("Informers: Stopped")
 }
-
-// VMI Event Handlers
 
 func (im *InformerManager) onVMIAdd(obj interface{}) {
 	vmi, ok := obj.(*unstructured.Unstructured)
@@ -264,8 +246,6 @@ func (im *InformerManager) onVMIDelete(obj interface{}) {
 	im.vmManager.HandleVMEvent(vmId, structs.VM_STATUS_STOPPED, "")
 }
 
-// extractVMIStatus extracts the VM status and node ID from a VMI object.
-// Handles all known VMI phases and conditions.
 func (im *InformerManager) extractVMIStatus(vmi *unstructured.Unstructured) (structs.VMStatus, string) {
 	vmId := vmi.GetName()
 
@@ -277,77 +257,59 @@ func (im *InformerManager) extractVMIStatus(vmi *unstructured.Unstructured) (str
 	phase, _, _ := unstructured.NestedString(statusObj, "phase")
 	nodeName, _, _ := unstructured.NestedString(statusObj, "nodeName")
 
-	// Check conditions for more detailed status
 	conditions, _, _ := unstructured.NestedSlice(statusObj, "conditions")
 	readyCondition := im.findCondition(conditions, "Ready")
 
-	// Check for migration in progress
+	// Skip status update during migration
 	migrationState, migrationFound, _ := unstructured.NestedMap(statusObj, "migrationState")
 	if migrationFound && migrationState != nil {
 		completed, _, _ := unstructured.NestedBool(migrationState, "completed")
 		if !completed {
-			// Migration in progress - don't update status
-			log.Printf("Informers: VMI %s migration in progress, skipping status update", vmId)
-			return structs.VM_STATUS_READY, nodeName // Return current status
+			log.Printf("Informers: VMI %s migration in progress", vmId)
+			return structs.VM_STATUS_READY, nodeName
+		}
+	}
+
+	// Paused VMs are still considered ready
+	pausedCondition := im.findCondition(conditions, "Paused")
+	if pausedCondition != nil {
+		pausedStatus, _, _ := unstructured.NestedString(pausedCondition, "status")
+		if pausedStatus == "True" {
+			return structs.VM_STATUS_READY, nodeName
 		}
 	}
 
 	switch phase {
 	case "":
-		// Unset phase - initial state
 		return structs.VM_STATUS_PENDING, nodeName
-
-	case "Pending":
-		// Waiting for resources to be allocated
+	case "Pending", "Scheduling", "Scheduled", "WaitingForSync":
 		return structs.VM_STATUS_BOOTING, nodeName
-
-	case "Scheduling":
-		// Being scheduled to a node
-		return structs.VM_STATUS_BOOTING, nodeName
-
-	case "Scheduled":
-		// Scheduled, but VM process not yet started
-		return structs.VM_STATUS_BOOTING, nodeName
-
 	case "Running":
-		// VM is running - check Ready condition to distinguish READY vs PROVISIONING
 		if readyCondition != nil {
 			status, _, _ := unstructured.NestedString(readyCondition, "status")
 			if status == "True" {
 				return structs.VM_STATUS_READY, nodeName
 			}
-			// Running but not Ready - cloud-init or agent not ready
-			return structs.VM_STATUS_PROVISIONING, nodeName
 		}
-		// No Ready condition - assume provisioning
 		return structs.VM_STATUS_PROVISIONING, nodeName
-
 	case "Succeeded":
-		// Clean shutdown
 		return structs.VM_STATUS_STOPPED, nodeName
-
 	case "Failed":
-		// Error state - check conditions for more detail
 		reason := ""
 		if readyCondition != nil {
 			reason, _, _ = unstructured.NestedString(readyCondition, "reason")
 		}
 		log.Printf("Informers: VMI %s failed with reason: %s", vmId, reason)
 		return structs.VM_STATUS_FAILED, nodeName
-
 	case "Unknown":
-		// Node communication lost
-		log.Printf("Informers: VMI %s in Unknown phase - node communication lost", vmId)
+		log.Printf("Informers: VMI %s in Unknown phase - node lost", vmId)
 		return structs.VM_STATUS_OFFLINE, nodeName
-
 	default:
-		// Unknown phase - log and treat as pending
-		log.Printf("Informers: WARNING: Unknown VMI phase %q for %s - treating as PENDING", phase, vmId)
+		log.Printf("Informers: WARNING: Unhandled VMI phase %q for %s", phase, vmId)
 		return structs.VM_STATUS_PENDING, nodeName
 	}
 }
 
-// findCondition finds a condition by type in a conditions slice.
 func (im *InformerManager) findCondition(conditions []interface{}, conditionType string) map[string]interface{} {
 	for _, c := range conditions {
 		condition, ok := c.(map[string]interface{})
@@ -362,8 +324,6 @@ func (im *InformerManager) findCondition(conditions []interface{}, conditionType
 	return nil
 }
 
-// Job Event Handlers
-
 func (im *InformerManager) onJobAdd(obj interface{}) {
 	job, ok := obj.(*batchv1.Job)
 	if !ok {
@@ -377,7 +337,7 @@ func (im *InformerManager) onJobAdd(obj interface{}) {
 	}
 
 	status, exitCode, errorMsg := im.extractJobStatus(job)
-	nodeId := "" // Will be updated by pod events
+	nodeId := ""
 
 	log.Printf("Informers: Job ADD %s -> %s", jobId, status)
 	im.jobManager.HandleJobEvent(jobId, status, exitCode, errorMsg, nodeId)
@@ -396,7 +356,7 @@ func (im *InformerManager) onJobUpdate(oldObj, newObj interface{}) {
 	}
 
 	status, exitCode, errorMsg := im.extractJobStatus(job)
-	nodeId := "" // Will be updated by pod events
+	nodeId := ""
 
 	log.Printf("Informers: Job UPDATE %s -> %s", jobId, status)
 	im.jobManager.HandleJobEvent(jobId, status, exitCode, errorMsg, nodeId)
@@ -426,7 +386,6 @@ func (im *InformerManager) onJobDelete(obj interface{}) {
 	im.jobManager.HandleJobEvent(jobId, structs.JOB_STATUS_CANCELLED, nil, "Job deleted", "")
 }
 
-// extractJobId gets the job ID from the label.
 func (im *InformerManager) extractJobId(job *batchv1.Job) string {
 	if job.Labels == nil {
 		return ""
@@ -434,7 +393,6 @@ func (im *InformerManager) extractJobId(job *batchv1.Job) string {
 	return job.Labels["uvacompute.io/job-id"]
 }
 
-// extractJobStatus determines job status from Job conditions.
 func (im *InformerManager) extractJobStatus(job *batchv1.Job) (structs.JobStatus, *int, string) {
 	for _, condition := range job.Status.Conditions {
 		if condition.Type == batchv1.JobComplete && condition.Status == corev1.ConditionTrue {
@@ -447,11 +405,8 @@ func (im *InformerManager) extractJobStatus(job *batchv1.Job) (structs.JobStatus
 		}
 	}
 
-	// Not terminal - status will be determined by pod events
 	return structs.JOB_STATUS_PENDING, nil, ""
 }
-
-// Pod Event Handlers - provide more granular job status
 
 func (im *InformerManager) onPodAdd(obj interface{}) {
 	pod, ok := obj.(*corev1.Pod)
@@ -493,11 +448,9 @@ func (im *InformerManager) onPodDelete(obj interface{}) {
 		return
 	}
 
-	// Pod deletion - the Job controller will handle the final status
 	log.Printf("Informers: Pod DELETE for job %s", jobId)
 }
 
-// extractPodJobId gets the job ID from pod labels.
 func (im *InformerManager) extractPodJobId(pod *corev1.Pod) string {
 	if pod.Labels == nil {
 		return ""
@@ -505,8 +458,6 @@ func (im *InformerManager) extractPodJobId(pod *corev1.Pod) string {
 	return pod.Labels["uvacompute.io/job-id"]
 }
 
-// handlePodEvent processes a pod event to determine job status.
-// This logic is adapted from jobs.go checkJobStatus.
 func (im *InformerManager) handlePodEvent(pod *corev1.Pod) {
 	jobId := im.extractPodJobId(pod)
 	if jobId == "" {
@@ -525,8 +476,6 @@ func (im *InformerManager) handlePodEvent(pod *corev1.Pod) {
 	im.jobManager.HandleJobEvent(jobId, status, exitCode, errorMsg, nodeId)
 }
 
-// extractPodStatus determines job status from pod state.
-// Returns status, exitCode, errorMsg, and whether the status is terminal.
 func (im *InformerManager) extractPodStatus(pod *corev1.Pod, jobId string) (structs.JobStatus, *int, string, bool) {
 	nodeId := pod.Spec.NodeName
 
@@ -563,9 +512,7 @@ func (im *InformerManager) extractPodStatus(pod *corev1.Pod, jobId string) (stru
 	}
 }
 
-// handlePendingPod handles the PodPending phase with detailed container state checking.
 func (im *InformerManager) handlePendingPod(pod *corev1.Pod, jobId, nodeId string) (structs.JobStatus, *int, string, bool) {
-	// Check pod conditions for scheduling failures
 	for _, condition := range pod.Status.Conditions {
 		if condition.Type == corev1.PodScheduled && condition.Status == corev1.ConditionFalse {
 			if condition.Reason == "Unschedulable" {
@@ -575,7 +522,6 @@ func (im *InformerManager) handlePendingPod(pod *corev1.Pod, jobId, nodeId strin
 		}
 	}
 
-	// Check init container statuses for failures
 	for _, containerStatus := range pod.Status.InitContainerStatuses {
 		if containerStatus.State.Waiting != nil {
 			reason := containerStatus.State.Waiting.Reason
@@ -592,9 +538,7 @@ func (im *InformerManager) handlePendingPod(pod *corev1.Pod, jobId, nodeId strin
 		}
 	}
 
-	// Check main container statuses
 	for _, containerStatus := range pod.Status.ContainerStatuses {
-		// Check for terminated containers first (immediate startup failures)
 		if containerStatus.State.Terminated != nil && containerStatus.State.Terminated.ExitCode != 0 {
 			exitCode := int(containerStatus.State.Terminated.ExitCode)
 			errorMsg := containerStatus.State.Terminated.Message
@@ -617,21 +561,17 @@ func (im *InformerManager) handlePendingPod(pod *corev1.Pod, jobId, nodeId strin
 				return structs.JOB_STATUS_PULLING, nil, "", false
 			}
 
-			// Unknown waiting reason - log it
 			log.Printf("Informers: WARNING: Unknown container waiting reason for job %s: %s - %s", jobId, reason, message)
 		}
 	}
 
-	// Default for pending pods
 	if nodeId != "" {
 		return structs.JOB_STATUS_PULLING, nil, "", false
 	}
 	return structs.JOB_STATUS_SCHEDULED, nil, "", false
 }
 
-// handleRunningPod handles the PodRunning phase.
 func (im *InformerManager) handleRunningPod(pod *corev1.Pod, jobId, nodeId string) (structs.JobStatus, *int, string, bool) {
-	// Check if any container has already terminated
 	for _, containerStatus := range pod.Status.ContainerStatuses {
 		if containerStatus.Name == "job" && containerStatus.State.Terminated != nil {
 			exitCode := int(containerStatus.State.Terminated.ExitCode)
@@ -642,7 +582,6 @@ func (im *InformerManager) handleRunningPod(pod *corev1.Pod, jobId, nodeId strin
 				}
 				return structs.JOB_STATUS_FAILED, &exitCode, "Container failed: " + errorMsg, true
 			}
-			// Container completed successfully
 			return structs.JOB_STATUS_COMPLETED, &exitCode, "", true
 		}
 	}
@@ -650,7 +589,6 @@ func (im *InformerManager) handleRunningPod(pod *corev1.Pod, jobId, nodeId strin
 	return structs.JOB_STATUS_RUNNING, nil, "", false
 }
 
-// isFatalWaitingReason returns true if the waiting reason indicates a non-recoverable error.
 func isFatalWaitingReason(reason string) bool {
 	switch reason {
 	case "CrashLoopBackOff",
@@ -658,34 +596,33 @@ func isFatalWaitingReason(reason string) bool {
 		"CreateContainerError",
 		"InvalidImageName",
 		"ErrImageNeverPull",
+		"ImageInspectError",
 		"RunContainerError",
 		"StartError",
 		"ContainerCannotRun",
 		"PreStartHookError",
 		"PostStartHookError",
-		"PreCreateHookError",
-		"ImageInspectError":
+		"PreCreateHookError":
 		return true
 	default:
 		return false
 	}
 }
 
-// isTransientWaitingReason returns true if the waiting reason is transient and will resolve.
 func isTransientWaitingReason(reason string) bool {
 	switch reason {
 	case "ContainerCreating",
+		"PodInitializing",
 		"Pulling",
-		"ImagePullBackOff",
 		"ErrImagePull",
-		"PodInitializing":
+		"ImagePullBackOff",
+		"RegistryUnavailable":
 		return true
 	default:
 		return false
 	}
 }
 
-// getWaitingErrorMessage returns a descriptive error message for a fatal waiting reason.
 func getWaitingErrorMessage(reason, message string) string {
 	switch reason {
 	case "CrashLoopBackOff":

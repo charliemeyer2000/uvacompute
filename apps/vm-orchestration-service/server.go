@@ -3,8 +3,11 @@ package main
 import (
 	"context"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"vm-orchestration-service/handlers"
@@ -32,6 +35,10 @@ func loadEnvFile() {
 func main() {
 	loadEnvFile()
 	fmt.Println("Starting server...")
+
+	// Create cancellable context for graceful shutdown
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	if structs.IsDevelopment() {
 		fmt.Println("Running in development mode")
@@ -103,7 +110,6 @@ func main() {
 	if err != nil {
 		fmt.Printf("Warning: Failed to create health monitor: %v\n", err)
 	} else {
-		ctx := context.Background()
 		go healthMonitor.Start(ctx)
 		fmt.Println("Health monitor started")
 	}
@@ -140,7 +146,8 @@ func main() {
 
 	// Start the event-driven informer manager
 	// This handles real-time status updates for VMIs, Jobs, and Pods
-	informerManager, err := lib.NewInformerManager(lib.InformerConfig{
+	var informerManager *lib.InformerManager
+	informerManager, err = lib.NewInformerManager(lib.InformerConfig{
 		KubeconfigPath: kubeVirtConfig.KubeconfigPath,
 		Namespace:      kubeVirtConfig.Namespace,
 		ResyncPeriod:   15 * time.Minute,
@@ -149,7 +156,7 @@ func main() {
 		fmt.Printf("Warning: Failed to create informer manager: %v\n", err)
 	} else {
 		// Start AFTER SyncFromConvex/SyncJobsFromConvex to avoid race conditions
-		if err := informerManager.Start(context.Background()); err != nil {
+		if err := informerManager.Start(ctx); err != nil {
 			fmt.Printf("Warning: Failed to start informers: %v\n", err)
 		} else {
 			fmt.Println("Informer manager started - watching VMIs, Jobs, and Pods")
@@ -166,7 +173,7 @@ func main() {
 		CallbackClient: callbackClient,
 		Interval:       30 * time.Minute,
 	})
-	go reconciler.Start(context.Background())
+	go reconciler.Start(ctx)
 	fmt.Println("Reconciler started (30 min backup interval)")
 
 	app.Router.Use(middleware.Logger)
@@ -193,10 +200,33 @@ func main() {
 		handlers.AuthMiddleware,
 	)
 
+	server := &http.Server{
+		Addr:    ":8080",
+		Handler: app.Router,
+	}
+
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, syscall.SIGTERM, syscall.SIGINT)
+
+	go func() {
+		<-sigCh
+		log.Println("Shutdown signal received")
+		cancel()
+		if informerManager != nil {
+			informerManager.Stop()
+		}
+		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer shutdownCancel()
+		if err := server.Shutdown(shutdownCtx); err != nil {
+			log.Printf("HTTP server shutdown error: %v", err)
+		}
+	}()
+
 	fmt.Println("Routes configured, starting server on :8080")
-	err = http.ListenAndServe(":8080", app.Router)
-	if err != nil {
+	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		fmt.Printf("Server failed to start: %v\n", err)
 		panic(err)
 	}
+
+	log.Println("Server stopped gracefully")
 }
