@@ -96,19 +96,25 @@ ssh workstation "sudo gpu-mode-nvidia"
 **View service status:**
 
 ```bash
-ssh root@24.199.85.26 "systemctl status vm-orchestration-service"
+ssh root@24.199.85.26 "systemctl status vm-orchestration.service"
 ```
 
 **View recent logs:**
 
 ```bash
-ssh root@24.199.85.26 "journalctl -u vm-orchestration-service -n 100 --no-pager"
+ssh root@24.199.85.26 "journalctl -u vm-orchestration.service -n 100 --no-pager"
 ```
 
 **Follow logs in real-time:**
 
 ```bash
-ssh root@24.199.85.26 "journalctl -u vm-orchestration-service -f"
+ssh root@24.199.85.26 "journalctl -u vm-orchestration.service -f"
+```
+
+**Check startup/sync logs (useful after deploys):**
+
+```bash
+ssh root@24.199.85.26 "journalctl -u vm-orchestration.service --since '10 minutes ago' --no-pager | head -60"
 ```
 
 ### 5. Check KubeVirt Components
@@ -145,7 +151,33 @@ ssh root@24.199.85.26 "systemctl status vmproxy"
 ssh workstation "systemctl status uvacompute-tunnel"
 ```
 
-### 7. Debug VM Creation Issues
+### 7. Check Jobs
+
+**List all jobs and pods:**
+
+```bash
+ssh root@24.199.85.26 "kubectl get jobs,pods -n uvacompute -o wide"
+```
+
+**Check job details (creation time, spec):**
+
+```bash
+ssh root@24.199.85.26 "kubectl get job JOB_ID -n uvacompute -o yaml | head -50"
+```
+
+**Describe a pod for scheduling issues:**
+
+```bash
+ssh root@24.199.85.26 "kubectl describe pod POD_NAME -n uvacompute | head -40"
+```
+
+**Delete an orphan job:**
+
+```bash
+ssh root@24.199.85.26 "kubectl delete job JOB_ID -n uvacompute"
+```
+
+### 8. Debug VM Creation Issues
 
 **Check events for a VM:**
 
@@ -159,7 +191,7 @@ ssh root@24.199.85.26 "kubectl get events -n uvacompute --field-selector involve
 ssh root@24.199.85.26 "kubectl get secret cloudinit-VM_ID -n uvacompute -o yaml"
 ```
 
-### 8. Node Connectivity
+### 9. Node Connectivity
 
 **Check node annotations (tunnel ports):**
 
@@ -195,6 +227,16 @@ ssh root@24.199.85.26 "ssh -p TUNNEL_PORT localhost hostname"
 2. Check tunnel status: `ssh workstation "systemctl status uvacompute-tunnel"`
 3. Check node appears: `ssh root@24.199.85.26 "kubectl get nodes"`
 4. Check node logs: `ssh workstation "journalctl -u k3s-agent -n 50"`
+
+### Job/VM Desync (UI doesn't match reality)
+
+There are 3 sources of truth: Kubernetes, vm-orchestration-service (in-memory), and Convex (database).
+
+1. Check what's actually running in K8s: `kubectl get jobs,pods -n uvacompute`
+2. Check service startup logs for sync results: `journalctl -u vm-orchestration.service --since '1 hour ago' | grep -E "(sync|Convex|Fetched)"`
+3. Look for "Fetched 0 active jobs" after restart - means Convex has no record
+4. If K8s has jobs that Convex doesn't know about, they're orphans - delete them from K8s
+5. Common cause: job cancellation succeeded in Convex but K8s delete failed
 
 ## File Locations
 
