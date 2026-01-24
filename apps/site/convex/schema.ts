@@ -22,6 +22,7 @@ export const JOB_STATUSES = [
   "completed",
   "failed",
   "cancelled",
+  "cancelling",
   "node_offline",
 ] as const;
 
