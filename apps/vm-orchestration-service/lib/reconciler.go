@@ -11,6 +11,8 @@ import (
 type Reconciler struct {
 	vmManager      *structs.VMManager
 	vmProvider     structs.VMProvider
+	jobManager     *structs.JobManager
+	jobAdapter     *JobAdapter
 	callbackClient *CallbackClient
 	interval       time.Duration
 }
@@ -18,6 +20,8 @@ type Reconciler struct {
 type ReconcilerConfig struct {
 	VMManager      *structs.VMManager
 	VMProvider     structs.VMProvider
+	JobManager     *structs.JobManager
+	JobAdapter     *JobAdapter
 	CallbackClient *CallbackClient
 	Interval       time.Duration
 }
@@ -25,12 +29,16 @@ type ReconcilerConfig struct {
 func NewReconciler(config ReconcilerConfig) *Reconciler {
 	interval := config.Interval
 	if interval == 0 {
-		interval = 5 * time.Minute
+		// Default to 30 minutes - the reconciler is now a backup consistency check
+		// since SharedInformers handle real-time status updates.
+		interval = 30 * time.Minute
 	}
 
 	return &Reconciler{
 		vmManager:      config.VMManager,
 		vmProvider:     config.VMProvider,
+		jobManager:     config.JobManager,
+		jobAdapter:     config.JobAdapter,
 		callbackClient: config.CallbackClient,
 		interval:       interval,
 	}
@@ -109,9 +117,13 @@ func (r *Reconciler) reconcile() {
 	}
 
 	if addedCount > 0 || updatedCount > 0 {
-		log.Printf("Reconciler: pass complete - added %d VMs, updated %d VMs", addedCount, updatedCount)
-	} else {
-		log.Printf("Reconciler: pass complete - no changes needed")
+		log.Printf("Reconciler: VM pass complete - added %d VMs, updated %d VMs", addedCount, updatedCount)
+	}
+
+	if r.jobManager != nil && r.jobAdapter != nil {
+		if err := SyncJobsFromConvex(r.jobManager, r.jobAdapter, r.callbackClient); err != nil {
+			log.Printf("Reconciler: failed to sync jobs from Convex: %v", err)
+		}
 	}
 }
 
