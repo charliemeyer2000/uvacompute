@@ -960,16 +960,23 @@ async function listVMs(): Promise<void> {
     );
 
     console.log();
-    const headers = ["Expires", "VM", "Resources", "Status"];
+    const hasAnyExposeUrl = sorted.some((vm) => vm.exposeUrl);
+    const headers = hasAnyExposeUrl
+      ? ["Expires", "VM", "Resources", "Status", "Endpoint"]
+      : ["Expires", "VM", "Resources", "Status"];
     const rows = sorted.map((vm) => {
       const nameDisplay = vm.name ? vm.name : "(unnamed)";
       const vmLabel = `${nameDisplay} ${theme.muted(vm.vmId)}`;
-      return [
+      const row = [
         formatExpiresAt(vm.expiresAt),
         vmLabel,
         formatResources(vm),
         formatStatus(vm.status),
       ];
+      if (hasAnyExposeUrl) {
+        row.push(vm.exposeUrl ? theme.success(vm.exposeUrl) : theme.muted("-"));
+      }
+      return row;
     });
 
     renderTable(headers, rows);
