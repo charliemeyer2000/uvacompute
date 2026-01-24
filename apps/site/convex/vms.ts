@@ -158,6 +158,7 @@ export const listActiveByUser = query({
       "booting",
       "provisioning",
       "ready",
+      "stopping",
     ];
 
     return allVms.filter((vm) => activeStatuses.includes(vm.status));
@@ -175,13 +176,7 @@ export const listInactiveByUser = query({
       .order("desc")
       .collect();
 
-    const inactiveStatuses = [
-      "failed",
-      "stopped",
-      "not_found",
-      "stopping",
-      "offline",
-    ];
+    const inactiveStatuses = ["failed", "stopped", "not_found", "offline"];
 
     return allVms.filter((vm) => inactiveStatuses.includes(vm.status));
   },
@@ -224,6 +219,7 @@ export const listActive = query({
       "booting",
       "provisioning",
       "ready",
+      "stopping",
     ];
 
     return allVms
@@ -247,6 +243,45 @@ export const listActive = query({
         expiresAt: vm.expiresAt,
         nodeId: vm.nodeId,
       }));
+  },
+});
+
+export const markStopping = mutation({
+  args: {
+    vmId: v.string(),
+    userId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const vm = await ctx.db
+      .query("vms")
+      .withIndex("by_vmId", (q) => q.eq("vmId", args.vmId))
+      .first();
+
+    if (!vm) {
+      throw new Error(`VM ${args.vmId} not found`);
+    }
+
+    if (vm.userId !== args.userId) {
+      throw new Error("Unauthorized: VM belongs to another user");
+    }
+
+    const deletableStatuses = [
+      "creating",
+      "pending",
+      "booting",
+      "provisioning",
+      "ready",
+      "stopping",
+    ];
+    if (!deletableStatuses.includes(vm.status)) {
+      throw new Error(`Cannot delete VM in status: ${vm.status}`);
+    }
+
+    if (vm.status !== "stopping") {
+      await ctx.db.patch(vm._id, { status: "stopping" });
+    }
+
+    return vm._id;
   },
 });
 

@@ -27,12 +27,31 @@ func SyncJobsFromConvex(jobManager *structs.JobManager, jobAdapter *JobAdapter, 
 
 	currentJobs := jobManager.ListAllJobs()
 
-	syncedCount := 0
-	orphanedCount := 0
+	syncedCount, orphanedCount, cancellingCount := 0, 0, 0
 
 	for _, cjob := range convexJobs {
 		existingJob, existsInMemory := currentJobs[cjob.JobId]
 		k8sStatus, err := jobAdapter.GetJobStatus(cjob.JobId)
+
+		if cjob.Status == "cancelling" {
+			if err != nil {
+				log.Printf("SyncJobsFromConvex: job %s is cancelling but not in K8s, marking cancelled", cjob.JobId)
+				if notifyErr := callbackClient.NotifyJobStatusUpdate(cjob.JobId, string(structs.JOB_STATUS_CANCELLED), nil, "", ""); notifyErr != nil {
+					log.Printf("ERROR: Failed to notify site about cancelling job %s: %v", cjob.JobId, notifyErr)
+				}
+			} else {
+				log.Printf("SyncJobsFromConvex: retrying deletion of cancelling job %s", cjob.JobId)
+				if deleteErr := jobAdapter.DeleteJob(cjob.JobId); deleteErr == nil {
+					if notifyErr := callbackClient.NotifyJobStatusUpdate(cjob.JobId, string(structs.JOB_STATUS_CANCELLED), nil, "", ""); notifyErr != nil {
+						log.Printf("ERROR: Failed to notify site about cancelled job %s: %v", cjob.JobId, notifyErr)
+					}
+				} else {
+					log.Printf("ERROR: Failed to delete cancelling job %s: %v - will retry next sync", cjob.JobId, deleteErr)
+				}
+			}
+			cancellingCount++
+			continue
+		}
 
 		if err != nil {
 			log.Printf("Job %s exists in Convex (status: %s) but not in Kubernetes - marking as failed", cjob.JobId, cjob.Status)
@@ -98,8 +117,8 @@ func SyncJobsFromConvex(jobManager *structs.JobManager, jobAdapter *JobAdapter, 
 		}
 	}
 
-	log.Printf("Convex job sync complete: %d jobs synced, %d orphaned jobs marked as failed",
-		syncedCount, orphanedCount)
+	log.Printf("Convex job sync complete: %d jobs synced, %d orphaned jobs marked as failed, %d cancelling jobs processed",
+		syncedCount, orphanedCount, cancellingCount)
 	return nil
 }
 
