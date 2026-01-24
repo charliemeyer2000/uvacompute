@@ -26,6 +26,7 @@ export const theme = {
 
 export const statusColors = {
   not_found: chalk.gray,
+  creating: chalk.yellow,
   pending: chalk.yellow,
   booting: chalk.blue,
   provisioning: chalk.blue,

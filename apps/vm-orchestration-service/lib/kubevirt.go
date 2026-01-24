@@ -12,7 +12,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -604,16 +603,6 @@ func (k *KubeVirtAdapter) InitializeFromKubevirt() error {
 
 	log.Printf("Found %d VMs in KubeVirt namespace %s", len(vms), k.namespace)
 	return nil
-}
-
-func (k *KubeVirtAdapter) WatchVMs(ctx context.Context) (<-chan watch.Event, error) {
-	watcher, err := k.client.Resource(vmiGVR).Namespace(k.namespace).Watch(ctx, metav1.ListOptions{
-		LabelSelector: "app.kubernetes.io/managed-by=vm-orchestration-service",
-	})
-	if err != nil {
-		return nil, err
-	}
-	return watcher.ResultChan(), nil
 }
 
 func (k *KubeVirtAdapter) Ping() error {
