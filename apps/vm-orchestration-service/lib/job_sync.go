@@ -1,7 +1,6 @@
 package lib
 
 import (
-	"context"
 	"log"
 	"time"
 
@@ -30,7 +29,6 @@ func SyncJobsFromConvex(jobManager *structs.JobManager, jobAdapter *JobAdapter, 
 
 	syncedCount := 0
 	orphanedCount := 0
-	watchersStarted := 0
 
 	for _, cjob := range convexJobs {
 		existingJob, existsInMemory := currentJobs[cjob.JobId]
@@ -83,34 +81,9 @@ func SyncJobsFromConvex(jobManager *structs.JobManager, jobAdapter *JobAdapter, 
 		if k8sStatus != convexStatus {
 			log.Printf("Job %s status mismatch (Convex: %s, K8s: %s) - updating Convex", cjob.JobId, cjob.Status, k8sStatus)
 
-			var exitCode *int
-			if k8sStatus == structs.JOB_STATUS_COMPLETED {
-				zero := 0
-				exitCode = &zero
-			} else if k8sStatus == structs.JOB_STATUS_FAILED {
-				one := 1
-				exitCode = &one
-			}
-
-			if notifyErr := callbackClient.NotifyJobStatusUpdate(cjob.JobId, string(k8sStatus), exitCode, "", nodeId); notifyErr != nil {
+			if notifyErr := callbackClient.NotifyJobStatusUpdate(cjob.JobId, string(k8sStatus), existingJob.ExitCode, existingJob.ErrorMessage, nodeId); notifyErr != nil {
 				log.Printf("ERROR: Failed to notify site about job %s status: %v", cjob.JobId, notifyErr)
 			}
-		}
-
-		isActive := k8sStatus == structs.JOB_STATUS_PENDING ||
-			k8sStatus == structs.JOB_STATUS_SCHEDULED ||
-			k8sStatus == structs.JOB_STATUS_PULLING ||
-			k8sStatus == structs.JOB_STATUS_RUNNING
-
-		if isActive {
-			log.Printf("Restarting status watcher for active job %s (status: %s)", cjob.JobId, k8sStatus)
-			jobId := cjob.JobId
-			ctx := context.Background()
-			statusCallback := func(status structs.JobStatus, exitCode *int, errorMsg string, nodeIdCb string) {
-				jobManager.UpdateJobStatus(jobId, status, exitCode, errorMsg, nodeIdCb)
-			}
-			jobAdapter.WatchJobStatusRecovered(ctx, jobId, statusCallback)
-			watchersStarted++
 		}
 
 		isTerminal := k8sStatus == structs.JOB_STATUS_COMPLETED ||
@@ -125,8 +98,8 @@ func SyncJobsFromConvex(jobManager *structs.JobManager, jobAdapter *JobAdapter, 
 		}
 	}
 
-	log.Printf("Convex job sync complete: %d jobs synced, %d orphaned jobs marked as failed, %d status watchers restarted",
-		syncedCount, orphanedCount, watchersStarted)
+	log.Printf("Convex job sync complete: %d jobs synced, %d orphaned jobs marked as failed",
+		syncedCount, orphanedCount)
 	return nil
 }
 
