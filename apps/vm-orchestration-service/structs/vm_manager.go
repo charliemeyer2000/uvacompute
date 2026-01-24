@@ -416,21 +416,18 @@ func (vm *VMManager) AddVMFromExternal(vmId string, state VMState) {
 }
 
 // HandleVMEvent processes VM status updates from Kubernetes informers.
-// It respects the creation flow by not overwriting PENDING/BOOTING/PROVISIONING
-// statuses unless the new status indicates a failure.
 func (vm *VMManager) HandleVMEvent(vmId string, status VMStatus, nodeId string) {
 	vm.mu.Lock()
 
 	vmState, exists := vm.vmMap[vmId]
 	if !exists {
 		vm.mu.Unlock()
-		// VM not tracked - ignore (Convex is source of truth for what we track)
 		return
 	}
 
-	// Skip if VM is in creation flow (PENDING/BOOTING/PROVISIONING)
-	// Let CreateVM handle those transitions, unless it's a failure
-	if vmState.Status == VM_STATUS_PENDING ||
+	// Skip if VM is in creation flow - let CreateVM handle those transitions
+	if vmState.Status == VM_STATUS_CREATING ||
+		vmState.Status == VM_STATUS_PENDING ||
 		vmState.Status == VM_STATUS_BOOTING ||
 		vmState.Status == VM_STATUS_PROVISIONING {
 		if status != VM_STATUS_FAILED && status != VM_STATUS_OFFLINE {
@@ -441,10 +438,22 @@ func (vm *VMManager) HandleVMEvent(vmId string, status VMStatus, nodeId string) 
 
 	// No change - skip
 	if vmState.Status == status {
-		// Update node ID if changed
+		// Update node ID if changed and notify
 		if nodeId != "" && vmState.NodeId != nodeId {
+			oldNodeId := vmState.NodeId
 			vmState.NodeId = nodeId
 			vm.vmMap[vmId] = vmState
+			vm.mu.Unlock()
+
+			log.Printf("VMManager: HandleVMEvent %s: nodeId changed %s -> %s (status: %s)", vmId, oldNodeId, nodeId, status)
+			if vm.callbackClient != nil {
+				go func() {
+					if err := vm.callbackClient.NotifyVMStatusUpdate(vmId, string(status), nodeId); err != nil {
+						log.Printf("ERROR: Failed to notify site about VM %s nodeId change: %v", vmId, err)
+					}
+				}()
+			}
+			return
 		}
 		vm.mu.Unlock()
 		return
@@ -473,6 +482,43 @@ func (vm *VMManager) HandleVMEvent(vmId string, status VMStatus, nodeId string) 
 				log.Printf("ERROR: Failed to notify site about VM %s status update from informer: %v", vmId, err)
 			}
 		}()
+	}
+}
+
+func (vm *VMManager) SetVMForTest(vmId string, status VMStatus, nodeId string) {
+	vm.mu.Lock()
+	defer vm.mu.Unlock()
+	vm.vmMap[vmId] = VMState{
+		Id:     vmId,
+		Status: status,
+		NodeId: nodeId,
+	}
+}
+
+func (vm *VMManager) GetVMStatusForTest(vmId string) VMStatus {
+	vm.mu.Lock()
+	defer vm.mu.Unlock()
+	if state, exists := vm.vmMap[vmId]; exists {
+		return state.Status
+	}
+	return ""
+}
+
+func (vm *VMManager) HasVM(vmId string) bool {
+	vm.mu.Lock()
+	defer vm.mu.Unlock()
+	_, exists := vm.vmMap[vmId]
+	return exists
+}
+
+func NewVMManagerForTest(callbackClient CallbackClient) *VMManager {
+	return &VMManager{
+		mu:               sync.Mutex{},
+		vmMap:            make(map[string]VMState),
+		expirationTimers: make(map[string]*time.Timer),
+		limits:           VMResourceLimits{MaxCpus: 16, MaxRam: 64, MaxGpus: 1},
+		vmProvider:       nil,
+		callbackClient:   callbackClient,
 	}
 }
 

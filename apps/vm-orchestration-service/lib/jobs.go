@@ -264,16 +264,6 @@ func (j *JobAdapter) createFrpcConfigMap(jobId string, config string) error {
 	return nil
 }
 
-// watchJobStatus is deprecated - status updates are now handled by SharedInformers.
-// The checkJobStatus function is still used for on-demand status checks.
-// This function is kept for reference but is no longer called.
-func (j *JobAdapter) watchJobStatusDeprecated(ctx context.Context, jobId string, statusCallback structs.JobStatusCallback) {
-	// Deprecated: See lib/informers.go for event-driven status updates
-	_ = ctx
-	_ = jobId
-	_ = statusCallback
-}
-
 func (j *JobAdapter) checkJobStatus(ctx context.Context, jobId string) (structs.JobStatus, *int, string, string, bool) {
 	job, err := j.client.BatchV1().Jobs(j.namespace).Get(ctx, jobId, metav1.GetOptions{})
 	if err != nil {
@@ -581,8 +571,3 @@ func (j *JobAdapter) EnsureNamespace() error {
 	return nil
 }
 
-// WatchJobStatusRecovered is deprecated - status updates are now handled by SharedInformers.
-// This function is kept for backward compatibility but does nothing.
-func (j *JobAdapter) WatchJobStatusRecovered(ctx context.Context, jobId string, statusCallback structs.JobStatusCallback) {
-	// No-op: Informers handle status updates now
-}

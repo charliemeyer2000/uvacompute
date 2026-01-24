@@ -12,7 +12,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -604,14 +603,6 @@ func (k *KubeVirtAdapter) InitializeFromKubevirt() error {
 
 	log.Printf("Found %d VMs in KubeVirt namespace %s", len(vms), k.namespace)
 	return nil
-}
-
-// WatchVMs is deprecated - VM status updates are now handled by SharedInformers.
-// See lib/informers.go for the event-driven implementation.
-// This function is kept for reference but is no longer used.
-func (k *KubeVirtAdapter) WatchVMsDeprecated(ctx context.Context) (<-chan watch.Event, error) {
-	_ = ctx
-	return nil, fmt.Errorf("deprecated: use InformerManager for VM status updates")
 }
 
 func (k *KubeVirtAdapter) Ping() error {
