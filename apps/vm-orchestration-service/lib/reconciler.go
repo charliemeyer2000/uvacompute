@@ -29,7 +29,9 @@ type ReconcilerConfig struct {
 func NewReconciler(config ReconcilerConfig) *Reconciler {
 	interval := config.Interval
 	if interval == 0 {
-		interval = 5 * time.Minute
+		// Default to 30 minutes - the reconciler is now a backup consistency check
+		// since SharedInformers handle real-time status updates.
+		interval = 30 * time.Minute
 	}
 
 	return &Reconciler{

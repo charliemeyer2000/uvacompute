@@ -415,6 +415,67 @@ func (vm *VMManager) AddVMFromExternal(vmId string, state VMState) {
 	}
 }
 
+// HandleVMEvent processes VM status updates from Kubernetes informers.
+// It respects the creation flow by not overwriting PENDING/BOOTING/PROVISIONING
+// statuses unless the new status indicates a failure.
+func (vm *VMManager) HandleVMEvent(vmId string, status VMStatus, nodeId string) {
+	vm.mu.Lock()
+
+	vmState, exists := vm.vmMap[vmId]
+	if !exists {
+		vm.mu.Unlock()
+		// VM not tracked - ignore (Convex is source of truth for what we track)
+		return
+	}
+
+	// Skip if VM is in creation flow (PENDING/BOOTING/PROVISIONING)
+	// Let CreateVM handle those transitions, unless it's a failure
+	if vmState.Status == VM_STATUS_PENDING ||
+		vmState.Status == VM_STATUS_BOOTING ||
+		vmState.Status == VM_STATUS_PROVISIONING {
+		if status != VM_STATUS_FAILED && status != VM_STATUS_OFFLINE {
+			vm.mu.Unlock()
+			return
+		}
+	}
+
+	// No change - skip
+	if vmState.Status == status {
+		// Update node ID if changed
+		if nodeId != "" && vmState.NodeId != nodeId {
+			vmState.NodeId = nodeId
+			vm.vmMap[vmId] = vmState
+		}
+		vm.mu.Unlock()
+		return
+	}
+
+	// Don't overwrite terminal states from informer
+	if vmState.Status == VM_STATUS_STOPPED || vmState.Status == VM_STATUS_FAILED {
+		vm.mu.Unlock()
+		return
+	}
+
+	oldStatus := vmState.Status
+	vmState.Status = status
+	if nodeId != "" {
+		vmState.NodeId = nodeId
+	}
+	vm.vmMap[vmId] = vmState
+	vm.mu.Unlock()
+
+	log.Printf("VMManager: HandleVMEvent %s: %s -> %s (node: %s)", vmId, oldStatus, status, nodeId)
+
+	// Notify callback client
+	if vm.callbackClient != nil {
+		go func() {
+			if err := vm.callbackClient.NotifyVMStatusUpdate(vmId, string(status), nodeId); err != nil {
+				log.Printf("ERROR: Failed to notify site about VM %s status update from informer: %v", vmId, err)
+			}
+		}()
+	}
+}
+
 func (vm *VMManager) checkResourceAvailability(req VMCreationRequest) error {
 	// Check GPU node availability first (before counting resources)
 	requestGpus := IntOrDefault(req.Gpus, DefaultGpus)

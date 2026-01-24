@@ -257,6 +257,68 @@ func (jm *JobManager) CancelJob(jobId string) error {
 	return nil
 }
 
+// HandleJobEvent processes Job status updates from Kubernetes informers.
+// Unlike VMs, jobs don't have a long creation flow, so we process all events.
+func (jm *JobManager) HandleJobEvent(jobId string, status JobStatus, exitCode *int, errorMsg string, nodeId string) {
+	jm.mu.Lock()
+
+	jobState, exists := jm.jobMap[jobId]
+	if !exists {
+		jm.mu.Unlock()
+		// Job not tracked - ignore (Convex is source of truth for what we track)
+		return
+	}
+
+	// Don't overwrite terminal states
+	if jobState.Status == JOB_STATUS_COMPLETED ||
+		jobState.Status == JOB_STATUS_FAILED ||
+		jobState.Status == JOB_STATUS_CANCELLED {
+		jm.mu.Unlock()
+		return
+	}
+
+	// No change - skip (but update nodeId if changed)
+	if jobState.Status == status {
+		if nodeId != "" && jobState.NodeId != nodeId {
+			jobState.NodeId = nodeId
+			jm.jobMap[jobId] = jobState
+		}
+		jm.mu.Unlock()
+		return
+	}
+
+	oldStatus := jobState.Status
+	jobState.Status = status
+	if exitCode != nil {
+		jobState.ExitCode = exitCode
+	}
+	if errorMsg != "" {
+		jobState.ErrorMessage = errorMsg
+	}
+	if nodeId != "" {
+		jobState.NodeId = nodeId
+	}
+	jm.jobMap[jobId] = jobState
+	jm.mu.Unlock()
+
+	log.Printf("JobManager: HandleJobEvent %s: %s -> %s (node: %s)", jobId, oldStatus, status, nodeId)
+
+	isTerminal := status == JOB_STATUS_COMPLETED || status == JOB_STATUS_FAILED || status == JOB_STATUS_CANCELLED
+
+	if jm.callbackClient != nil {
+		go func() {
+			// For terminal states, archive logs FIRST before notifying status change
+			if isTerminal {
+				jm.archiveJobLogs(jobId)
+			}
+
+			if err := jm.callbackClient.NotifyJobStatusUpdate(jobId, string(status), exitCode, errorMsg, nodeId); err != nil {
+				log.Printf("ERROR: Failed to notify site about Job %s status update from informer: %v", jobId, err)
+			}
+		}()
+	}
+}
+
 func (jm *JobManager) checkResourceAvailability(req JobCreationRequest) error {
 	var totalCpus, totalRam, totalGpus int
 

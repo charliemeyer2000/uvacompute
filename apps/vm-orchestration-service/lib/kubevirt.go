@@ -606,14 +606,12 @@ func (k *KubeVirtAdapter) InitializeFromKubevirt() error {
 	return nil
 }
 
-func (k *KubeVirtAdapter) WatchVMs(ctx context.Context) (<-chan watch.Event, error) {
-	watcher, err := k.client.Resource(vmiGVR).Namespace(k.namespace).Watch(ctx, metav1.ListOptions{
-		LabelSelector: "app.kubernetes.io/managed-by=vm-orchestration-service",
-	})
-	if err != nil {
-		return nil, err
-	}
-	return watcher.ResultChan(), nil
+// WatchVMs is deprecated - VM status updates are now handled by SharedInformers.
+// See lib/informers.go for the event-driven implementation.
+// This function is kept for reference but is no longer used.
+func (k *KubeVirtAdapter) WatchVMsDeprecated(ctx context.Context) (<-chan watch.Event, error) {
+	_ = ctx
+	return nil, fmt.Errorf("deprecated: use InformerManager for VM status updates")
 }
 
 func (k *KubeVirtAdapter) Ping() error {
