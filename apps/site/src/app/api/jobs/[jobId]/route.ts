@@ -152,36 +152,44 @@ export async function DELETE(
       );
     }
 
-    const cancellableStatuses = [
-      "creating",
-      "pending",
-      "scheduled",
-      "pulling",
-      "running",
-    ];
-    if (!cancellableStatuses.includes(job.status)) {
+    try {
+      await fetchMutation(api.jobs.markCancelling, {
+        jobId,
+        userId: session.user.id,
+      });
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : "Cannot cancel job";
       return NextResponse.json(
         {
           status: "cancellation_failed_not_cancellable",
-          msg: `Cannot cancel job in status: ${job.status}`,
+          msg: message,
         },
-        { status: 400 },
+        { status: 409 },
       );
     }
 
     const authHeaders = createAuthHeaders("DELETE", `/jobs/${jobId}`, "");
-    const response = await fetch(
-      `${VM_ORCHESTRATION_SERVICE_URL}/jobs/${jobId}`,
-      {
+    let response: Response;
+    try {
+      response = await fetch(`${VM_ORCHESTRATION_SERVICE_URL}/jobs/${jobId}`, {
         method: "DELETE",
         headers: authHeaders,
-      },
-    );
+      });
+    } catch (networkError) {
+      console.error(`Network error cancelling job ${jobId}:`, networkError);
+      return NextResponse.json(
+        {
+          status: "cancellation_pending",
+          jobId,
+          msg: "Cancellation in progress - will be completed automatically",
+        },
+        { status: 202 },
+      );
+    }
 
-    // Handle 404 - job not found in orchestration service (orphaned DB record)
     if (response.status === 404) {
       console.log(
-        `Job ${jobId} not found in orchestration service - cleaning up orphaned DB entry`,
+        `Job ${jobId} not found in orchestration service - marking as cancelled`,
       );
       try {
         await fetchMutation(api.jobs.cancel, {
@@ -200,21 +208,19 @@ export async function DELETE(
           {
             status: "cancellation_success",
             jobId,
-            msg: "Job was not found in orchestration service (possibly failed creation). Database entry has been cleaned up.",
+            msg: "Job cancelled",
           },
           { status: 200 },
         );
       } catch (convexError: unknown) {
-        console.error(
-          "Warning: Failed to mark orphaned job as cancelled in Convex:",
-          convexError,
-        );
+        console.error("Failed to mark orphaned job as cancelled:", convexError);
         return NextResponse.json(
           {
-            status: "cancellation_failed_internal",
-            msg: "Job not found in orchestration and failed to clean up database entry",
+            status: "cancellation_pending",
+            jobId,
+            msg: "Cancellation in progress - will be completed automatically",
           },
-          { status: 500 },
+          { status: 202 },
         );
       }
     }
@@ -222,14 +228,15 @@ export async function DELETE(
     if (!response.ok) {
       const errorText = await response.text();
       console.error(
-        `Orchestration service error: ${response.status} ${errorText}`,
+        `Orchestration service error for job ${jobId}: ${response.status} ${errorText}`,
       );
       return NextResponse.json(
         {
-          status: "failed",
-          msg: `Orchestration service error: ${response.status}`,
+          status: "cancellation_pending",
+          jobId,
+          msg: "Cancellation in progress - will be completed automatically",
         },
-        { status: response.status },
+        { status: 202 },
       );
     }
 
@@ -242,7 +249,6 @@ export async function DELETE(
           jobId,
           userId: session.user.id,
         });
-        // Release endpoint if one was reserved
         try {
           await fetchAction(api.endpoints.release, {
             type: "job",
@@ -255,15 +261,6 @@ export async function DELETE(
         console.error(
           "Warning: Failed to mark job as cancelled in Convex:",
           convexError,
-        );
-
-        return NextResponse.json(
-          {
-            status: "cancellation_success",
-            jobId,
-            msg: "Job cancelled in orchestration service, but database update failed. This will be corrected automatically.",
-          },
-          { status: 200 },
         );
       }
     }
