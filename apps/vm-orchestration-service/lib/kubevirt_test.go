@@ -137,14 +137,14 @@ func TestBuildVMObject(t *testing.T) {
 				t.Fatal("Expected devices in domain")
 			}
 
-			gpus, found, _ := unstructured.NestedSlice(devices, "gpus")
+			hostDevices, found, _ := unstructured.NestedSlice(devices, "hostDevices")
 			if tt.expectGPU {
-				if !found || len(gpus) == 0 {
-					t.Error("Expected GPU devices")
+				if !found || len(hostDevices) == 0 {
+					t.Error("Expected GPU host devices")
 				}
 			} else {
-				if found && len(gpus) > 0 {
-					t.Error("Did not expect GPU devices")
+				if found && len(hostDevices) > 0 {
+					t.Error("Did not expect GPU host devices")
 				}
 			}
 
@@ -212,25 +212,25 @@ func TestBuildVMObjectGPUDevices(t *testing.T) {
 	templateSpec, _, _ := unstructured.NestedMap(template, "spec")
 	domain, _, _ := unstructured.NestedMap(templateSpec, "domain")
 	devices, _, _ := unstructured.NestedMap(domain, "devices")
-	gpus, found, _ := unstructured.NestedSlice(devices, "gpus")
+	hostDevices, found, _ := unstructured.NestedSlice(devices, "hostDevices")
 
 	if !found {
-		t.Fatal("Expected GPUs in devices")
+		t.Fatal("Expected hostDevices in devices")
 	}
 
-	if len(gpus) != 2 {
-		t.Errorf("Expected 2 GPU devices, got %d", len(gpus))
+	if len(hostDevices) != 2 {
+		t.Errorf("Expected 2 GPU host devices, got %d", len(hostDevices))
 	}
 
-	for i, gpu := range gpus {
-		gpuMap, ok := gpu.(map[string]interface{})
+	for i, dev := range hostDevices {
+		devMap, ok := dev.(map[string]interface{})
 		if !ok {
-			t.Fatalf("GPU %d is not a map", i)
+			t.Fatalf("hostDevice %d is not a map", i)
 		}
 
-		deviceName, _ := gpuMap["deviceName"].(string)
-		if deviceName != "nvidia.com/gpu" {
-			t.Errorf("GPU %d: expected deviceName 'nvidia.com/gpu', got '%s'", i, deviceName)
+		deviceName, _ := devMap["deviceName"].(string)
+		if deviceName != "nvidia.com/gpu-passthrough" {
+			t.Errorf("hostDevice %d: expected deviceName 'nvidia.com/gpu-passthrough', got '%s'", i, deviceName)
 		}
 	}
 }

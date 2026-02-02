@@ -244,11 +244,26 @@ export async function DELETE(
     const data = JobCancellationResponseSchema.parse(rawData);
 
     if (data.status === "cancellation_success") {
-      try {
-        await fetchMutation(api.jobs.cancel, {
-          jobId,
-          userId: session.user.id,
-        });
+      let convexUpdated = false;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          await fetchMutation(api.jobs.cancel, {
+            jobId,
+            userId: session.user.id,
+          });
+          convexUpdated = true;
+          break;
+        } catch (convexError: unknown) {
+          console.error(
+            `Attempt ${attempt + 1}/3: Failed to mark job ${jobId} as cancelled in Convex:`,
+            convexError,
+          );
+          if (attempt < 2) {
+            await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
+          }
+        }
+      }
+      if (convexUpdated) {
         try {
           await fetchAction(api.endpoints.release, {
             type: "job",
@@ -257,10 +272,9 @@ export async function DELETE(
         } catch (endpointError) {
           console.error("Warning: Failed to release endpoint:", endpointError);
         }
-      } catch (convexError: unknown) {
+      } else {
         console.error(
-          "Warning: Failed to mark job as cancelled in Convex:",
-          convexError,
+          `CRITICAL: Job ${jobId} cancelled in K8s but Convex update failed after 3 attempts. Cron will catch this.`,
         );
       }
     }

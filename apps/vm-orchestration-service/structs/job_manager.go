@@ -1,6 +1,7 @@
 package structs
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"log"
@@ -23,16 +24,20 @@ type JobProvider interface {
 }
 
 type JobManager struct {
-	mu             sync.Mutex
+	mu             sync.RWMutex
 	jobMap         map[string]JobState
 	limits         JobResourceLimits
 	jobProvider    JobProvider
 	callbackClient CallbackClient
+	jobCleanupFunc func(jobId string)
+}
+
+func (jm *JobManager) SetJobCleanupFunc(f func(jobId string)) {
+	jm.jobCleanupFunc = f
 }
 
 func NewJobManager(limits JobResourceLimits, jobProvider JobProvider, callbackClient CallbackClient) *JobManager {
 	return &JobManager{
-		mu:             sync.Mutex{},
 		jobMap:         make(map[string]JobState),
 		limits:         limits,
 		jobProvider:    jobProvider,
@@ -105,17 +110,17 @@ func (jm *JobManager) createJobAsync(jobId string, image string, command []strin
 }
 
 func (jm *JobManager) GetJob(jobId string) (JobState, bool) {
-	jm.mu.Lock()
-	defer jm.mu.Unlock()
+	jm.mu.RLock()
+	defer jm.mu.RUnlock()
 
 	jobState, exists := jm.jobMap[jobId]
 	return jobState, exists
 }
 
 func (jm *JobManager) GetJobLogs(jobId string) (io.ReadCloser, error) {
-	jm.mu.Lock()
+	jm.mu.RLock()
 	_, exists := jm.jobMap[jobId]
-	jm.mu.Unlock()
+	jm.mu.RUnlock()
 
 	if !exists {
 		return nil, fmt.Errorf("job %s not found", jobId)
@@ -129,15 +134,15 @@ func (jm *JobManager) GetJobLogs(jobId string) (io.ReadCloser, error) {
 }
 
 func (jm *JobManager) StreamJobLogs(jobId string) (io.ReadCloser, error) {
-	jm.mu.Lock()
+	jm.mu.RLock()
 	jobState, exists := jm.jobMap[jobId]
-	jm.mu.Unlock()
+	jm.mu.RUnlock()
 
 	if !exists {
 		return nil, fmt.Errorf("job %s not found", jobId)
 	}
 
-	if jobState.Status == JOB_STATUS_COMPLETED || jobState.Status == JOB_STATUS_FAILED || jobState.Status == JOB_STATUS_CANCELLED {
+	if jobState.Status.IsTerminal() {
 		return nil, fmt.Errorf("job %s is in terminal state, use GetJobLogs instead", jobId)
 	}
 
@@ -171,18 +176,21 @@ func (jm *JobManager) UpdateJobStatus(jobId string, status JobStatus, exitCode *
 	if nodeId != "" {
 		jobState.NodeId = nodeId
 	}
+	if status.IsTerminal() && jobState.TerminalSince == nil {
+		now := time.Now()
+		jobState.TerminalSince = &now
+	}
 	jm.jobMap[jobId] = jobState
 	jm.mu.Unlock()
 
-	isTerminal := status == JOB_STATUS_COMPLETED || status == JOB_STATUS_FAILED || status == JOB_STATUS_CANCELLED
-
 	if jm.callbackClient != nil {
 		go func() {
-			if isTerminal {
+			if status.IsTerminal() {
 				jm.archiveJobLogs(jobId)
 			}
 			if err := jm.callbackClient.NotifyJobStatusUpdate(jobId, string(status), exitCode, errorMessage, nodeId); err != nil {
-				log.Printf("ERROR: Failed to notify site about Job %s status update: %v", jobId, err)
+				log.Printf("ERROR: Failed to notify site about Job %s status update: %v - enqueueing retry", jobId, err)
+				jm.callbackClient.EnqueueJobRetry(jobId, string(status), exitCode, errorMessage, nodeId)
 			}
 		}()
 	}
@@ -252,7 +260,7 @@ func (jm *JobManager) CancelJob(jobId string) error {
 		return fmt.Errorf("job %s not found", jobId)
 	}
 
-	if jobState.Status == JOB_STATUS_COMPLETED || jobState.Status == JOB_STATUS_FAILED || jobState.Status == JOB_STATUS_CANCELLED {
+	if jobState.Status.IsTerminal() {
 		jm.mu.Unlock()
 		return fmt.Errorf("job %s is already in terminal state: %s", jobId, jobState.Status)
 	}
@@ -270,7 +278,7 @@ func (jm *JobManager) CancelJob(jobId string) error {
 		jm.mu.Unlock()
 		return nil
 	}
-	if jobState.Status == JOB_STATUS_COMPLETED || jobState.Status == JOB_STATUS_FAILED || jobState.Status == JOB_STATUS_CANCELLED {
+	if jobState.Status.IsTerminal() {
 		jm.mu.Unlock()
 		log.Printf("Job %s reached terminal state %s before cancellation completed", jobId, jobState.Status)
 		return nil
@@ -300,9 +308,7 @@ func (jm *JobManager) HandleJobEvent(jobId string, status JobStatus, exitCode *i
 		return
 	}
 
-	if jobState.Status == JOB_STATUS_COMPLETED ||
-		jobState.Status == JOB_STATUS_FAILED ||
-		jobState.Status == JOB_STATUS_CANCELLED {
+	if jobState.Status.IsTerminal() {
 		jm.mu.Unlock()
 		return
 	}
@@ -385,23 +391,30 @@ func (jm *JobManager) HandleJobEvent(jobId string, status JobStatus, exitCode *i
 	if nodeId != "" {
 		jobState.NodeId = nodeId
 	}
+	if status.IsTerminal() && jobState.TerminalSince == nil {
+		now := time.Now()
+		jobState.TerminalSince = &now
+	}
 	jm.jobMap[jobId] = jobState
 	jm.mu.Unlock()
 
 	log.Printf("JobManager: HandleJobEvent %s: %s -> %s (node: %s)", jobId, oldStatus, status, nodeId)
 
-	isTerminal := status == JOB_STATUS_COMPLETED || status == JOB_STATUS_FAILED || status == JOB_STATUS_CANCELLED
-
 	if jm.callbackClient != nil {
 		go func() {
-			if isTerminal {
+			if status.IsTerminal() {
 				jm.archiveJobLogs(jobId)
 			}
 
 			if err := jm.callbackClient.NotifyJobStatusUpdate(jobId, string(status), exitCode, errorMsg, nodeId); err != nil {
-				log.Printf("ERROR: Failed to notify site about Job %s status update from informer: %v", jobId, err)
+				log.Printf("ERROR: Failed to notify site about Job %s status update from informer: %v - enqueueing retry", jobId, err)
+				jm.callbackClient.EnqueueJobRetry(jobId, string(status), exitCode, errorMsg, nodeId)
 			}
 		}()
+	}
+
+	if status.IsTerminal() && jm.jobCleanupFunc != nil {
+		go jm.jobCleanupFunc(jobId)
 	}
 }
 
@@ -416,8 +429,8 @@ func (jm *JobManager) SetJobForTest(jobId string, status JobStatus, nodeId strin
 }
 
 func (jm *JobManager) GetJobStatusForTest(jobId string) JobStatus {
-	jm.mu.Lock()
-	defer jm.mu.Unlock()
+	jm.mu.RLock()
+	defer jm.mu.RUnlock()
 	if state, exists := jm.jobMap[jobId]; exists {
 		return state.Status
 	}
@@ -425,19 +438,50 @@ func (jm *JobManager) GetJobStatusForTest(jobId string) JobStatus {
 }
 
 func (jm *JobManager) HasJob(jobId string) bool {
-	jm.mu.Lock()
-	defer jm.mu.Unlock()
+	jm.mu.RLock()
+	defer jm.mu.RUnlock()
 	_, exists := jm.jobMap[jobId]
 	return exists
 }
 
 func NewJobManagerForTest(callbackClient CallbackClient) *JobManager {
 	return &JobManager{
-		mu:             sync.Mutex{},
 		jobMap:         make(map[string]JobState),
 		limits:         JobResourceLimits{MaxCpus: 16, MaxRam: 64, MaxGpus: 1},
-		jobProvider:    nil,
 		callbackClient: callbackClient,
+	}
+}
+
+func (jm *JobManager) StartPruner(ctx context.Context) {
+	go func() {
+		ticker := time.NewTicker(5 * time.Minute)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				jm.pruneTerminalEntries()
+			}
+		}
+	}()
+}
+
+func (jm *JobManager) pruneTerminalEntries() {
+	jm.mu.Lock()
+	defer jm.mu.Unlock()
+
+	now := time.Now()
+	pruned := 0
+	for jobId, jobState := range jm.jobMap {
+		if jobState.Status.IsTerminal() &&
+			jobState.TerminalSince != nil && now.Sub(*jobState.TerminalSince) > 10*time.Minute {
+			delete(jm.jobMap, jobId)
+			pruned++
+		}
+	}
+	if pruned > 0 {
+		log.Printf("JobManager: pruned %d terminal entries from jobMap", pruned)
 	}
 }
 
@@ -476,8 +520,8 @@ func (jm *JobManager) checkResourceAvailability(req JobCreationRequest) error {
 }
 
 func (jm *JobManager) ListAllJobs() map[string]JobState {
-	jm.mu.Lock()
-	defer jm.mu.Unlock()
+	jm.mu.RLock()
+	defer jm.mu.RUnlock()
 
 	result := make(map[string]JobState, len(jm.jobMap))
 	for k, v := range jm.jobMap {
