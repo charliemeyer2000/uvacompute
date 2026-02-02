@@ -28,17 +28,21 @@ type VMProvider interface {
 }
 
 type VMManager struct {
-	mu               sync.Mutex
+	mu               sync.RWMutex
 	vmMap            map[string]VMState
 	expirationTimers map[string]*time.Timer
 	limits           VMResourceLimits
 	vmProvider       VMProvider
 	callbackClient   CallbackClient
+	vmCleanupFunc    func(vmId string)
+}
+
+func (vm *VMManager) SetVMCleanupFunc(f func(vmId string)) {
+	vm.vmCleanupFunc = f
 }
 
 func NewVMManager(limits VMResourceLimits, vmProvider VMProvider, callbackClient CallbackClient) *VMManager {
 	return &VMManager{
-		mu:               sync.Mutex{},
 		vmMap:            make(map[string]VMState),
 		expirationTimers: make(map[string]*time.Timer),
 		limits:           limits,
@@ -154,8 +158,8 @@ func (vm *VMManager) StartExpirationTimer(vmId string, expiresAt int64) {
 }
 
 func (vm *VMManager) HasExpirationTimer(vmId string) bool {
-	vm.mu.Lock()
-	defer vm.mu.Unlock()
+	vm.mu.RLock()
+	defer vm.mu.RUnlock()
 	_, exists := vm.expirationTimers[vmId]
 	return exists
 }
@@ -205,8 +209,8 @@ func (vm *VMManager) handleExpiration(vmId string) {
 }
 
 func (vm *VMManager) GetVM(vmId string) (VMState, bool) {
-	vm.mu.Lock()
-	defer vm.mu.Unlock()
+	vm.mu.RLock()
+	defer vm.mu.RUnlock()
 
 	vmState, exists := vm.vmMap[vmId]
 	return vmState, exists
@@ -232,6 +236,10 @@ func (vm *VMManager) UpdateVMStatus(vmId string, status VMStatus, errorMessage s
 		vmState.Status = status
 		vmState.ErrorMessage = errorMessage
 		nodeId = vmState.NodeId
+		if status.IsTerminal() && vmState.TerminalSince == nil {
+			now := time.Now()
+			vmState.TerminalSince = &now
+		}
 		vm.vmMap[vmId] = vmState
 	}
 	vm.mu.Unlock()
@@ -251,7 +259,8 @@ func (vm *VMManager) UpdateVMStatus(vmId string, status VMStatus, errorMessage s
 	if vm.callbackClient != nil {
 		go func() {
 			if err := vm.callbackClient.NotifyVMStatusUpdate(vmId, string(status), nodeId); err != nil {
-				log.Printf("ERROR: Failed to notify site about VM %s status update: %v", vmId, err)
+				log.Printf("ERROR: Failed to notify site about VM %s status update: %v - enqueueing retry", vmId, err)
+				vm.callbackClient.EnqueueVMRetry(vmId, string(status), nodeId)
 			}
 		}()
 	}
@@ -302,7 +311,7 @@ func (vm *VMManager) ExtendVM(vmId string, hours int) (int64, error) {
 		return 0, fmt.Errorf("VM %s not found", vmId)
 	}
 
-	if vmState.Status == VM_STATUS_STOPPED || vmState.Status == VM_STATUS_FAILED || vmState.Status == VM_STATUS_OFFLINE {
+	if vmState.Status.IsTerminal() || vmState.Status == VM_STATUS_OFFLINE {
 		vm.mu.Unlock()
 		return 0, fmt.Errorf("VM %s is not running", vmId)
 	}
@@ -399,8 +408,8 @@ func (vm *VMManager) InitializeFromBackend() error {
 }
 
 func (vm *VMManager) ListAllVMs() map[string]VMState {
-	vm.mu.Lock()
-	defer vm.mu.Unlock()
+	vm.mu.RLock()
+	defer vm.mu.RUnlock()
 
 	result := make(map[string]VMState)
 	for k, v := range vm.vmMap {
@@ -462,8 +471,7 @@ func (vm *VMManager) HandleVMEvent(vmId string, status VMStatus, nodeId string) 
 		return
 	}
 
-	// Don't overwrite terminal states from informer
-	if vmState.Status == VM_STATUS_STOPPED || vmState.Status == VM_STATUS_FAILED {
+	if vmState.Status.IsTerminal() {
 		vm.mu.Unlock()
 		return
 	}
@@ -473,18 +481,41 @@ func (vm *VMManager) HandleVMEvent(vmId string, status VMStatus, nodeId string) 
 	if nodeId != "" {
 		vmState.NodeId = nodeId
 	}
+	if status.IsTerminal() && vmState.TerminalSince == nil {
+		now := time.Now()
+		vmState.TerminalSince = &now
+	}
 	vm.vmMap[vmId] = vmState
 	vm.mu.Unlock()
 
 	log.Printf("VMManager: HandleVMEvent %s: %s -> %s (node: %s)", vmId, oldStatus, status, nodeId)
 
-	// Notify callback client
+	if status == VM_STATUS_READY {
+		vm.mu.Lock()
+		vmStateCheck, exists := vm.vmMap[vmId]
+		vm.mu.Unlock()
+		if exists && vmStateCheck.ExpiresAt > 0 && !vm.HasExpirationTimer(vmId) {
+			if vmStateCheck.ExpiresAt <= time.Now().UnixMilli() {
+				log.Printf("VMManager: VM %s is READY but already expired, triggering expiration", vmId)
+				go vm.handleExpiration(vmId)
+			} else {
+				log.Printf("VMManager: VM %s is READY but missing expiration timer, restarting", vmId)
+				vm.StartExpirationTimer(vmId, vmStateCheck.ExpiresAt)
+			}
+		}
+	}
+
 	if vm.callbackClient != nil {
 		go func() {
 			if err := vm.callbackClient.NotifyVMStatusUpdate(vmId, string(status), nodeId); err != nil {
-				log.Printf("ERROR: Failed to notify site about VM %s status update from informer: %v", vmId, err)
+				log.Printf("ERROR: Failed to notify site about VM %s status update from informer: %v - enqueueing retry", vmId, err)
+				vm.callbackClient.EnqueueVMRetry(vmId, string(status), nodeId)
 			}
 		}()
+	}
+
+	if status.IsTerminal() && vm.vmCleanupFunc != nil {
+		go vm.vmCleanupFunc(vmId)
 	}
 }
 
@@ -499,8 +530,8 @@ func (vm *VMManager) SetVMForTest(vmId string, status VMStatus, nodeId string) {
 }
 
 func (vm *VMManager) GetVMStatusForTest(vmId string) VMStatus {
-	vm.mu.Lock()
-	defer vm.mu.Unlock()
+	vm.mu.RLock()
+	defer vm.mu.RUnlock()
 	if state, exists := vm.vmMap[vmId]; exists {
 		return state.Status
 	}
@@ -508,20 +539,55 @@ func (vm *VMManager) GetVMStatusForTest(vmId string) VMStatus {
 }
 
 func (vm *VMManager) HasVM(vmId string) bool {
-	vm.mu.Lock()
-	defer vm.mu.Unlock()
+	vm.mu.RLock()
+	defer vm.mu.RUnlock()
 	_, exists := vm.vmMap[vmId]
 	return exists
 }
 
 func NewVMManagerForTest(callbackClient CallbackClient) *VMManager {
 	return &VMManager{
-		mu:               sync.Mutex{},
 		vmMap:            make(map[string]VMState),
 		expirationTimers: make(map[string]*time.Timer),
 		limits:           VMResourceLimits{MaxCpus: 16, MaxRam: 64, MaxGpus: 1},
-		vmProvider:       nil,
 		callbackClient:   callbackClient,
+	}
+}
+
+func (vm *VMManager) StartPruner(ctx context.Context) {
+	go func() {
+		ticker := time.NewTicker(5 * time.Minute)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				vm.pruneTerminalEntries()
+			}
+		}
+	}()
+}
+
+func (vm *VMManager) pruneTerminalEntries() {
+	vm.mu.Lock()
+	defer vm.mu.Unlock()
+
+	now := time.Now()
+	pruned := 0
+	for vmId, vmState := range vm.vmMap {
+		if vmState.Status.IsTerminal() &&
+			vmState.TerminalSince != nil && now.Sub(*vmState.TerminalSince) > 10*time.Minute {
+			delete(vm.vmMap, vmId)
+			if timer, exists := vm.expirationTimers[vmId]; exists {
+				timer.Stop()
+				delete(vm.expirationTimers, vmId)
+			}
+			pruned++
+		}
+	}
+	if pruned > 0 {
+		log.Printf("VMManager: pruned %d terminal entries from vmMap", pruned)
 	}
 }
 
