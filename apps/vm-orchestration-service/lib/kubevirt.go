@@ -175,14 +175,15 @@ func (k *KubeVirtAdapter) buildVMObject(vmId string, cpus, ram, disk, gpus int, 
 	}
 
 	if gpus > 0 {
+		// Use hostDevices for VFIO GPU passthrough instead of gpus (which requires nvidia-device-plugin)
 		gpuDevices := make([]interface{}, gpus)
 		for i := 0; i < gpus; i++ {
 			gpuDevices[i] = map[string]interface{}{
 				"name":       fmt.Sprintf("gpu%d", i),
-				"deviceName": "nvidia.com/gpu",
+				"deviceName": "nvidia.com/gpu-passthrough",
 			}
 		}
-		devices["gpus"] = gpuDevices
+		devices["hostDevices"] = gpuDevices
 	}
 
 	// Build the template spec
