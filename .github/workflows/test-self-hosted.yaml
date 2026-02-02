@@ -1,0 +1,30 @@
+name: Test Self-Hosted Runner
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: [self-hosted, uvacompute]
+    steps:
+      - name: System info
+        run: |
+          echo "=== Runner Info ==="
+          uname -a
+          echo ""
+          echo "=== CPU ==="
+          nproc
+          echo ""
+          echo "=== Memory ==="
+          free -h
+          echo ""
+          echo "=== Disk ==="
+          df -h /
+          echo ""
+          echo "=== GPU ==="
+          nvidia-smi 2>/dev/null || echo "No GPU available"
+
+      - uses: actions/checkout@v4
+
+      - name: Run a test
+        run: echo "Hello from uvacompute self-hosted runner!"
