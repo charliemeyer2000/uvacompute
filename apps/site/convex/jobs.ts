@@ -335,3 +335,38 @@ export const markNodeOffline = internalMutation({
     return count;
   },
 });
+
+export const cleanupStaleJobs = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const now = Date.now();
+    const staleThreshold = 15 * 60 * 1000;
+    let count = 0;
+
+    const cancellingJobs = await ctx.db
+      .query("jobs")
+      .filter((q) => q.eq(q.field("status"), "cancelling"))
+      .collect();
+
+    for (const job of cancellingJobs) {
+      if (now - job.createdAt > staleThreshold) {
+        await ctx.db.patch(job._id, {
+          status: "cancelled",
+          completedAt: now,
+        });
+        if (job.exposeSubdomain) {
+          try {
+            await ctx.scheduler.runAfter(0, api.endpoints.release, {
+              type: "job" as const,
+              resourceId: job.jobId,
+            });
+          } catch {}
+        }
+        count++;
+        console.log(`Cron: force-cancelled stale job ${job.jobId}`);
+      }
+    }
+
+    return count;
+  },
+});
