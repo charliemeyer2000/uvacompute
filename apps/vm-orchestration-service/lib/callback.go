@@ -17,6 +17,7 @@ type CallbackClient struct {
 	siteBaseUrl  string
 	sharedSecret string
 	httpClient   *http.Client
+	retryQueue   *RetryQueue
 }
 
 const MAX_ATTEMPTS int = 3
