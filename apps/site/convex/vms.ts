@@ -316,3 +316,64 @@ export const markNodeOffline = internalMutation({
     return count;
   },
 });
+
+export const cleanupExpired = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const now = Date.now();
+    const vms = await ctx.db
+      .query("vms")
+      .filter((q) =>
+        q.and(
+          q.eq(q.field("status"), "ready"),
+          q.lt(q.field("expiresAt"), now),
+        ),
+      )
+      .collect();
+
+    for (const vm of vms) {
+      await ctx.db.patch(vm._id, { status: "stopping" });
+      console.log(
+        `Cron: marked expired VM ${vm.vmId} as stopping (expired ${Math.round((now - vm.expiresAt) / 60000)} min ago)`,
+      );
+    }
+
+    return vms.length;
+  },
+});
+
+export const cleanupStaleTransitions = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const now = Date.now();
+    const staleThreshold = 15 * 60 * 1000;
+    let count = 0;
+
+    const stoppingVMs = await ctx.db
+      .query("vms")
+      .filter((q) => q.eq(q.field("status"), "stopping"))
+      .collect();
+
+    for (const vm of stoppingVMs) {
+      const lastUpdate = vm.expiresAt || vm.createdAt;
+      if (now - lastUpdate > staleThreshold) {
+        await ctx.db.patch(vm._id, {
+          status: "stopped",
+          deletedAt: now,
+        });
+        if (vm.exposeSubdomain) {
+          try {
+            await ctx.scheduler.runAfter(0, api.endpoints.release, {
+              type: "vm" as const,
+              resourceId: vm.vmId,
+            });
+          } catch {}
+        }
+        count++;
+        console.log(`Cron: force-stopped stale VM ${vm.vmId}`);
+      }
+    }
+
+    return count;
+  },
+});

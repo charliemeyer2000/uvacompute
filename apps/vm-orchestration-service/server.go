@@ -130,6 +130,21 @@ func main() {
 		},
 	})
 
+	callbackClient.StartRetryQueue(ctx)
+	app.VMManager.StartPruner(ctx)
+	app.JobManager.StartPruner(ctx)
+
+	app.JobManager.SetJobCleanupFunc(func(jobId string) {
+		if err := jobAdapter.DeleteJob(jobId); err != nil {
+			log.Printf("Job cleanup: failed to delete K8s Job %s: %v", jobId, err)
+		}
+	})
+	app.VMManager.SetVMCleanupFunc(func(vmId string) {
+		if err := vmAdapter.DestroyVM(vmId); err != nil {
+			log.Printf("VM cleanup: failed to destroy K8s VM %s: %v", vmId, err)
+		}
+	})
+
 	if err := app.VMManager.InitializeFromBackend(); err != nil {
 		fmt.Printf("Warning: Failed to sync state from backend: %v\n", err)
 	}
@@ -171,6 +186,8 @@ func main() {
 		JobManager:     app.JobManager,
 		JobAdapter:     jobAdapter,
 		CallbackClient: callbackClient,
+		K8sClient:      jobAdapter.K8sClient(),
+		Namespace:      kubeVirtConfig.Namespace,
 		Interval:       30 * time.Minute,
 	})
 	go reconciler.Start(ctx)
