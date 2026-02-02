@@ -16,6 +16,8 @@ type CallbackClient interface {
 	NotifyVMStatusUpdate(vmId string, status string, nodeId string) error
 	NotifyJobStatusUpdate(jobId string, status string, exitCode *int, errorMsg string, nodeId string) error
 	UploadJobLogs(jobId string, logs string) error
+	EnqueueVMRetry(vmId, status, nodeId string)
+	EnqueueJobRetry(jobId, status string, exitCode *int, errorMsg, nodeId string)
 }
 
 type AppConfig struct {

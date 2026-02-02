@@ -28,6 +28,10 @@ const (
 
 type VMStatus string
 
+func (s VMStatus) IsTerminal() bool {
+	return s == VM_STATUS_STOPPED || s == VM_STATUS_FAILED
+}
+
 const (
 	VM_STATUS_NOT_FOUND    VMStatus = "not_found"    // vm not found (API response only)
 	VM_STATUS_CREATING     VMStatus = "creating"     // VM creation initiated, waiting for orchestration
@@ -123,10 +127,11 @@ type VMState struct {
 	Gpus    int     `json:"gpus"`
 	GPUType GPUType `json:"gpu-type"`
 
-	Status       VMStatus `json:"status"`
-	ErrorMessage string   `json:"errorMessage,omitempty"`
-	NodeId       string   `json:"nodeId,omitempty"`
-	ExpiresAt    int64    `json:"expiresAt,omitempty"`
+	Status        VMStatus   `json:"status"`
+	ErrorMessage  string     `json:"errorMessage,omitempty"`
+	NodeId        string     `json:"nodeId,omitempty"`
+	ExpiresAt     int64      `json:"expiresAt,omitempty"`
+	TerminalSince *time.Time `json:"-"`
 }
 
 type VMExtendStatus string
@@ -230,6 +235,10 @@ func ParseVMInfo(yamlData []byte) (*VMInfo, error) {
 
 type JobStatus string
 
+func (s JobStatus) IsTerminal() bool {
+	return s == JOB_STATUS_COMPLETED || s == JOB_STATUS_FAILED || s == JOB_STATUS_CANCELLED
+}
+
 const (
 	JOB_STATUS_PENDING      JobStatus = "pending"
 	JOB_STATUS_SCHEDULED    JobStatus = "scheduled"
@@ -309,6 +318,7 @@ type JobState struct {
 	ErrorMessage     string     `json:"errorMessage,omitempty"`
 	NodeId           string     `json:"nodeId,omitempty"`
 	PullingStartedAt *time.Time `json:"pullingStartedAt,omitempty"` // Track when PULLING started for timeout
+	TerminalSince    *time.Time `json:"-"`
 }
 
 type JobResourceLimits struct {

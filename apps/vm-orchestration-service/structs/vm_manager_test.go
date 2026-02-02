@@ -65,11 +65,13 @@ func TestCreateVM(t *testing.T) {
 		t.Fatal("vmId should not be empty")
 	}
 
-	if len(vm.vmMap) != 1 {
-		t.Fatalf("expected 1 VM, got %d", len(vm.vmMap))
+	vm.WaitForStatus(vmId, VM_STATUS_READY)
+
+	vmState, exists := vm.GetVM(vmId)
+	if !exists {
+		t.Fatal("expected VM to exist")
 	}
 
-	vmState := vm.vmMap[vmId]
 	if vmState.UserId != "test-user" {
 		t.Fatalf("expected userId 'test-user', got %s", vmState.UserId)
 	}
@@ -101,7 +103,13 @@ func TestCreateVMWithCustomValues(t *testing.T) {
 		t.Fatalf("CreateVM failed: %v", err)
 	}
 
-	vmState := vm.vmMap[vmId]
+	vm.WaitForStatus(vmId, VM_STATUS_READY)
+
+	vmState, exists := vm.GetVM(vmId)
+	if !exists {
+		t.Fatal("expected VM to exist")
+	}
+
 	if vmState.Cpus != 4 {
 		t.Fatalf("expected 4 CPUs, got %d", vmState.Cpus)
 	}
@@ -132,7 +140,9 @@ func TestDeleteVM(t *testing.T) {
 
 	vmId, _ := vm.CreateVM(req)
 
-	if len(vm.vmMap) != 1 {
+	vm.WaitForStatus(vmId, VM_STATUS_READY)
+
+	if !vm.HasVM(vmId) {
 		t.Fatal("VM should exist before delete")
 	}
 
@@ -141,7 +151,7 @@ func TestDeleteVM(t *testing.T) {
 		t.Fatalf("DeleteVM failed: %v", err)
 	}
 
-	if len(vm.vmMap) != 0 {
+	if vm.HasVM(vmId) {
 		t.Fatal("VM should be deleted")
 	}
 }
@@ -159,10 +169,12 @@ func TestResourceLimits(t *testing.T) {
 		Cpus:   &cpus,
 	}
 
-	_, err := vm.CreateVM(req1)
+	vmId1, err := vm.CreateVM(req1)
 	if err != nil {
 		t.Fatalf("First VM should succeed: %v", err)
 	}
+
+	vm.WaitForStatus(vmId1, VM_STATUS_READY)
 
 	req2 := VMCreationRequest{
 		VMId:   uuid.New().String(),

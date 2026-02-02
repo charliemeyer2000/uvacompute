@@ -137,11 +137,26 @@ export async function DELETE(
     const data = VMDeletionResponseSchema.parse(rawData);
 
     if (data.status === "deletion_success") {
-      try {
-        await fetchMutation(api.vms.updateStatus, {
-          vmId,
-          status: "stopped",
-        });
+      let convexUpdated = false;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          await fetchMutation(api.vms.updateStatus, {
+            vmId,
+            status: "stopped",
+          });
+          convexUpdated = true;
+          break;
+        } catch (convexError: unknown) {
+          console.error(
+            `Attempt ${attempt + 1}/3: Failed to mark VM ${vmId} as stopped in Convex:`,
+            convexError,
+          );
+          if (attempt < 2) {
+            await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
+          }
+        }
+      }
+      if (convexUpdated) {
         try {
           await fetchAction(api.endpoints.release, {
             type: "vm",
@@ -150,10 +165,9 @@ export async function DELETE(
         } catch (endpointError) {
           console.error("Warning: Failed to release endpoint:", endpointError);
         }
-      } catch (convexError: unknown) {
+      } else {
         console.error(
-          "Warning: Failed to mark VM as stopped in Convex:",
-          convexError,
+          `CRITICAL: VM ${vmId} deleted from K8s but Convex update failed after 3 attempts. Cron will catch this.`,
         );
       }
     }

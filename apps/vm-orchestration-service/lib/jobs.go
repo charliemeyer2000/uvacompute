@@ -28,6 +28,10 @@ type JobAdapter struct {
 	namespace string
 }
 
+func (j *JobAdapter) K8sClient() kubernetes.Interface {
+	return j.client
+}
+
 func NewJobAdapter(config JobAdapterConfig) (*JobAdapter, error) {
 	var restConfig *rest.Config
 	var err error
