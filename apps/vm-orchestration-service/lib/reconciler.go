@@ -3,7 +3,12 @@ package lib
 import (
 	"context"
 	"log"
+	"strings"
 	"time"
+
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
 
 	"vm-orchestration-service/structs"
 )
@@ -14,6 +19,8 @@ type Reconciler struct {
 	jobManager     *structs.JobManager
 	jobAdapter     *JobAdapter
 	callbackClient *CallbackClient
+	k8sClient      kubernetes.Interface
+	namespace      string
 	interval       time.Duration
 }
 
@@ -23,6 +30,8 @@ type ReconcilerConfig struct {
 	JobManager     *structs.JobManager
 	JobAdapter     *JobAdapter
 	CallbackClient *CallbackClient
+	K8sClient      kubernetes.Interface
+	Namespace      string
 	Interval       time.Duration
 }
 
@@ -40,6 +49,8 @@ func NewReconciler(config ReconcilerConfig) *Reconciler {
 		jobManager:     config.JobManager,
 		jobAdapter:     config.JobAdapter,
 		callbackClient: config.CallbackClient,
+		k8sClient:      config.K8sClient,
+		namespace:      config.Namespace,
 		interval:       interval,
 	}
 }
@@ -127,6 +138,8 @@ func (r *Reconciler) reconcile() {
 	}
 
 	r.reconcileStoppingVMs()
+	r.cleanupDeadPods()
+	r.cleanupOrphanResources()
 }
 
 func (r *Reconciler) reconcileStoppingVMs() {
@@ -167,6 +180,122 @@ func (r *Reconciler) reconcileStoppingVMs() {
 
 	if stoppingCount > 0 {
 		log.Printf("Reconciler: processed %d stopping VMs", stoppingCount)
+	}
+}
+
+func (r *Reconciler) cleanupDeadPods() {
+	if r.k8sClient == nil {
+		return
+	}
+
+	ctx := context.Background()
+	namespaces := []string{r.namespace, "cdi"}
+	totalDeleted := 0
+
+	for _, ns := range namespaces {
+		pods, err := r.k8sClient.CoreV1().Pods(ns).List(ctx, metav1.ListOptions{})
+		if err != nil {
+			log.Printf("Reconciler: failed to list pods in namespace %s: %v", ns, err)
+			continue
+		}
+
+		for _, pod := range pods.Items {
+			shouldDelete := false
+
+			switch pod.Status.Phase {
+			case corev1.PodFailed, corev1.PodSucceeded:
+				shouldDelete = true
+			case corev1.PodUnknown:
+				shouldDelete = true
+			case corev1.PodPending, corev1.PodRunning:
+				for _, cs := range pod.Status.ContainerStatuses {
+					if cs.State.Terminated != nil && cs.State.Terminated.Reason == "ContainerStatusUnknown" {
+						shouldDelete = true
+						break
+					}
+				}
+			}
+
+			if !shouldDelete {
+				continue
+			}
+
+			err := r.k8sClient.CoreV1().Pods(ns).Delete(ctx, pod.Name, metav1.DeleteOptions{})
+			if err != nil {
+				log.Printf("Reconciler: failed to delete dead pod %s/%s: %v", ns, pod.Name, err)
+			} else {
+				totalDeleted++
+			}
+		}
+	}
+
+	if totalDeleted > 0 {
+		log.Printf("Reconciler: cleaned up %d dead pods", totalDeleted)
+	}
+}
+
+func (r *Reconciler) cleanupOrphanResources() {
+	if r.k8sClient == nil {
+		return
+	}
+
+	ctx := context.Background()
+	cutoff := time.Now().Add(-30 * time.Minute)
+	totalDeleted := 0
+
+	secrets, err := r.k8sClient.CoreV1().Secrets(r.namespace).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		log.Printf("Reconciler: failed to list secrets: %v", err)
+	} else {
+		kubeVMs, _ := r.vmProvider.ListVMs()
+		knownVMs := make(map[string]bool)
+		for _, vm := range kubeVMs {
+			knownVMs[vm.Name] = true
+		}
+		for vmId := range r.vmManager.ListAllVMs() {
+			knownVMs[vmId] = true
+		}
+
+		for _, secret := range secrets.Items {
+			if !strings.HasPrefix(secret.Name, "cloudinit-") {
+				continue
+			}
+			if secret.CreationTimestamp.Time.After(cutoff) {
+				continue
+			}
+			vmId := strings.TrimPrefix(secret.Name, "cloudinit-")
+			if knownVMs[vmId] {
+				continue
+			}
+			if err := r.k8sClient.CoreV1().Secrets(r.namespace).Delete(ctx, secret.Name, metav1.DeleteOptions{}); err != nil {
+				log.Printf("Reconciler: failed to delete orphan secret %s: %v", secret.Name, err)
+			} else {
+				totalDeleted++
+			}
+		}
+	}
+
+	pvcs, err := r.k8sClient.CoreV1().PersistentVolumeClaims(r.namespace).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		log.Printf("Reconciler: failed to list PVCs: %v", err)
+	} else {
+		for _, pvc := range pvcs.Items {
+			if len(pvc.OwnerReferences) > 0 {
+				continue
+			}
+			if pvc.CreationTimestamp.Time.After(cutoff) {
+				continue
+			}
+			if err := r.k8sClient.CoreV1().PersistentVolumeClaims(r.namespace).Delete(ctx, pvc.Name, metav1.DeleteOptions{}); err != nil {
+				log.Printf("Reconciler: failed to delete orphan PVC %s: %v", pvc.Name, err)
+			} else {
+				totalDeleted++
+			}
+		}
+	}
+
+	if totalDeleted > 0 {
+		log.Printf("Reconciler: cleaned up %d orphan resources", totalDeleted)
 	}
 }
 

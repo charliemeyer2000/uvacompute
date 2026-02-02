@@ -281,3 +281,7 @@ func (m *MockCallbackClient) NotifyJobStatusUpdate(jobId string, status string, 
 func (m *MockCallbackClient) UploadJobLogs(jobId string, logs string) error {
 	return nil
 }
+
+func (m *MockCallbackClient) EnqueueVMRetry(vmId, status, nodeId string) {}
+
+func (m *MockCallbackClient) EnqueueJobRetry(jobId, status string, exitCode *int, errorMsg, nodeId string) {}

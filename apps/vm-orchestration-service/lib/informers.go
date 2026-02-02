@@ -26,12 +26,15 @@ import (
 type InformerManager struct {
 	dynamicFactory dynamicinformer.DynamicSharedInformerFactory
 	typedFactory   informers.SharedInformerFactory
+	cdiFactory     informers.SharedInformerFactory
 	vmiInformer    cache.SharedIndexInformer
 	jobInformer    cache.SharedIndexInformer
 	podInformer    cache.SharedIndexInformer
+	cdiPodInformer cache.SharedIndexInformer
 	vmManager      *structs.VMManager
 	jobManager     *structs.JobManager
 	callbackClient structs.CallbackClient
+	k8sClient      kubernetes.Interface
 	namespace      string
 	stopCh         chan struct{}
 	mu             sync.Mutex
@@ -96,12 +99,20 @@ func NewInformerManager(config InformerConfig, vmManager *structs.VMManager, job
 		}),
 	)
 
+	cdiFactory := informers.NewSharedInformerFactoryWithOptions(
+		typedClient,
+		resyncPeriod,
+		informers.WithNamespace("cdi"),
+	)
+
 	return &InformerManager{
 		dynamicFactory: dynamicFactory,
 		typedFactory:   typedFactory,
+		cdiFactory:     cdiFactory,
 		vmManager:      vmManager,
 		jobManager:     jobManager,
 		callbackClient: callbackClient,
+		k8sClient:      typedClient,
 		namespace:      config.Namespace,
 		stopCh:         make(chan struct{}),
 	}, nil
@@ -142,8 +153,15 @@ func (im *InformerManager) Start(ctx context.Context) error {
 		DeleteFunc: im.onPodDelete,
 	})
 
+	im.cdiPodInformer = im.cdiFactory.Core().V1().Pods().Informer()
+	im.cdiPodInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc:    im.onCDIPodEvent,
+		UpdateFunc: func(_, newObj interface{}) { im.onCDIPodEvent(newObj) },
+	})
+
 	im.dynamicFactory.Start(im.stopCh)
 	im.typedFactory.Start(im.stopCh)
+	im.cdiFactory.Start(im.stopCh)
 
 	log.Printf("Informers: Waiting for cache sync...")
 
@@ -154,6 +172,7 @@ func (im *InformerManager) Start(ctx context.Context) error {
 	go func() {
 		dynamicSynced := im.dynamicFactory.WaitForCacheSync(im.stopCh)
 		typedSynced := im.typedFactory.WaitForCacheSync(im.stopCh)
+		cdiSynced := im.cdiFactory.WaitForCacheSync(im.stopCh)
 
 		allSynced := true
 		for _, synced := range dynamicSynced {
@@ -163,6 +182,12 @@ func (im *InformerManager) Start(ctx context.Context) error {
 			}
 		}
 		for _, synced := range typedSynced {
+			if !synced {
+				allSynced = false
+				break
+			}
+		}
+		for _, synced := range cdiSynced {
 			if !synced {
 				allSynced = false
 				break
@@ -657,5 +682,37 @@ func getWaitingErrorMessage(reason, message string) string {
 		return "Cannot inspect image: " + message
 	default:
 		return reason + ": " + message
+	}
+}
+
+func (im *InformerManager) onCDIPodEvent(obj interface{}) {
+	pod, ok := obj.(*corev1.Pod)
+	if !ok {
+		return
+	}
+
+	switch pod.Status.Phase {
+	case corev1.PodSucceeded, corev1.PodFailed, corev1.PodUnknown:
+	case corev1.PodPending, corev1.PodRunning:
+		shouldDelete := false
+		for _, cs := range pod.Status.ContainerStatuses {
+			if cs.State.Terminated != nil && cs.State.Terminated.Reason == "ContainerStatusUnknown" {
+				shouldDelete = true
+				break
+			}
+		}
+		if !shouldDelete {
+			return
+		}
+	default:
+		return
+	}
+
+	ctx := context.Background()
+	err := im.k8sClient.CoreV1().Pods("cdi").Delete(ctx, pod.Name, metav1.DeleteOptions{})
+	if err != nil {
+		log.Printf("Informers: failed to delete terminal CDI pod %s: %v", pod.Name, err)
+	} else {
+		log.Printf("Informers: deleted terminal CDI pod %s (phase: %s)", pod.Name, pod.Status.Phase)
 	}
 }
