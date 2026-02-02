@@ -1,0 +1,13 @@
+# uvacompute
+
+> instant access to gpu-powered virtual machines and container jobs
+
+uvacompute provides gpu-powered virtual machines and container jobs. get an ssh shell in under 10 seconds with up to rtx 5090s.
+
+## docs
+
+- [getting started](https://uvacompute.com/docs/getting-started.md): install the cli, create an account, and authenticate
+- [virtual machines](https://uvacompute.com/docs/vms.md): create and manage gpu-powered vms
+- [container jobs](https://uvacompute.com/docs/jobs.md): run docker containers on demand
+- [node management](https://uvacompute.com/docs/nodes.md): contribute your hardware to the network
+- [configuration](https://uvacompute.com/docs/configuration.md): configuration file locations and reference
