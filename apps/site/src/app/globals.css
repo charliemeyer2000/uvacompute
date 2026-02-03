@@ -123,3 +123,25 @@
     @apply bg-background text-foreground;
   }
 }
+
+::view-transition-old(docs-content) {
+  animation: docs-fade-out 0.15s ease-in forwards;
+}
+
+::view-transition-new(docs-content) {
+  animation: docs-fade-in 0.2s ease-out 0.05s both;
+}
+
+@keyframes docs-fade-out {
+  to {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+}
+
+@keyframes docs-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}

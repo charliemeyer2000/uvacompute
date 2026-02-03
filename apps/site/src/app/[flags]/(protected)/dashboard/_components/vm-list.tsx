@@ -3,24 +3,15 @@
 import Link from "next/link";
 import { useQuery } from "convex/react";
 import { api } from "../../../../../../convex/_generated/api";
-import { authClient } from "@/lib/auth-client";
 import ActiveVMs from "./active-vms";
 import VMHistory from "./vm-history";
 import ActiveJobs from "./active-jobs";
 import JobHistory from "./job-history";
 
-export default function VMList() {
-  const { data: session } = authClient.useSession();
+export default function VMList({ userId }: { userId: string }) {
+  const allVMs = useQuery(api.vms.listByUser, { userId });
 
-  const allVMs = useQuery(
-    api.vms.listByUser,
-    session?.user?.id ? { userId: session.user.id } : "skip",
-  );
-
-  const allJobs = useQuery(
-    api.jobs.listByUser,
-    session?.user?.id ? { userId: session.user.id } : "skip",
-  );
+  const allJobs = useQuery(api.jobs.listByUser, { userId });
 
   const hasNoResources =
     allVMs && allJobs && allVMs.length === 0 && allJobs.length === 0;
@@ -45,10 +36,10 @@ export default function VMList() {
 
   return (
     <div className="space-y-8">
-      <ActiveVMs />
-      <ActiveJobs />
-      <VMHistory />
-      <JobHistory />
+      <ActiveVMs userId={userId} />
+      <ActiveJobs userId={userId} />
+      <VMHistory userId={userId} />
+      <JobHistory userId={userId} />
     </div>
   );
 }
