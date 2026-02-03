@@ -17,7 +17,10 @@ export default function ConfigurationDocsPage() {
         </p>
       </section>
 
-      <section className="border border-gray-200 p-6 space-y-6">
+      <section
+        id="cli-configuration"
+        className="border border-gray-200 p-6 space-y-6"
+      >
         <h3 className="text-lg font-semibold mb-2">
           cli configuration (~/.uvacompute/)
         </h3>
@@ -74,7 +77,10 @@ export default function ConfigurationDocsPage() {
         </div>
       </section>
 
-      <section className="border border-gray-200 p-6 space-y-6">
+      <section
+        id="node-system-configuration"
+        className="border border-gray-200 p-6 space-y-6"
+      >
         <h3 className="text-lg font-semibold mb-2">
           node system configuration (/etc/uvacompute/)
         </h3>
@@ -138,7 +144,10 @@ export default function ConfigurationDocsPage() {
         </div>
       </section>
 
-      <section className="border border-gray-200 p-6 space-y-6">
+      <section
+        id="node-data-storage"
+        className="border border-gray-200 p-6 space-y-6"
+      >
         <h3 className="text-lg font-semibold mb-2">
           node data storage (/var/lib/uvacompute/)
         </h3>
@@ -179,7 +188,7 @@ export default function ConfigurationDocsPage() {
         </div>
       </section>
 
-      <section className="border border-gray-200 p-6 space-y-6">
+      <section id="ssh-keys" className="border border-gray-200 p-6 space-y-6">
         <h3 className="text-lg font-semibold mb-2">ssh keys (~/.ssh/)</h3>
         <p className="text-sm text-gray-600 mb-4">
           ssh keys used for secure communication between nodes and the hub.
@@ -217,7 +226,10 @@ export default function ConfigurationDocsPage() {
         </div>
       </section>
 
-      <section className="border border-gray-200 p-6 space-y-6">
+      <section
+        id="gpu-mode-scripts"
+        className="border border-gray-200 p-6 space-y-6"
+      >
         <h3 className="text-lg font-semibold mb-2">gpu mode scripts</h3>
         <p className="text-sm text-gray-600 mb-4">
           scripts for switching gpu modes are installed to{" "}
@@ -280,7 +292,7 @@ export default function ConfigurationDocsPage() {
         </div>
       </section>
 
-      <section>
+      <section id="directory-summary">
         <h3 className="text-lg font-semibold mb-4">directory summary</h3>
         <div className="overflow-x-auto">
           <table className="w-full text-sm border border-gray-200">

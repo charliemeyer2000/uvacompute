@@ -1,11 +1,10 @@
 "use client";
 
 import { useRouter, usePathname } from "next/navigation";
-import { useQuery, useMutation } from "convex/react";
+import { usePreloadedQuery, useMutation, Preloaded } from "convex/react";
 import { authClient } from "@/lib/auth-client";
 import { api } from "../../../../../convex/_generated/api";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
 import Link from "next/link";
 import { toast } from "sonner";
 import { EarlyAccessProvider } from "./early-access-context";
@@ -38,18 +37,28 @@ function NavLink({
 export default function ProtectedLayout({
   children,
   earlyAccessEnabled,
+  preloadedUser,
+  preloadedDevAccess,
+  preloadedEarlyAccess,
+  preloadedPendingRequest,
+  userId,
 }: {
   children: React.ReactNode;
   earlyAccessEnabled: boolean;
+  preloadedUser: Preloaded<typeof api.auth.getCurrentUser>;
+  preloadedDevAccess: Preloaded<typeof api.devAccess.hasDevAccess>;
+  preloadedEarlyAccess: Preloaded<typeof api.earlyAccess.hasEarlyAccess>;
+  preloadedPendingRequest: Preloaded<
+    typeof api.earlyAccess.hasPendingEarlyAccessRequest
+  >;
+  userId: string;
 }) {
   const router = useRouter();
   const pathname = usePathname();
-  const user = useQuery(api.auth.getCurrentUser);
-  const hasDevAccess = useQuery(api.devAccess.hasDevAccess);
-  const hasEarlyAccess = useQuery(api.earlyAccess.hasEarlyAccess);
-  const hasPendingRequest = useQuery(
-    api.earlyAccess.hasPendingEarlyAccessRequest,
-  );
+  const user = usePreloadedQuery(preloadedUser);
+  const hasDevAccess = usePreloadedQuery(preloadedDevAccess);
+  const hasEarlyAccess = usePreloadedQuery(preloadedEarlyAccess);
+  const hasPendingRequest = usePreloadedQuery(preloadedPendingRequest);
   const syncEarlyAccess = useMutation(api.earlyAccess.syncEarlyAccessFromToken);
 
   const { isLoading: isRedirecting } = useRedirectLogic({
@@ -99,17 +108,10 @@ export default function ProtectedLayout({
               </Link>
               <div className="text-sm text-gray-500">
                 {isOnOnboarding ? "welcome" : "welcome back"}
-                {user ? (
-                  firstName ? (
-                    <span className="text-black">, {firstName}</span>
-                  ) : (
-                    ""
-                  )
+                {firstName ? (
+                  <span className="text-black">, {firstName}</span>
                 ) : (
-                  <>
-                    ,{" "}
-                    <Skeleton className="inline-block h-4 w-20 align-middle" />
-                  </>
+                  ""
                 )}
               </div>
             </div>
@@ -123,10 +125,10 @@ export default function ProtectedLayout({
               <nav className="flex items-center gap-6">
                 {isRedirecting ? (
                   <>
-                    <Skeleton className="h-5 w-12" />
-                    <Skeleton className="h-5 w-12" />
-                    <Skeleton className="h-5 w-14" />
-                    <Skeleton className="h-5 w-12" />
+                    <span className="h-5 w-12" />
+                    <span className="h-5 w-12" />
+                    <span className="h-5 w-14" />
+                    <span className="h-5 w-12" />
                   </>
                 ) : (
                   <>
@@ -154,8 +156,8 @@ export default function ProtectedLayout({
               <div className="flex items-center gap-6">
                 {isRedirecting ? (
                   <>
-                    <Skeleton className="h-5 w-14" />
-                    <Skeleton className="h-5 w-16" />
+                    <span className="h-5 w-14" />
+                    <span className="h-5 w-16" />
                   </>
                 ) : (
                   <>
