@@ -19,9 +19,14 @@ This skill helps debug the UVACompute infrastructure components.
 
 ### SSH to Hub (DO Droplet)
 
+**Prerequisite:** The local SSH key (`~/.ssh/id_ed25519`) is passphrase-protected. Ensure it's loaded in the SSH agent before connecting:
+
 ```bash
+ssh-add ~/.ssh/id_ed25519  # only needed once per session
 ssh root@***REDACTED_IP***
 ```
+
+If you get "Permission denied" errors, the most likely cause is the key not being loaded in the agent (`ssh-add -l` to check).
 
 ### SSH to Workstation
 
