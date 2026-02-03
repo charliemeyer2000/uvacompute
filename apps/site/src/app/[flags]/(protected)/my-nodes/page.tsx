@@ -187,12 +187,9 @@ export default function MyNodesPage() {
         </div>
       ) : (
         <div className="space-y-4">
-          {nodes.map((node, i) => (
-            <motion.div
+          {nodes.map((node) => (
+            <div
               key={node._id}
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.25, delay: i * 0.05 }}
               className={`bg-white border border-gray-200 border-l-4 ${getStatusBorderColor(node.status)} overflow-hidden hover:border-gray-300 transition-colors`}
             >
               {/* Node Header - Clickable */}
@@ -384,7 +381,7 @@ export default function MyNodesPage() {
                   </motion.div>
                 )}
               </AnimatePresence>
-            </motion.div>
+            </div>
           ))}
         </div>
       )}

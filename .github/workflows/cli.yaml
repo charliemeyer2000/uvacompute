@@ -1,6 +1,7 @@
 name: Build and Test CLI
 on:
   push:
+    branches: [main]
     paths:
       - "apps/cli/**"
   pull_request:
@@ -26,10 +27,22 @@ jobs:
             artifact: uvacompute-windows.exe
 
     runs-on: ${{ matrix.os }}
+
+    # On PRs, only run Linux build. On push to main, run all platforms.
+    if: ${{ github.event_name == 'push' || matrix.os == 'ubuntu-latest' }}
+
     steps:
       - uses: actions/checkout@v4
 
       - uses: oven-sh/setup-bun@v2
+
+      - name: Cache Bun dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ hashFiles('apps/cli/bun.lockb') }}
+          restore-keys: |
+            bun-${{ runner.os }}-
 
       - name: Install dependencies
         run: bun install
