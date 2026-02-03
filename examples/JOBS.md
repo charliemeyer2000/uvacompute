@@ -87,6 +87,87 @@ uva jobs cancel <jobId>
 
 ---
 
+## GitHub Actions Self-Hosted Runner
+
+Use uvacompute as a self-hosted GitHub Actions runner. This spins up an ephemeral runner that picks up one workflow job, executes it, then exits.
+
+### Prerequisites
+
+- [gh cli](https://cli.github.com) installed and authenticated
+- uva cli installed and authenticated
+
+### Quick Start
+
+Download the helper script and run it:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/charliemeyer2000/uvacompute/main/apps/site/public/gh-runner.sh \
+  -o gh-runner.sh && chmod +x gh-runner.sh
+
+# repo-level runner
+./gh-runner.sh --repo your-org/your-repo
+
+# org-level runner
+./gh-runner.sh --org your-org
+```
+
+### With GPU and Custom Resources
+
+```bash
+./gh-runner.sh --repo your-org/your-repo --gpu 1 --cpus 4 --ram 16
+```
+
+### Workflow Configuration
+
+In your GitHub Actions workflow, target the runner with `self-hosted` and `uvacompute` labels:
+
+```yaml
+name: My Workflow
+on: [push]
+
+jobs:
+  build:
+    runs-on: [self-hosted, uvacompute]
+    steps:
+      - uses: actions/checkout@v4
+      - run: echo "Running on uvacompute!"
+```
+
+If you requested a GPU, the `gpu` label is added automatically:
+
+```yaml
+jobs:
+  train:
+    runs-on: [self-hosted, uvacompute, gpu]
+    steps:
+      - run: nvidia-smi
+```
+
+### Script Options
+
+| Flag         | Description                           | Default    |
+| ------------ | ------------------------------------- | ---------- |
+| `--repo`     | GitHub repo (e.g. myorg/myrepo)       | —          |
+| `--org`      | GitHub org for org-level runner       | —          |
+| `--cpus`     | Number of CPUs                        | 4          |
+| `--ram`      | RAM in GB                             | 16         |
+| `--disk`     | Disk in GB                            | 64         |
+| `--gpu`      | Number of GPUs                        | 0          |
+| `--gpu-type` | GPU type                              | 5090       |
+| `--labels`   | Extra runner labels (comma-separated) | uvacompute |
+
+### How It Works
+
+1. The script gets a runner registration token from GitHub using the `gh` CLI
+2. It launches a container job on uvacompute running `ubuntu:22.04`
+3. Inside the container, it downloads and configures the GitHub Actions runner in `--ephemeral` mode
+4. The runner picks up one queued workflow job, executes it, then exits
+5. The container job completes when the runner finishes
+
+**Note:** Runners are ephemeral — each one handles a single workflow job. To process multiple queued jobs, run the script multiple times.
+
+---
+
 ## vLLM Server with Exposed Endpoint
 
 Run a vLLM inference server with a 7B model on a single GPU, exposed via HTTPS endpoint.

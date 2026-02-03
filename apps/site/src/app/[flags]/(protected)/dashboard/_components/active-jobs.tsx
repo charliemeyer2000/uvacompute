@@ -4,7 +4,6 @@ import { useState } from "react";
 import Link from "next/link";
 import { useQuery } from "convex/react";
 import { api } from "../../../../../../convex/_generated/api";
-import { authClient } from "@/lib/auth-client";
 import {
   Pagination,
   PaginationContent,
@@ -32,6 +31,7 @@ import {
 import { getStatusBorderColor, getStatusDotColor } from "@/lib/status-colors";
 import { MoreVertical, Container, ExternalLink, Globe } from "lucide-react";
 import { toast } from "sonner";
+import { motion } from "motion/react";
 
 function JobCard({ job }: { job: Job }) {
   const [showCancelDialog, setShowCancelDialog] = useState(false);
@@ -215,14 +215,10 @@ function JobCard({ job }: { job: Job }) {
 
 const ITEMS_PER_PAGE = 6;
 
-export default function ActiveJobs() {
-  const { data: session } = authClient.useSession();
+export default function ActiveJobs({ userId }: { userId: string }) {
   const [currentPage, setCurrentPage] = useState(1);
 
-  const activeJobs = useQuery(
-    api.jobs.listActiveByUser,
-    session?.user?.id ? { userId: session.user.id } : "skip",
-  );
+  const activeJobs = useQuery(api.jobs.listActiveByUser, { userId });
 
   const totalPages = activeJobs
     ? Math.ceil(activeJobs.length / ITEMS_PER_PAGE)
@@ -272,8 +268,15 @@ export default function ActiveJobs() {
       ) : activeJobs.length > 0 ? (
         <>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {paginatedActiveJobs?.map((job) => (
-              <JobCard key={job._id} job={job as Job} />
+            {paginatedActiveJobs?.map((job, i) => (
+              <motion.div
+                key={job._id}
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.25, delay: i * 0.05 }}
+              >
+                <JobCard job={job as Job} />
+              </motion.div>
             ))}
           </div>
           {totalPages > 1 && (

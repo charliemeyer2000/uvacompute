@@ -4,7 +4,6 @@ import { useState } from "react";
 import Link from "next/link";
 import { useQuery } from "convex/react";
 import { api } from "../../../../../../convex/_generated/api";
-import { authClient } from "@/lib/auth-client";
 import {
   Pagination,
   PaginationContent,
@@ -49,6 +48,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
+import { motion } from "motion/react";
 
 function VMCard({ vm, isActive }: { vm: VM; isActive: boolean }) {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -364,14 +364,10 @@ function VMCard({ vm, isActive }: { vm: VM; isActive: boolean }) {
 
 const ITEMS_PER_PAGE = 6;
 
-export default function ActiveVMs() {
-  const { data: session } = authClient.useSession();
+export default function ActiveVMs({ userId }: { userId: string }) {
   const [currentPage, setCurrentPage] = useState(1);
 
-  const activeVMs = useQuery(
-    api.vms.listActiveByUser,
-    session?.user?.id ? { userId: session.user.id } : "skip",
-  );
+  const activeVMs = useQuery(api.vms.listActiveByUser, { userId });
 
   const totalPages = activeVMs
     ? Math.ceil(activeVMs.length / ITEMS_PER_PAGE)
@@ -417,18 +413,24 @@ export default function ActiveVMs() {
       ) : activeVMs.length > 0 ? (
         <>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {paginatedActiveVMs?.map((vm) => (
-              <VMCard
+            {paginatedActiveVMs?.map((vm, i) => (
+              <motion.div
                 key={vm._id}
-                vm={vm}
-                isActive={[
-                  "creating",
-                  "pending",
-                  "booting",
-                  "provisioning",
-                  "ready",
-                ].includes(vm.status)}
-              />
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.25, delay: i * 0.05 }}
+              >
+                <VMCard
+                  vm={vm}
+                  isActive={[
+                    "creating",
+                    "pending",
+                    "booting",
+                    "provisioning",
+                    "ready",
+                  ].includes(vm.status)}
+                />
+              </motion.div>
             ))}
           </div>
           {totalPages > 1 && (
