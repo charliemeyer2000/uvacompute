@@ -17,7 +17,7 @@ export default function VMsDocsPage() {
         </p>
       </section>
 
-      <section>
+      <section id="prerequisites">
         <h3 className="text-lg font-semibold mb-4">prerequisites</h3>
         <p className="text-gray-600 mb-4">
           before creating a vm, make sure you have:
@@ -33,7 +33,10 @@ export default function VMsDocsPage() {
         </ul>
       </section>
 
-      <section className="border border-gray-200 p-6 space-y-6">
+      <section
+        id="create-a-vm"
+        className="border border-gray-200 p-6 space-y-6"
+      >
         <div>
           <div className="flex items-center gap-3 mb-2">
             <span className="text-2xl font-semibold text-black">1</span>
@@ -72,7 +75,7 @@ export default function VMsDocsPage() {
         </div>
       </section>
 
-      <section>
+      <section id="managing-vms">
         <h3 className="text-lg font-semibold mb-4">managing vms</h3>
 
         <div className="space-y-4">
@@ -99,7 +102,7 @@ export default function VMsDocsPage() {
         </div>
       </section>
 
-      <section>
+      <section id="vm-options">
         <h3 className="text-lg font-semibold mb-4">vm options</h3>
         <div className="overflow-x-auto">
           <table className="w-full text-sm border border-gray-200">

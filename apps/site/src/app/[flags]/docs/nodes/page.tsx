@@ -17,7 +17,7 @@ export default function NodesDocsPage() {
         </p>
       </section>
 
-      <section>
+      <section id="prerequisites">
         <h3 className="text-lg font-semibold mb-4">prerequisites</h3>
         <ul className="list-disc ml-6 space-y-2 text-gray-600">
           <li>a linux machine with nvidia gpu(s)</li>
@@ -32,7 +32,10 @@ export default function NodesDocsPage() {
         </ul>
       </section>
 
-      <section className="border border-gray-200 p-6 space-y-6">
+      <section
+        id="installing-a-node"
+        className="border border-gray-200 p-6 space-y-6"
+      >
         <h3 className="text-lg font-semibold mb-2">installing a node</h3>
 
         <div>
@@ -96,7 +99,10 @@ export default function NodesDocsPage() {
         </div>
       </section>
 
-      <section className="border border-gray-200 p-6 space-y-6">
+      <section
+        id="pausing-a-node"
+        className="border border-gray-200 p-6 space-y-6"
+      >
         <h3 className="text-lg font-semibold mb-2">pausing a node</h3>
         <p className="text-sm text-gray-600 mb-4">
           pausing a node prevents new workloads from being scheduled while
@@ -133,7 +139,10 @@ export default function NodesDocsPage() {
         </div>
       </section>
 
-      <section className="border border-gray-200 p-6 space-y-6">
+      <section
+        id="resuming-a-node"
+        className="border border-gray-200 p-6 space-y-6"
+      >
         <h3 className="text-lg font-semibold mb-2">resuming a node</h3>
         <p className="text-sm text-gray-600 mb-4">
           resuming a paused node allows it to accept new workloads again.
@@ -161,7 +170,10 @@ export default function NodesDocsPage() {
         </div>
       </section>
 
-      <section className="border border-gray-200 p-6 space-y-6">
+      <section
+        id="uninstalling-a-node"
+        className="border border-gray-200 p-6 space-y-6"
+      >
         <h3 className="text-lg font-semibold mb-2">uninstalling a node</h3>
         <p className="text-sm text-gray-600 mb-4">
           completely remove uvacompute from your machine.
@@ -207,7 +219,7 @@ export default function NodesDocsPage() {
         </div>
       </section>
 
-      <section>
+      <section id="status-reference">
         <h3 className="text-lg font-semibold mb-4">node status reference</h3>
         <div className="overflow-x-auto">
           <table className="w-full text-sm border border-gray-200">
@@ -257,7 +269,7 @@ export default function NodesDocsPage() {
         </div>
       </section>
 
-      <section>
+      <section id="additional-commands">
         <h3 className="text-lg font-semibold mb-4">additional commands</h3>
 
         <div className="space-y-4">

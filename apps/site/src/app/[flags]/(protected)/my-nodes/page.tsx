@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { getStatusBorderColor, getStatusDotColor } from "@/lib/status-colors";
 import { ChevronDown, ChevronRight, Server, Pause, Play } from "lucide-react";
 import { toast } from "sonner";
+import { AnimatePresence, motion } from "motion/react";
 
 interface VM {
   _id: string;
@@ -186,9 +187,12 @@ export default function MyNodesPage() {
         </div>
       ) : (
         <div className="space-y-4">
-          {nodes.map((node) => (
-            <div
+          {nodes.map((node, i) => (
+            <motion.div
               key={node._id}
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.25, delay: i * 0.05 }}
               className={`bg-white border border-gray-200 border-l-4 ${getStatusBorderColor(node.status)} overflow-hidden hover:border-gray-300 transition-colors`}
             >
               {/* Node Header - Clickable */}
@@ -257,118 +261,130 @@ export default function MyNodesPage() {
               </div>
 
               {/* Expanded Content */}
-              {expandedNode === node.nodeId && (
-                <div className="border-t border-gray-100 px-5 py-4 bg-gray-50/50">
-                  {/* Actions */}
-                  <div className="flex gap-2 mb-4">
-                    {node.status === "online" && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handlePause(node.nodeId);
-                        }}
-                        className="text-yellow-700 border-yellow-200 hover:bg-yellow-50"
-                      >
-                        <Pause className="w-3.5 h-3.5 mr-1.5" />
-                        pause node
-                      </Button>
-                    )}
-                    {node.status === "draining" && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleResume(node.nodeId);
-                        }}
-                        className="text-green-700 border-green-200 hover:bg-green-50"
-                      >
-                        <Play className="w-3.5 h-3.5 mr-1.5" />
-                        resume node
-                      </Button>
-                    )}
-                  </div>
-
-                  {/* Active Workloads */}
-                  <div className="mb-4">
-                    <h4 className="text-xs text-gray-400 uppercase tracking-wide mb-2">
-                      active workloads
-                    </h4>
-                    {workloads === undefined ? (
-                      <div className="text-xs text-gray-400">loading...</div>
-                    ) : workloads.vms.length === 0 &&
-                      workloads.jobs.length === 0 ? (
-                      <div className="text-xs text-gray-400">
-                        no active workloads on this node
-                      </div>
-                    ) : (
-                      <div className="space-y-2">
-                        {workloads.vms.map((vm: VM) => (
-                          <div
-                            key={vm._id}
-                            className="flex items-center justify-between bg-white p-3 border border-gray-200"
+              <AnimatePresence initial={false}>
+                {expandedNode === node.nodeId && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: "auto", opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.2, ease: "easeInOut" }}
+                    className="overflow-hidden"
+                  >
+                    <div className="border-t border-gray-100 px-5 py-4 bg-gray-50/50">
+                      {/* Actions */}
+                      <div className="flex gap-2 mb-4">
+                        {node.status === "online" && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handlePause(node.nodeId);
+                            }}
+                            className="text-yellow-700 border-yellow-200 hover:bg-yellow-50"
                           >
-                            <div className="flex items-center gap-2">
-                              <span className="px-1.5 py-0.5 text-[10px] uppercase tracking-wide bg-blue-100 text-blue-700 font-medium">
-                                vm
-                              </span>
-                              <span className="text-xs font-mono text-black">
-                                {vm.name || vm.vmId.slice(0, 12)}
-                              </span>
-                            </div>
-                            <span className="text-xs text-gray-400">
-                              {vm.cpus} CPU, {vm.ram} GB, {vm.gpus} GPU
-                            </span>
-                          </div>
-                        ))}
-                        {workloads.jobs.map((job: Job) => (
-                          <div
-                            key={job._id}
-                            className="flex items-center justify-between bg-white p-3 border border-gray-200"
+                            <Pause className="w-3.5 h-3.5 mr-1.5" />
+                            pause node
+                          </Button>
+                        )}
+                        {node.status === "draining" && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleResume(node.nodeId);
+                            }}
+                            className="text-green-700 border-green-200 hover:bg-green-50"
                           >
-                            <div className="flex items-center gap-2">
-                              <span className="px-1.5 py-0.5 text-[10px] uppercase tracking-wide bg-purple-100 text-purple-700 font-medium">
-                                job
-                              </span>
-                              <span className="text-xs font-mono text-black">
-                                {job.name || job.jobId.slice(0, 12)}
-                              </span>
-                            </div>
-                            <span className="text-xs text-gray-400">
-                              {job.cpus} CPU, {job.ram} GB, {job.gpus} GPU
-                            </span>
-                          </div>
-                        ))}
+                            <Play className="w-3.5 h-3.5 mr-1.5" />
+                            resume node
+                          </Button>
+                        )}
                       </div>
-                    )}
-                  </div>
 
-                  {/* Node Details */}
-                  <div className="border-t border-gray-200 pt-3 space-y-1.5 text-xs">
-                    <div className="flex justify-between">
-                      <span className="text-gray-400">node id</span>
-                      <span className="text-gray-600 font-mono">
-                        {node.nodeId}
-                      </span>
+                      {/* Active Workloads */}
+                      <div className="mb-4">
+                        <h4 className="text-xs text-gray-400 uppercase tracking-wide mb-2">
+                          active workloads
+                        </h4>
+                        {workloads === undefined ? (
+                          <div className="text-xs text-gray-400">
+                            loading...
+                          </div>
+                        ) : workloads.vms.length === 0 &&
+                          workloads.jobs.length === 0 ? (
+                          <div className="text-xs text-gray-400">
+                            no active workloads on this node
+                          </div>
+                        ) : (
+                          <div className="space-y-2">
+                            {workloads.vms.map((vm: VM) => (
+                              <div
+                                key={vm._id}
+                                className="flex items-center justify-between bg-white p-3 border border-gray-200"
+                              >
+                                <div className="flex items-center gap-2">
+                                  <span className="px-1.5 py-0.5 text-[10px] uppercase tracking-wide bg-blue-100 text-blue-700 font-medium">
+                                    vm
+                                  </span>
+                                  <span className="text-xs font-mono text-black">
+                                    {vm.name || vm.vmId.slice(0, 12)}
+                                  </span>
+                                </div>
+                                <span className="text-xs text-gray-400">
+                                  {vm.cpus} CPU, {vm.ram} GB, {vm.gpus} GPU
+                                </span>
+                              </div>
+                            ))}
+                            {workloads.jobs.map((job: Job) => (
+                              <div
+                                key={job._id}
+                                className="flex items-center justify-between bg-white p-3 border border-gray-200"
+                              >
+                                <div className="flex items-center gap-2">
+                                  <span className="px-1.5 py-0.5 text-[10px] uppercase tracking-wide bg-purple-100 text-purple-700 font-medium">
+                                    job
+                                  </span>
+                                  <span className="text-xs font-mono text-black">
+                                    {job.name || job.jobId.slice(0, 12)}
+                                  </span>
+                                </div>
+                                <span className="text-xs text-gray-400">
+                                  {job.cpus} CPU, {job.ram} GB, {job.gpus} GPU
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Node Details */}
+                      <div className="border-t border-gray-200 pt-3 space-y-1.5 text-xs">
+                        <div className="flex justify-between">
+                          <span className="text-gray-400">node id</span>
+                          <span className="text-gray-600 font-mono">
+                            {node.nodeId}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-400">registered</span>
+                          <span className="text-gray-600">
+                            {new Date(node.registeredAt).toLocaleDateString()}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-400">last heartbeat</span>
+                          <span className="text-gray-600">
+                            {new Date(node.lastHeartbeat).toLocaleString()}
+                          </span>
+                        </div>
+                      </div>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-400">registered</span>
-                      <span className="text-gray-600">
-                        {new Date(node.registeredAt).toLocaleDateString()}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-400">last heartbeat</span>
-                      <span className="text-gray-600">
-                        {new Date(node.lastHeartbeat).toLocaleString()}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </motion.div>
           ))}
         </div>
       )}
