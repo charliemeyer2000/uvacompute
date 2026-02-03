@@ -1,7 +1,9 @@
 import type { NextConfig } from "next";
 import createWithVercelToolbar from "@vercel/toolbar/plugins/next";
 const nextConfig: NextConfig = {
-  /* config options here */
+  experimental: {
+    viewTransition: true,
+  },
   images: {
     remotePatterns: [{ hostname: "lh3.googleusercontent.com" }],
   },

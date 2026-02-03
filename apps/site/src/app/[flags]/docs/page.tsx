@@ -17,7 +17,7 @@ export default function DocsPage() {
       </section>
 
       <section className="border border-gray-200 p-6 space-y-6">
-        <div>
+        <div id="install-the-cli">
           <div className="flex items-center gap-3 mb-2">
             <span className="text-2xl font-semibold text-black">1</span>
             <h3 className="text-lg font-semibold text-black">
@@ -36,7 +36,7 @@ export default function DocsPage() {
           </div>
         </div>
 
-        <div>
+        <div id="create-an-account">
           <div className="flex items-center gap-3 mb-2">
             <span className="text-2xl font-semibold text-black">2</span>
             <h3 className="text-lg font-semibold text-black">
@@ -58,7 +58,7 @@ export default function DocsPage() {
           </div>
         </div>
 
-        <div>
+        <div id="authenticate-your-cli">
           <div className="flex items-center gap-3 mb-2">
             <span className="text-2xl font-semibold text-black">3</span>
             <h3 className="text-lg font-semibold text-black">
@@ -79,7 +79,7 @@ export default function DocsPage() {
         </div>
       </section>
 
-      <section>
+      <section id="whats-next">
         <h2 className="text-xl font-semibold mb-4">what&apos;s next?</h2>
         <ul className="space-y-2 text-gray-600">
           <li>

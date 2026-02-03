@@ -1,0 +1,316 @@
+"use client";
+
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
+import { cn } from "@/lib/utils";
+import { authClient } from "@/lib/auth-client";
+import { usePreloadedQuery, Preloaded } from "convex/react";
+import { api } from "../../../../../convex/_generated/api";
+import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
+import { AnimatePresence, motion } from "motion/react";
+import { ViewTransition } from "react";
+
+const docNavItems = [
+  {
+    href: "/docs",
+    label: "getting started",
+    subheadings: [
+      { label: "install the cli", id: "install-the-cli" },
+      { label: "create an account", id: "create-an-account" },
+      { label: "authenticate your cli", id: "authenticate-your-cli" },
+      { label: "what's next?", id: "whats-next" },
+    ],
+  },
+  {
+    href: "/docs/vms",
+    label: "virtual machines",
+    subheadings: [
+      { label: "prerequisites", id: "prerequisites" },
+      { label: "create a vm", id: "create-a-vm" },
+      { label: "managing vms", id: "managing-vms" },
+      { label: "vm options", id: "vm-options" },
+    ],
+  },
+  {
+    href: "/docs/jobs",
+    label: "container jobs",
+    subheadings: [
+      { label: "prerequisites", id: "prerequisites" },
+      { label: "examples", id: "examples" },
+      { label: "managing jobs", id: "managing-jobs" },
+      { label: "github actions runner", id: "github-actions-runner" },
+      { label: "job options", id: "job-options" },
+    ],
+  },
+  {
+    href: "/docs/nodes",
+    label: "node management",
+    subheadings: [
+      { label: "prerequisites", id: "prerequisites" },
+      { label: "installing a node", id: "installing-a-node" },
+      { label: "pausing a node", id: "pausing-a-node" },
+      { label: "resuming a node", id: "resuming-a-node" },
+      { label: "uninstalling a node", id: "uninstalling-a-node" },
+      { label: "status reference", id: "status-reference" },
+      { label: "additional commands", id: "additional-commands" },
+    ],
+  },
+  {
+    href: "/docs/configuration",
+    label: "configuration",
+    subheadings: [
+      { label: "cli config", id: "cli-configuration" },
+      { label: "node system config", id: "node-system-configuration" },
+      { label: "node data storage", id: "node-data-storage" },
+      { label: "ssh keys", id: "ssh-keys" },
+      { label: "gpu mode scripts", id: "gpu-mode-scripts" },
+      { label: "directory summary", id: "directory-summary" },
+    ],
+  },
+];
+
+function NavLink({
+  href,
+  isActive,
+  children,
+}: {
+  href: string;
+  isActive: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <Link
+      href={href}
+      className={`relative py-2 text-sm transition-colors ${
+        isActive ? "text-black" : "text-gray-500 hover:text-black"
+      }`}
+    >
+      {children}
+      {isActive && (
+        <span className="absolute bottom-0 left-0 right-0 h-[2px] bg-orange-accent" />
+      )}
+    </Link>
+  );
+}
+
+function UserGreeting({
+  preloadedUser,
+}: {
+  preloadedUser: Preloaded<typeof api.auth.getCurrentUser>;
+}) {
+  const user = usePreloadedQuery(preloadedUser);
+  const firstName = user?.name ? user.name.split(" ")[0].toLowerCase() : "";
+  return firstName ? <span className="text-black">, {firstName}</span> : null;
+}
+
+function AdminLink({
+  preloadedDevAccess,
+}: {
+  preloadedDevAccess: Preloaded<typeof api.devAccess.hasDevAccess>;
+}) {
+  const hasDevAccess = usePreloadedQuery(preloadedDevAccess);
+  if (!hasDevAccess) return null;
+  return (
+    <NavLink href="/admin" isActive={false}>
+      admin
+    </NavLink>
+  );
+}
+
+type DocsLayoutClientProps = {
+  children: React.ReactNode;
+} & (
+  | {
+      isLoggedIn: true;
+      preloadedUser: Preloaded<typeof api.auth.getCurrentUser>;
+      preloadedDevAccess: Preloaded<typeof api.devAccess.hasDevAccess>;
+    }
+  | {
+      isLoggedIn: false;
+      preloadedUser?: never;
+      preloadedDevAccess?: never;
+    }
+);
+
+export default function DocsLayoutClient(props: DocsLayoutClientProps) {
+  const { children, isLoggedIn } = props;
+  const pathname = usePathname();
+  const router = useRouter();
+
+  const handleSignOut = async () => {
+    try {
+      await authClient.signOut();
+      router.push("/login");
+    } catch (error) {
+      toast.error("sign out failed", {
+        description:
+          error instanceof Error ? error.message : "an error occurred",
+      });
+    }
+  };
+
+  function isActiveDocSection(href: string): boolean {
+    if (href === "/docs") {
+      return pathname === "/docs" || pathname?.endsWith("/docs") || false;
+    }
+    return pathname?.includes(href) ?? false;
+  }
+
+  return (
+    <main className="max-w-7xl mx-auto px-8 py-8 min-h-screen font-mono">
+      <div>
+        {/* Header Section */}
+        <div className="mb-8">
+          <div className="flex items-center justify-between">
+            <Link
+              href={isLoggedIn ? "/vms" : "/"}
+              className="text-3xl font-normal tracking-tight hover:text-gray-700 transition-colors"
+            >
+              uvacompute
+            </Link>
+            {isLoggedIn ? (
+              <div className="text-sm text-gray-500">
+                welcome back
+                {props.preloadedUser ? (
+                  <UserGreeting preloadedUser={props.preloadedUser} />
+                ) : null}
+              </div>
+            ) : (
+              <div className="flex items-center gap-4">
+                <Link
+                  href="/login"
+                  className="text-sm text-gray-500 hover:text-black transition-colors"
+                >
+                  sign in
+                </Link>
+                <Link
+                  href="/early-access"
+                  className="text-sm text-orange-accent hover:underline transition-colors"
+                >
+                  get early access
+                </Link>
+              </div>
+            )}
+          </div>
+
+          <div className="h-[3px] bg-orange-accent mt-4 mb-4" />
+
+          <div className="flex items-center justify-between">
+            <nav className="flex items-center gap-6">
+              {isLoggedIn ? (
+                <>
+                  <NavLink href="/vms" isActive={false}>
+                    vms
+                  </NavLink>
+                  <NavLink href="/jobs" isActive={false}>
+                    jobs
+                  </NavLink>
+                  <NavLink href="/my-nodes" isActive={false}>
+                    nodes
+                  </NavLink>
+                  <NavLink href="/docs" isActive={true}>
+                    docs
+                  </NavLink>
+                </>
+              ) : (
+                <>
+                  <NavLink href="/" isActive={false}>
+                    home
+                  </NavLink>
+                  <NavLink href="/docs" isActive={true}>
+                    docs
+                  </NavLink>
+                </>
+              )}
+            </nav>
+
+            <div className="flex items-center gap-6">
+              {isLoggedIn ? (
+                <>
+                  <span className="text-gray-200">|</span>
+                  <NavLink href="/profile" isActive={false}>
+                    profile
+                  </NavLink>
+                  {props.preloadedDevAccess && (
+                    <AdminLink preloadedDevAccess={props.preloadedDevAccess} />
+                  )}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleSignOut}
+                    className="text-gray-500 hover:text-black hover:bg-transparent px-0"
+                  >
+                    sign out
+                  </Button>
+                </>
+              ) : null}
+            </div>
+          </div>
+        </div>
+
+        {/* Docs Content with Sidebar */}
+        <div className="flex gap-8">
+          {/* Sidebar Navigation */}
+          <nav className="w-48 flex-shrink-0">
+            <ul className="space-y-1">
+              {docNavItems.map((item) => {
+                const isActive = isActiveDocSection(item.href);
+                return (
+                  <li key={item.href}>
+                    <Link
+                      href={item.href}
+                      className={cn(
+                        "block py-2 px-3 text-sm border-l-2 transition-colors",
+                        isActive
+                          ? "border-orange-accent bg-orange-accent/5 text-black font-medium"
+                          : "border-transparent text-gray-500 hover:border-gray-300 hover:text-black",
+                      )}
+                    >
+                      {item.label}
+                    </Link>
+                    <AnimatePresence initial={false}>
+                      {isActive && item.subheadings.length > 0 && (
+                        <motion.ul
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: "auto", opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          transition={{ duration: 0.2, ease: "easeInOut" }}
+                          className="overflow-hidden"
+                        >
+                          {item.subheadings.map((sub, i) => (
+                            <motion.li
+                              key={sub.id}
+                              initial={{ opacity: 0, x: -4 }}
+                              animate={{ opacity: 1, x: 0 }}
+                              transition={{
+                                duration: 0.15,
+                                delay: 0.05 + i * 0.03,
+                              }}
+                            >
+                              <a
+                                href={`#${sub.id}`}
+                                className="block py-1 pl-6 pr-3 text-xs border-l-2 border-transparent text-gray-400 hover:text-gray-700 transition-colors"
+                              >
+                                {sub.label}
+                              </a>
+                            </motion.li>
+                          ))}
+                        </motion.ul>
+                      )}
+                    </AnimatePresence>
+                  </li>
+                );
+              })}
+            </ul>
+          </nav>
+
+          {/* Main Content */}
+          <ViewTransition name="docs-content">
+            <article className="flex-1 min-w-0">{children}</article>
+          </ViewTransition>
+        </div>
+      </div>
+    </main>
+  );
+}
