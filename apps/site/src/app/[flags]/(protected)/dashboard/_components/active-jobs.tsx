@@ -31,7 +31,6 @@ import {
 import { getStatusBorderColor, getStatusDotColor } from "@/lib/status-colors";
 import { MoreVertical, Container, ExternalLink, Globe } from "lucide-react";
 import { toast } from "sonner";
-import { motion } from "motion/react";
 
 function JobCard({ job }: { job: Job }) {
   const [showCancelDialog, setShowCancelDialog] = useState(false);
@@ -268,15 +267,10 @@ export default function ActiveJobs({ userId }: { userId: string }) {
       ) : activeJobs.length > 0 ? (
         <>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {paginatedActiveJobs?.map((job, i) => (
-              <motion.div
-                key={job._id}
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.25, delay: i * 0.05 }}
-              >
+            {paginatedActiveJobs?.map((job) => (
+              <div key={job._id}>
                 <JobCard job={job as Job} />
-              </motion.div>
+              </div>
             ))}
           </div>
           {totalPages > 1 && (

@@ -16,7 +16,6 @@ import {
 import { VM, formatDate, formatStatus } from "@/lib/vm-utils";
 import { getStatusBorderColor, getStatusDotColor } from "@/lib/status-colors";
 import { Archive } from "lucide-react";
-import { motion } from "motion/react";
 
 function VMCard({ vm }: { vm: VM }) {
   return (
@@ -139,15 +138,10 @@ export default function VMHistory({ userId }: { userId: string }) {
       ) : inactiveVMs.length > 0 ? (
         <>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {paginatedInactiveVMs?.map((vm, i) => (
-              <motion.div
-                key={vm._id}
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.25, delay: i * 0.05 }}
-              >
+            {paginatedInactiveVMs?.map((vm) => (
+              <div key={vm._id}>
                 <VMCard vm={vm} />
-              </motion.div>
+              </div>
             ))}
           </div>
           {totalPages > 1 && (
