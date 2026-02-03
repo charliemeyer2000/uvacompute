@@ -234,34 +234,40 @@ export default function VMDetailPageClient({
       </div>
 
       <div className="border border-gray-200 bg-white">
-        <div className="grid grid-cols-4 divide-x divide-gray-200">
+        <div className="grid grid-cols-2 lg:grid-cols-4 divide-y lg:divide-y-0 lg:divide-x divide-gray-200">
           <div className="p-4">
             <div className="flex items-center gap-2 text-gray-400 text-xs uppercase tracking-wide mb-1">
-              <Cpu className="h-3.5 w-3.5" />
+              <Cpu className="h-3.5 w-3.5 flex-shrink-0" />
               cpu
             </div>
-            <p className="text-lg font-medium text-black">{vm.cpus} vCPU</p>
+            <p className="text-lg font-medium text-black truncate">
+              {vm.cpus} vCPU
+            </p>
           </div>
           <div className="p-4">
             <div className="flex items-center gap-2 text-gray-400 text-xs uppercase tracking-wide mb-1">
-              <MemoryStick className="h-3.5 w-3.5" />
+              <MemoryStick className="h-3.5 w-3.5 flex-shrink-0" />
               ram
             </div>
-            <p className="text-lg font-medium text-black">{vm.ram} GB</p>
+            <p className="text-lg font-medium text-black truncate">
+              {vm.ram} GB
+            </p>
           </div>
           <div className="p-4">
             <div className="flex items-center gap-2 text-gray-400 text-xs uppercase tracking-wide mb-1">
-              <HardDrive className="h-3.5 w-3.5" />
+              <HardDrive className="h-3.5 w-3.5 flex-shrink-0" />
               disk
             </div>
-            <p className="text-lg font-medium text-black">{vm.disk} GB</p>
+            <p className="text-lg font-medium text-black truncate">
+              {vm.disk} GB
+            </p>
           </div>
           <div className="p-4">
             <div className="flex items-center gap-2 text-gray-400 text-xs uppercase tracking-wide mb-1">
-              <Zap className="h-3.5 w-3.5" />
+              <Zap className="h-3.5 w-3.5 flex-shrink-0" />
               gpu
             </div>
-            <p className="text-lg font-medium text-black">
+            <p className="text-lg font-medium text-black truncate">
               {vm.gpus > 0 ? `${vm.gpus}x ${vm.gpuType}` : "—"}
             </p>
           </div>
