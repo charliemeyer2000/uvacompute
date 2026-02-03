@@ -4,7 +4,6 @@ import { useState } from "react";
 import Link from "next/link";
 import { useQuery } from "convex/react";
 import { api } from "../../../../../../convex/_generated/api";
-import { authClient } from "@/lib/auth-client";
 import {
   Pagination,
   PaginationContent,
@@ -17,6 +16,7 @@ import {
 import { VM, formatDate, formatStatus } from "@/lib/vm-utils";
 import { getStatusBorderColor, getStatusDotColor } from "@/lib/status-colors";
 import { Archive } from "lucide-react";
+import { motion } from "motion/react";
 
 function VMCard({ vm }: { vm: VM }) {
   return (
@@ -90,14 +90,10 @@ function VMCard({ vm }: { vm: VM }) {
 
 const ITEMS_PER_PAGE = 6;
 
-export default function VMHistory() {
-  const { data: session } = authClient.useSession();
+export default function VMHistory({ userId }: { userId: string }) {
   const [currentPage, setCurrentPage] = useState(1);
 
-  const inactiveVMs = useQuery(
-    api.vms.listInactiveByUser,
-    session?.user?.id ? { userId: session.user.id } : "skip",
-  );
+  const inactiveVMs = useQuery(api.vms.listInactiveByUser, { userId });
 
   const totalPages = inactiveVMs
     ? Math.ceil(inactiveVMs.length / ITEMS_PER_PAGE)
@@ -143,8 +139,15 @@ export default function VMHistory() {
       ) : inactiveVMs.length > 0 ? (
         <>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {paginatedInactiveVMs?.map((vm) => (
-              <VMCard key={vm._id} vm={vm} />
+            {paginatedInactiveVMs?.map((vm, i) => (
+              <motion.div
+                key={vm._id}
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.25, delay: i * 0.05 }}
+              >
+                <VMCard vm={vm} />
+              </motion.div>
             ))}
           </div>
           {totalPages > 1 && (
