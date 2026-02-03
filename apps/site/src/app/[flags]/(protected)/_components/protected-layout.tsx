@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { toast } from "sonner";
 import { EarlyAccessProvider } from "./early-access-context";
+import { ViewTransition } from "react";
 import { useRedirectLogic } from "./use-redirect-logic";
 
 function NavLink({
@@ -191,7 +192,7 @@ export default function ProtectedLayout({
             </div>
           </div>
 
-          {children}
+          <ViewTransition name="page-content">{children}</ViewTransition>
         </div>
       </main>
     </EarlyAccessProvider>

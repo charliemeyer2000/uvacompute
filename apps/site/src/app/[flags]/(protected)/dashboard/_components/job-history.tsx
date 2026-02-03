@@ -28,7 +28,6 @@ import {
 } from "@/lib/job-utils";
 import { getStatusBorderColor, getStatusDotColor } from "@/lib/status-colors";
 import { MoreVertical, ExternalLink, Archive } from "lucide-react";
-import { motion } from "motion/react";
 
 function JobCard({ job }: { job: Job }) {
   return (
@@ -217,15 +216,10 @@ export default function JobHistory({ userId }: { userId: string }) {
       ) : inactiveJobs.length > 0 ? (
         <>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {paginatedInactiveJobs?.map((job, i) => (
-              <motion.div
-                key={job._id}
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.25, delay: i * 0.05 }}
-              >
+            {paginatedInactiveJobs?.map((job) => (
+              <div key={job._id}>
                 <JobCard job={job as Job} />
-              </motion.div>
+              </div>
             ))}
           </div>
           {totalPages > 1 && (
