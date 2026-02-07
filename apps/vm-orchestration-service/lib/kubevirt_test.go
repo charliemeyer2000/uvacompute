@@ -1,6 +1,7 @@
 package lib
 
 import (
+	"strings"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -353,5 +354,195 @@ func TestGetEnvOrDefault(t *testing.T) {
 				t.Errorf("Expected '%s', got '%s'", tt.expected, result)
 			}
 		})
+	}
+}
+
+func TestGenerateMIMEMultipart_BasicNoOptionalFields(t *testing.T) {
+	t.Parallel()
+	sshConfig := generateSSHKeysConfig([]string{"ssh-rsa AAAA... user@example.com"})
+	result := generateMIMEMultipart(sshConfig, "", "", false, nil, nil)
+
+	if !strings.Contains(result, "multipart/mixed") {
+		t.Error("should contain multipart/mixed Content-Type header")
+	}
+	if !strings.Contains(result, "==CLOUDCONFIG_BOUNDARY==") {
+		t.Error("should contain boundary marker")
+	}
+	if !strings.Contains(result, "ssh-config.cfg") {
+		t.Error("should contain SSH config part")
+	}
+	if !strings.Contains(result, "uvacompute-base.cfg") {
+		t.Error("should contain base template part")
+	}
+	if !strings.Contains(result, "completion-marker.cfg") {
+		t.Error("should contain completion marker when no expose")
+	}
+	if strings.Contains(result, "uvacompute-cuda.cfg") {
+		t.Error("should NOT contain CUDA template for non-GPU")
+	}
+	if strings.Contains(result, "startup-script.sh") {
+		t.Error("should NOT contain startup script when empty")
+	}
+	if strings.Contains(result, "user-config.cfg") {
+		t.Error("should NOT contain user config when empty")
+	}
+	if strings.Contains(result, "frpc-config.cfg") {
+		t.Error("should NOT contain frpc config when no expose")
+	}
+}
+
+func TestGenerateMIMEMultipart_WithGPU(t *testing.T) {
+	t.Parallel()
+	sshConfig := generateSSHKeysConfig(nil)
+	result := generateMIMEMultipart(sshConfig, "", "", true, nil, nil)
+
+	if !strings.Contains(result, "uvacompute-cuda.cfg") {
+		t.Error("should contain CUDA template for GPU VMs")
+	}
+}
+
+func TestGenerateMIMEMultipart_WithStartupScript(t *testing.T) {
+	t.Parallel()
+	sshConfig := generateSSHKeysConfig(nil)
+	result := generateMIMEMultipart(sshConfig, "echo hello", "", false, nil, nil)
+
+	if !strings.Contains(result, "startup-script.sh") {
+		t.Error("should contain startup script part")
+	}
+	if !strings.Contains(result, "text/x-shellscript") {
+		t.Error("startup script should have x-shellscript content type")
+	}
+	if !strings.Contains(result, "echo hello") {
+		t.Error("should contain the user's script content")
+	}
+	if !strings.Contains(result, "export HOME=/root") {
+		t.Error("should wrap script with HOME export")
+	}
+}
+
+func TestGenerateMIMEMultipart_WithCloudInitConfig(t *testing.T) {
+	t.Parallel()
+	sshConfig := generateSSHKeysConfig(nil)
+	userConfig := "#cloud-config\npackages:\n  - vim"
+	result := generateMIMEMultipart(sshConfig, "", userConfig, false, nil, nil)
+
+	if !strings.Contains(result, "user-config.cfg") {
+		t.Error("should contain user config part")
+	}
+	if !strings.Contains(result, "packages:") {
+		t.Error("should contain user cloud-init content")
+	}
+}
+
+func TestGenerateMIMEMultipart_WithExpose(t *testing.T) {
+	t.Setenv("FRP_AUTH_TOKEN", "test-token")
+
+	sshConfig := generateSSHKeysConfig(nil)
+	port := 8080
+	subdomain := "my-app"
+	result := generateMIMEMultipart(sshConfig, "", "", false, &port, &subdomain)
+
+	if !strings.Contains(result, "frpc-config.cfg") {
+		t.Error("should contain frpc config part when expose is set")
+	}
+	if strings.Contains(result, "completion-marker.cfg") {
+		t.Error("should NOT contain separate completion marker when expose is set")
+	}
+}
+
+func TestGenerateMIMEMultipart_AllFields(t *testing.T) {
+	t.Setenv("FRP_AUTH_TOKEN", "test-token")
+
+	sshKeys := []string{"ssh-rsa AAAA... user@example.com"}
+	sshConfig := generateSSHKeysConfig(sshKeys)
+	port := 3000
+	subdomain := "all-fields"
+	result := generateMIMEMultipart(sshConfig, "#!/bin/bash\necho all", "#cloud-config\npackages:\n  - curl", true, &port, &subdomain)
+
+	expected := []string{
+		"ssh-config.cfg",
+		"uvacompute-base.cfg",
+		"uvacompute-cuda.cfg",
+		"frpc-config.cfg",
+		"startup-script.sh",
+		"user-config.cfg",
+	}
+	for _, part := range expected {
+		if !strings.Contains(result, part) {
+			t.Errorf("should contain %s", part)
+		}
+	}
+
+	if !strings.Contains(result, "--==CLOUDCONFIG_BOUNDARY==--") {
+		t.Error("should end with boundary terminator")
+	}
+}
+
+func TestGenerateMIMEMultipart_BoundaryStructure(t *testing.T) {
+	t.Parallel()
+	sshConfig := generateSSHKeysConfig(nil)
+	result := generateMIMEMultipart(sshConfig, "", "", false, nil, nil)
+
+	if !strings.HasPrefix(result, "Content-Type: multipart/mixed") {
+		t.Error("should start with Content-Type header")
+	}
+
+	boundary := "==CLOUDCONFIG_BOUNDARY=="
+	startBoundaries := strings.Count(result, "--"+boundary+"\n")
+	endBoundary := strings.Count(result, "--"+boundary+"--")
+
+	if startBoundaries < 3 {
+		t.Errorf("expected at least 3 part boundaries, got %d", startBoundaries)
+	}
+	if endBoundary != 1 {
+		t.Errorf("expected exactly 1 end boundary, got %d", endBoundary)
+	}
+}
+
+func TestGenerateSSHKeysConfig(t *testing.T) {
+	t.Parallel()
+
+	t.Run("single key", func(t *testing.T) {
+		result := generateSSHKeysConfig([]string{"ssh-rsa AAAA..."})
+		if !strings.Contains(result, "#cloud-config") {
+			t.Error("should start with #cloud-config")
+		}
+		if !strings.Contains(result, "ssh-rsa AAAA...") {
+			t.Error("should contain the SSH key")
+		}
+		if !strings.Contains(result, "ssh_pwauth: false") {
+			t.Error("should disable password auth")
+		}
+	})
+
+	t.Run("multiple keys", func(t *testing.T) {
+		keys := []string{"ssh-rsa key1", "ssh-ed25519 key2"}
+		result := generateSSHKeysConfig(keys)
+		if !strings.Contains(result, "ssh-rsa key1") {
+			t.Error("should contain first key")
+		}
+		if !strings.Contains(result, "ssh-ed25519 key2") {
+			t.Error("should contain second key")
+		}
+	})
+
+	t.Run("no keys", func(t *testing.T) {
+		result := generateSSHKeysConfig(nil)
+		if !strings.Contains(result, "ssh_authorized_keys:") {
+			t.Error("should still have authorized_keys section")
+		}
+	})
+}
+
+func TestGenerateCloudInitUserData(t *testing.T) {
+	t.Setenv("FRP_AUTH_TOKEN", "test-token")
+
+	result := generateCloudInitUserData([]string{"ssh-rsa AAAA..."}, "", "", false, nil, nil)
+
+	if !strings.Contains(result, "multipart/mixed") {
+		t.Error("should produce MIME multipart output")
+	}
+	if !strings.Contains(result, "ssh-rsa AAAA...") {
+		t.Error("should include SSH keys")
 	}
 }
