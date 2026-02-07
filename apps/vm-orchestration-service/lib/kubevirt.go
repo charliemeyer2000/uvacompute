@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -346,8 +347,34 @@ func (k *KubeVirtAdapter) waitForVMBooted(ctx context.Context, vmId string, stat
 			case "Scheduled":
 				statusCallback(structs.VM_STATUS_BOOTING)
 			}
+
+			// Check virt-launcher pod for scheduling failures (fast-fail instead of waiting 5 min)
+			if err := k.checkPodSchedulingFailure(ctx, vmId); err != nil {
+				return fmt.Errorf("VM scheduling failed: %w", err)
+			}
 		}
 	}
+}
+
+// checkPodSchedulingFailure checks if the virt-launcher pod for a VM has failed to schedule.
+func (k *KubeVirtAdapter) checkPodSchedulingFailure(ctx context.Context, vmId string) error {
+	pods, err := k.typedClient.CoreV1().Pods(k.namespace).List(ctx, metav1.ListOptions{
+		LabelSelector: fmt.Sprintf("kubevirt.io/domain=%s", vmId),
+	})
+	if err != nil || len(pods.Items) == 0 {
+		return nil // Pod not created yet or can't check - not an error
+	}
+
+	pod := &pods.Items[0]
+	for _, condition := range pod.Status.Conditions {
+		if condition.Type == corev1.PodScheduled &&
+			condition.Status == corev1.ConditionFalse &&
+			condition.Reason == "Unschedulable" {
+			return fmt.Errorf("%s", condition.Message)
+		}
+	}
+
+	return nil
 }
 
 func (k *KubeVirtAdapter) waitForCloudInitComplete(ctx context.Context, vmId string) error {
@@ -620,6 +647,62 @@ func (k *KubeVirtAdapter) HasVfioCapableNode(ctx context.Context) (bool, error) 
 		return false, fmt.Errorf("failed to list nodes: %w", err)
 	}
 	return len(nodes.Items) > 0, nil
+}
+
+func (k *KubeVirtAdapter) GetAvailableGPUs(ctx context.Context) (int, error) {
+	gpuResource := corev1.ResourceName("nvidia.com/gpu-passthrough")
+
+	nodes, err := k.typedClient.CoreV1().Nodes().List(ctx, metav1.ListOptions{
+		LabelSelector: "uvacompute.com/gpu-mode=vfio",
+	})
+	if err != nil {
+		return 0, fmt.Errorf("failed to list GPU nodes: %w", err)
+	}
+
+	totalAvailable := 0
+	for _, node := range nodes.Items {
+		// Skip nodes that are not ready
+		nodeReady := false
+		for _, condition := range node.Status.Conditions {
+			if condition.Type == corev1.NodeReady && condition.Status == corev1.ConditionTrue {
+				nodeReady = true
+				break
+			}
+		}
+		if !nodeReady {
+			continue
+		}
+
+		allocatable, exists := node.Status.Allocatable[gpuResource]
+		if !exists {
+			continue
+		}
+
+		// Count GPUs requested by running pods on this node
+		pods, err := k.typedClient.CoreV1().Pods("").List(ctx, metav1.ListOptions{
+			FieldSelector: fmt.Sprintf("spec.nodeName=%s,status.phase!=Failed,status.phase!=Succeeded", node.Name),
+		})
+		if err != nil {
+			log.Printf("Warning: failed to list pods on node %s: %v", node.Name, err)
+			continue
+		}
+
+		var requestedGPUs int64
+		for _, pod := range pods.Items {
+			for _, container := range pod.Spec.Containers {
+				if gpuReq, ok := container.Resources.Requests[gpuResource]; ok {
+					requestedGPUs += gpuReq.Value()
+				}
+			}
+		}
+
+		available := allocatable.Value() - requestedGPUs
+		if available > 0 {
+			totalAvailable += int(available)
+		}
+	}
+
+	return totalAvailable, nil
 }
 
 func (k *KubeVirtAdapter) EnsureNamespace() error {

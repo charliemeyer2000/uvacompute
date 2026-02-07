@@ -25,6 +25,7 @@ type VMProvider interface {
 	GetVMInfo(vmId string) (*VMInfo, error)
 	ListVMs() ([]ListVM, error)
 	HasVfioCapableNode(ctx context.Context) (bool, error)
+	GetAvailableGPUs(ctx context.Context) (int, error)
 }
 
 type VMManager struct {
@@ -602,6 +603,14 @@ func (vm *VMManager) checkResourceAvailability(req VMCreationRequest) error {
 		}
 		if !hasVfio {
 			return fmt.Errorf("no GPU nodes available for VM passthrough (all GPUs in container mode)")
+		}
+
+		// Check actual GPU resource availability in the cluster
+		availableGPUs, err := vm.vmProvider.GetAvailableGPUs(ctx)
+		if err != nil {
+			log.Printf("WARNING: Failed to check GPU availability: %v - falling back to in-memory accounting", err)
+		} else if availableGPUs < requestGpus {
+			return fmt.Errorf("no GPU resources available: requested %d GPU(s), but %d available in cluster", requestGpus, availableGPUs)
 		}
 	}
 
