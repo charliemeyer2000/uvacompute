@@ -31,14 +31,18 @@ func NewCallbackClient(siteBaseUrl string, sharedSecret string) *CallbackClient 
 	}
 }
 
+func (c *CallbackClient) buildVMStatusPayload(status string, nodeId string) string {
+	payload := map[string]string{"status": status}
+	if nodeId != "" {
+		payload["nodeId"] = nodeId
+	}
+	data, _ := json.Marshal(payload)
+	return string(data)
+}
+
 func (c *CallbackClient) NotifyVMStatusUpdate(vmId string, status string, nodeId string) error {
 	url := fmt.Sprintf("%s/api/vms/%s/update-status", c.siteBaseUrl, vmId)
-	var body string
-	if nodeId != "" {
-		body = fmt.Sprintf(`{"status":"%s","nodeId":"%s"}`, status, nodeId)
-	} else {
-		body = fmt.Sprintf(`{"status":"%s"}`, status)
-	}
+	body := c.buildVMStatusPayload(status, nodeId)
 	log.Printf("Notifying site about VM %s status update: %s (node: %s)", vmId, status, nodeId)
 
 	for attempt := 0; attempt < MAX_ATTEMPTS; attempt++ {
@@ -60,20 +64,24 @@ func (c *CallbackClient) NotifyVMStatusUpdate(vmId string, status string, nodeId
 	return fmt.Errorf("failed to notify site about VM status update for VM %s after %d attempts", vmId, 3)
 }
 
-func (c *CallbackClient) NotifyJobStatusUpdate(jobId string, status string, exitCode *int, errorMsg string, nodeId string) error {
-	url := fmt.Sprintf("%s/api/jobs/%s/update-status", c.siteBaseUrl, jobId)
-
-	body := fmt.Sprintf(`{"status":"%s"`, status)
+func (c *CallbackClient) buildJobStatusPayload(status string, exitCode *int, errorMsg string, nodeId string) string {
+	payload := map[string]interface{}{"status": status}
 	if exitCode != nil {
-		body += fmt.Sprintf(`,"exitCode":%d`, *exitCode)
+		payload["exitCode"] = *exitCode
 	}
 	if errorMsg != "" {
-		body += fmt.Sprintf(`,"errorMessage":"%s"`, errorMsg)
+		payload["errorMessage"] = errorMsg
 	}
 	if nodeId != "" {
-		body += fmt.Sprintf(`,"nodeId":"%s"`, nodeId)
+		payload["nodeId"] = nodeId
 	}
-	body += "}"
+	data, _ := json.Marshal(payload)
+	return string(data)
+}
+
+func (c *CallbackClient) NotifyJobStatusUpdate(jobId string, status string, exitCode *int, errorMsg string, nodeId string) error {
+	url := fmt.Sprintf("%s/api/jobs/%s/update-status", c.siteBaseUrl, jobId)
+	body := c.buildJobStatusPayload(status, exitCode, errorMsg, nodeId)
 
 	log.Printf("Notifying site about Job %s status update: %s (node: %s)", jobId, status, nodeId)
 
