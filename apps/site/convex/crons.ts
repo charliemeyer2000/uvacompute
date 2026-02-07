@@ -23,4 +23,11 @@ crons.interval(
   internal.jobs.cleanupStaleJobs,
 );
 
+// Hourly: clean up failed VMs that are missing deletedAt (backfill for old records)
+crons.interval(
+  "cleanup stale failed VMs",
+  { hours: 1 },
+  internal.vms.cleanupStaleFailedVMs,
+);
+
 export default crons;

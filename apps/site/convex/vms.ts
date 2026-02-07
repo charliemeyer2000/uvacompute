@@ -81,7 +81,7 @@ export const updateStatus = mutation({
       updates.expiresAt = now + vm.hours * 60 * 60 * 1000;
     }
 
-    if (args.status === "stopped") {
+    if (args.status === "stopped" || args.status === "failed") {
       updates.deletedAt = Date.now();
 
       if (vm.exposeSubdomain) {
@@ -375,5 +375,36 @@ export const cleanupStaleTransitions = internalMutation({
     }
 
     return count;
+  },
+});
+
+export const cleanupStaleFailedVMs = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const now = Date.now();
+    const failedVMs = await ctx.db
+      .query("vms")
+      .filter((q) =>
+        q.and(
+          q.eq(q.field("status"), "failed"),
+          q.eq(q.field("deletedAt"), undefined),
+        ),
+      )
+      .collect();
+
+    for (const vm of failedVMs) {
+      await ctx.db.patch(vm._id, { deletedAt: now });
+      if (vm.exposeSubdomain) {
+        try {
+          await ctx.scheduler.runAfter(0, api.endpoints.release, {
+            type: "vm" as const,
+            resourceId: vm.vmId,
+          });
+        } catch {}
+      }
+      console.log(`Cleanup: marked stale failed VM ${vm.vmId} as deleted`);
+    }
+
+    return failedVMs.length;
   },
 });
