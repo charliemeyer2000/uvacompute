@@ -187,7 +187,7 @@ async function pollVMStatus(
   token: string,
   spinner: Ora,
 ): Promise<void> {
-  const maxAttempts = 180;
+  const maxAttempts = 600;
   let attempts = 0;
   let consecutiveTransientErrors = 0;
   const maxConsecutiveTransientErrors = 5;

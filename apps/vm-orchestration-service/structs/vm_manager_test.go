@@ -45,6 +45,10 @@ func (m *MockVMProvider) HasVfioCapableNode(ctx context.Context) (bool, error) {
 	return true, nil // Mock always returns true for tests
 }
 
+func (m *MockVMProvider) GetAvailableGPUs(ctx context.Context) (int, error) {
+	return 1, nil // Mock always returns 1 available GPU for tests
+}
+
 func TestCreateVM(t *testing.T) {
 	limits := VMResourceLimits{MaxCpus: 16, MaxRam: 64, MaxGpus: 1}
 	mockProvider := &MockVMProvider{}
