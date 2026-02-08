@@ -1,15 +1,21 @@
 import type { Command } from "commander";
 import ora, { type Ora } from "ora";
-import { getBaseUrl, loadToken, checkServiceStatus } from "./lib/utils";
+import {
+  getBaseUrl,
+  loadToken,
+  checkServiceStatus,
+  formatElapsed,
+} from "./lib/utils";
+import { confirm } from "@inquirer/prompts";
 import {
   theme,
   formatSectionHeader,
   formatDetail,
   formatCommand,
   formatAge,
-  renderTable,
   formatStatusBullet,
 } from "./lib/theme";
+import { renderInteractiveTable } from "./lib/interactive-table";
 import {
   JobCreationResponseSchema,
   JobCancellationResponseSchema,
@@ -72,6 +78,7 @@ async function pollJobStatus(
   spinner: Ora,
 ): Promise<{ status: JobStatus; exitCode?: number; errorMessage?: string }> {
   const maxAttempts = 300;
+  const startTime = Date.now();
   let attempts = 0;
 
   while (attempts < maxAttempts) {
@@ -88,7 +95,7 @@ async function pollJobStatus(
           await statusResponse.json(),
         );
 
-        spinner.text = getJobStatusMessage(statusData.status);
+        spinner.text = `${getJobStatusMessage(statusData.status)} (${formatElapsed(startTime)})`;
 
         if (statusData.status === "running") {
           return { status: statusData.status };
@@ -337,8 +344,18 @@ async function runJob(
               );
             }
           }
-        } catch {
-          console.log(theme.muted("[stream ended]"));
+        } catch (streamError) {
+          console.log();
+          const msg = streamError instanceof Error ? streamError.message : "";
+          if (msg === "STREAM_DISCONNECTED") {
+            console.log(theme.warning("[stream disconnected]"));
+            const finalStatus = await getJobStatus(data.jobId, token);
+            if (finalStatus) {
+              console.log(theme.muted(`  Job status: ${finalStatus.status}`));
+            }
+          } else {
+            console.log(theme.error(`[stream error: ${msg}]`));
+          }
         }
       } else if (!shouldFollow) {
         console.log(theme.muted("To view logs:"));
@@ -428,12 +445,20 @@ async function listJobs(options: { all?: boolean }): Promise<void> {
       return;
     }
 
-    const sorted = [...filteredJobs].sort(
-      (a, b) =>
-        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-    );
+    // Sort: active first (by createdAt desc), then terminal (by createdAt desc)
+    const activeStatuses = new Set<string>(JOB_STATUS_GROUPS.ACTIVE);
+    const sorted = [...filteredJobs].sort((a, b) => {
+      const aActive = activeStatuses.has(a.status) ? 0 : 1;
+      const bActive = activeStatuses.has(b.status) ? 0 : 1;
+      if (aActive !== bActive) return aActive - bActive;
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
 
-    console.log();
+    const activeCount = sorted.filter((job) =>
+      activeStatuses.has(job.status),
+    ).length;
+    const terminalCount = sorted.length - activeCount;
+
     const hasAnyExposeUrl = sorted.some((job) => job.exposeUrl);
     const headers = hasAnyExposeUrl
       ? ["Age", "Job", "Image", "Resources", "Status", "Endpoint"]
@@ -458,8 +483,14 @@ async function listJobs(options: { all?: boolean }): Promise<void> {
       return row;
     });
 
-    renderTable(headers, rows);
-    console.log();
+    await renderInteractiveTable({
+      headers,
+      rows,
+      activeCount,
+      expiredCount: terminalCount,
+      activeLabel: "active",
+      expiredLabel: "terminal",
+    });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Unknown error";
     spinner.fail(`Error: ${message}`);
@@ -542,13 +573,14 @@ async function streamLogs(jobId: string, token: string): Promise<void> {
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
         let buffer = "";
+        let pendingErrorEvent = false;
 
         const processChunk = async (): Promise<void> => {
           try {
             const { done, value } = await reader.read();
 
             if (done) {
-              resolve();
+              reject(new Error("STREAM_DISCONNECTED"));
               return;
             }
 
@@ -556,16 +588,21 @@ async function streamLogs(jobId: string, token: string): Promise<void> {
 
             const lines = buffer.split("\n");
             buffer = lines.pop() || "";
-
             for (const line of lines) {
               if (line.startsWith("data: ")) {
                 const data = line.slice(6);
+                if (pendingErrorEvent) {
+                  reject(new Error(data || "Stream error"));
+                  return;
+                }
                 process.stdout.write(data + "\n");
               } else if (line.startsWith("event: done")) {
                 resolve();
                 return;
               } else if (line.startsWith("event: error")) {
-                // Next line will have the error data
+                pendingErrorEvent = true;
+              } else if (line.trim() === "") {
+                pendingErrorEvent = false;
               }
             }
 
@@ -610,10 +647,14 @@ async function getJobLogs(
           console.log();
           console.log(theme.muted("[stream ended]"));
         } catch (error) {
-          const message =
-            error instanceof Error ? error.message : "Stream error";
-          console.error(theme.error(`\nStream error: ${message}`));
-          process.exit(1);
+          console.log();
+          const msg = error instanceof Error ? error.message : "Stream error";
+          if (msg === "STREAM_DISCONNECTED") {
+            console.log(theme.warning("[stream disconnected]"));
+          } else {
+            console.error(theme.error(`Stream error: ${msg}`));
+            process.exit(1);
+          }
         }
         return;
       }
@@ -664,7 +705,21 @@ async function getJobLogs(
   }
 }
 
-async function cancelJob(jobId: string): Promise<void> {
+async function cancelJob(
+  jobId: string,
+  options: { force?: boolean },
+): Promise<void> {
+  if (!options.force && process.stdout.isTTY) {
+    const confirmed = await confirm({
+      message: `Cancel job ${jobId}?`,
+      default: false,
+    });
+    if (!confirmed) {
+      console.log(theme.muted("Cancelled."));
+      return;
+    }
+  }
+
   const spinner = ora(`Cancelling job ${jobId}...`).start();
 
   try {
@@ -786,5 +841,6 @@ export function registerJobCommands(program: Command) {
     .command("cancel")
     .description("Cancel a running job")
     .argument("<jobId>", "Job ID or name to cancel")
+    .option("-f, --force", "Skip confirmation prompt")
     .action(cancelJob);
 }

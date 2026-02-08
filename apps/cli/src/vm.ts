@@ -12,7 +12,12 @@ import {
 import { homedir } from "os";
 import { join } from "path";
 import { select, confirm } from "@inquirer/prompts";
-import { getBaseUrl, loadToken, checkServiceStatus } from "./lib/utils";
+import {
+  getBaseUrl,
+  loadToken,
+  checkServiceStatus,
+  formatElapsed,
+} from "./lib/utils";
 import { ensureSSHKeysConfigured, getRegisteredKeys } from "./lib/ssh-utils";
 import {
   theme,
@@ -21,9 +26,9 @@ import {
   formatDetail,
   formatCommand,
   formatExpiresAt,
-  renderTable,
   formatStatusBullet,
 } from "./lib/theme";
+import { renderInteractiveTable } from "./lib/interactive-table";
 import { type VMCreationRequest } from "./lib/types";
 import {
   VMCreationResponseSchema,
@@ -188,6 +193,7 @@ async function pollVMStatus(
   spinner: Ora,
 ): Promise<void> {
   const maxAttempts = 600;
+  const startTime = Date.now();
   let attempts = 0;
   let consecutiveTransientErrors = 0;
   const maxConsecutiveTransientErrors = 5;
@@ -222,7 +228,7 @@ async function pollVMStatus(
           await statusResponse.json(),
         );
 
-        spinner.text = getStatusMessage(statusData.status);
+        spinner.text = `${getStatusMessage(statusData.status)} (${formatElapsed(startTime)})`;
 
         if (statusData.status === "ready") {
           return;
@@ -910,7 +916,7 @@ async function getVMStatus(vmId: string): Promise<void> {
   }
 }
 
-async function listVMs(): Promise<void> {
+async function listVMs(options: { all?: boolean }): Promise<void> {
   const spinner = ora("Fetching VMs...").start();
 
   try {
@@ -946,20 +952,41 @@ async function listVMs(): Promise<void> {
 
     const data = VMListResponseSchema.parse(rawData);
 
+    const activeStatuses = new Set<string>(VM_STATUS_GROUPS.ACTIVE);
+    let filteredVMs = data.vms;
+
+    if (!options.all) {
+      filteredVMs = filteredVMs.filter((vm) => activeStatuses.has(vm.status));
+    }
+
     spinner.succeed(theme.success("VMs retrieved!"));
 
-    if (data.vms.length === 0) {
-      console.log(theme.warning("\nNo VMs found."));
-      console.log(theme.muted("Create one with: uva vm create -h 1 -n myvm\n"));
+    if (filteredVMs.length === 0) {
+      if (options.all) {
+        console.log(theme.warning("\nNo VMs found."));
+        console.log(
+          theme.muted("Create one with: uva vm create -h 1 -n myvm\n"),
+        );
+      } else {
+        console.log(theme.warning("\nNo active VMs found."));
+        console.log(theme.muted("Use 'uva vm list --all' to see all VMs\n"));
+      }
       return;
     }
 
-    const sorted = [...data.vms].sort(
-      (a, b) =>
-        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-    );
+    // Sort: active first (by createdAt desc), then expired (by createdAt desc)
+    const sorted = [...filteredVMs].sort((a, b) => {
+      const aActive = activeStatuses.has(a.status) ? 0 : 1;
+      const bActive = activeStatuses.has(b.status) ? 0 : 1;
+      if (aActive !== bActive) return aActive - bActive;
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
 
-    console.log();
+    const activeCount = sorted.filter((vm) =>
+      activeStatuses.has(vm.status),
+    ).length;
+    const expiredCount = sorted.length - activeCount;
+
     const hasAnyExposeUrl = sorted.some((vm) => vm.exposeUrl);
     const headers = hasAnyExposeUrl
       ? ["Expires", "VM", "Resources", "Status", "Endpoint"]
@@ -979,8 +1006,14 @@ async function listVMs(): Promise<void> {
       return row;
     });
 
-    renderTable(headers, rows);
-    console.log();
+    await renderInteractiveTable({
+      headers,
+      rows,
+      activeCount,
+      expiredCount,
+      activeLabel: "active",
+      expiredLabel: "expired",
+    });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Unknown error";
     spinner.fail(`Error: ${message}`);
@@ -1213,7 +1246,11 @@ export function registerVMCommands(program: Command) {
     .argument("<vmId>", "VM ID to check")
     .action(getVMStatus);
 
-  vm.command("list").alias("ls").description("List VMs").action(listVMs);
+  vm.command("list")
+    .alias("ls")
+    .description("List VMs")
+    .option("-a, --all", "Show all VMs (including expired)")
+    .action(listVMs);
 
   vm.command("ssh")
     .description("Connect to VM via SSH")
