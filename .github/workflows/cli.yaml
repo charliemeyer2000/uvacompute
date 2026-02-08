@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 jobs:
-  build-and-test:
+  build:
     strategy:
       matrix:
         include:
@@ -25,11 +25,7 @@ jobs:
           - os: windows-latest
             target: win32-x64
             artifact: uvacompute-windows.exe
-
     runs-on: ${{ matrix.os }}
-
-    # On PRs, only run Linux build. On push to main, run all platforms.
-    if: ${{ github.event_name == 'push' || matrix.os == 'ubuntu-latest' }}
 
     steps:
       - uses: actions/checkout@v4
@@ -40,7 +36,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.bun/install/cache
-          key: bun-${{ runner.os }}-${{ hashFiles('apps/cli/bun.lockb') }}
+          key: bun-${{ runner.os }}-${{ hashFiles('apps/cli/bun.lock') }}
           restore-keys: |
             bun-${{ runner.os }}-
 
