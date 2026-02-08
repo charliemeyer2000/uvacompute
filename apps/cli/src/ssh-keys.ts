@@ -1,6 +1,7 @@
 import type { Command } from "commander";
 import ora from "ora";
 import { readFileSync, existsSync } from "fs";
+import { confirm } from "@inquirer/prompts";
 import { getBaseUrl, loadToken } from "./lib/utils";
 import { theme, formatSectionHeader, formatDetail } from "./lib/theme";
 import {
@@ -130,7 +131,21 @@ async function listSSHKeys(): Promise<void> {
   }
 }
 
-async function removeSSHKey(keyId: string): Promise<void> {
+async function removeSSHKey(
+  keyId: string,
+  options: { force?: boolean },
+): Promise<void> {
+  if (!options.force && process.stdout.isTTY) {
+    const confirmed = await confirm({
+      message: `Remove SSH key ${keyId}?`,
+      default: false,
+    });
+    if (!confirmed) {
+      console.log(theme.muted("Cancelled."));
+      return;
+    }
+  }
+
   const spinner = ora(`Removing SSH key ${keyId}...`).start();
 
   try {
@@ -221,6 +236,7 @@ export function registerSSHKeyCommands(program: Command) {
     .alias("rm")
     .description("Remove an SSH key")
     .argument("<keyId>", "SSH key ID to remove")
+    .option("-f, --force", "Skip confirmation prompt")
     .action(removeSSHKey);
 
   sshKey

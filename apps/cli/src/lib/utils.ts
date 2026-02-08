@@ -183,6 +183,14 @@ export function markCompletionPromptShown(): void {
   }
 }
 
+export function formatElapsed(startTime: number): string {
+  const elapsed = Math.floor((Date.now() - startTime) / 1000);
+  if (elapsed < 60) return `${elapsed}s`;
+  const minutes = Math.floor(elapsed / 60);
+  const seconds = elapsed % 60;
+  return `${minutes}m${seconds.toString().padStart(2, "0")}s`;
+}
+
 export async function checkServiceStatus(): Promise<ServiceStatus | null> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 3000);
