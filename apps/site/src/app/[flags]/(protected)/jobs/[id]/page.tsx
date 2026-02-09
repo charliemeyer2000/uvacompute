@@ -122,7 +122,7 @@ export default function JobDetailPage() {
   return (
     <div className="space-y-6">
       {/* Breadcrumb and Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-y-3">
         <div className="flex items-center gap-3">
           <Link
             href="/jobs"
@@ -208,7 +208,7 @@ export default function JobDetailPage() {
           <p className="text-xs text-gray-400 uppercase tracking-wide mb-2">
             timing
           </p>
-          <div className="flex items-center gap-4 text-sm">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
             <div>
               <span className="text-gray-500">created: </span>
               <span className="text-black">{formatDate(job.createdAt)}</span>

@@ -100,7 +100,7 @@ export default function MyNodesPage() {
     return (
       <div className="space-y-6">
         {/* Page Header Skeleton */}
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-wrap gap-y-2">
           <div>
             <div className="h-8 w-48 bg-gray-100 animate-pulse mb-2" />
             <div className="h-4 w-72 bg-gray-100 animate-pulse" />
@@ -138,7 +138,7 @@ export default function MyNodesPage() {
   return (
     <div className="space-y-6">
       {/* Page Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-y-2">
         <div>
           <h1 className="text-2xl font-semibold text-black">
             contributed nodes
@@ -150,7 +150,7 @@ export default function MyNodesPage() {
 
         {/* Stats Summary */}
         {nodes.length > 0 && (
-          <div className="flex items-center gap-6 text-sm">
+          <div className="flex items-center gap-3 sm:gap-6 text-sm">
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-green-500" />
               <span className="text-gray-500">{onlineCount} online</span>
@@ -170,7 +170,7 @@ export default function MyNodesPage() {
       </div>
 
       {nodes.length === 0 ? (
-        <div className="border border-gray-200 bg-white p-12 text-center">
+        <div className="border border-gray-200 bg-white p-6 sm:p-12 text-center">
           <div className="mx-auto w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center mb-4">
             <Server className="w-6 h-6 text-gray-400" />
           </div>
@@ -197,7 +197,7 @@ export default function MyNodesPage() {
                 className="p-5 cursor-pointer"
                 onClick={() => toggleExpand(node.nodeId)}
               >
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between flex-wrap gap-y-2">
                   <div className="flex items-center gap-4">
                     <span className="text-gray-400">
                       {expandedNode === node.nodeId ? (
@@ -319,7 +319,7 @@ export default function MyNodesPage() {
                             {workloads.vms.map((vm: VM) => (
                               <div
                                 key={vm._id}
-                                className="flex items-center justify-between bg-white p-3 border border-gray-200"
+                                className="flex items-center justify-between flex-wrap gap-y-2 bg-white p-3 border border-gray-200"
                               >
                                 <div className="flex items-center gap-2">
                                   <span className="px-1.5 py-0.5 text-[10px] uppercase tracking-wide bg-blue-100 text-blue-700 font-medium">
@@ -337,7 +337,7 @@ export default function MyNodesPage() {
                             {workloads.jobs.map((job: Job) => (
                               <div
                                 key={job._id}
-                                className="flex items-center justify-between bg-white p-3 border border-gray-200"
+                                className="flex items-center justify-between flex-wrap gap-y-2 bg-white p-3 border border-gray-200"
                               >
                                 <div className="flex items-center gap-2">
                                   <span className="px-1.5 py-0.5 text-[10px] uppercase tracking-wide bg-purple-100 text-purple-700 font-medium">
