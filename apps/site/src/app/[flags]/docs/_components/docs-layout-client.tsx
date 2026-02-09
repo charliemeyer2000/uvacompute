@@ -7,6 +7,7 @@ import { authClient } from "@/lib/auth-client";
 import { usePreloadedQuery, Preloaded } from "convex/react";
 import { api } from "../../../../../convex/_generated/api";
 import { Button } from "@/components/ui/button";
+import { NavLink } from "@/components/nav-link";
 import { toast } from "sonner";
 import { AnimatePresence, motion } from "motion/react";
 import { useState, ViewTransition } from "react";
@@ -69,30 +70,6 @@ const docNavItems = [
     ],
   },
 ];
-
-function NavLink({
-  href,
-  isActive,
-  children,
-}: {
-  href: string;
-  isActive: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <Link
-      href={href}
-      className={`relative py-2 text-sm transition-colors ${
-        isActive ? "text-black" : "text-gray-500 hover:text-black"
-      }`}
-    >
-      {children}
-      {isActive && (
-        <span className="absolute bottom-0 left-0 right-0 h-[2px] bg-orange-accent" />
-      )}
-    </Link>
-  );
-}
 
 function UserGreeting({
   preloadedUser,
@@ -198,7 +175,7 @@ export default function DocsLayoutClient(props: DocsLayoutClientProps) {
 
           <div className="h-[3px] bg-orange-accent mt-4 mb-4" />
 
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between flex-wrap gap-y-2">
             <nav className="flex items-center gap-3 sm:gap-6">
               {isLoggedIn ? (
                 <>

@@ -72,7 +72,7 @@ export default function JobsPageClient({
     return (
       <div className="space-y-6">
         {/* Page Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-wrap gap-y-2">
           <div>
             <h1 className="text-2xl font-semibold text-black">
               container jobs
@@ -84,7 +84,7 @@ export default function JobsPageClient({
         </div>
 
         {/* Empty State */}
-        <div className="border border-gray-200 bg-white p-12 text-center">
+        <div className="border border-gray-200 bg-white p-6 sm:p-12 text-center">
           <div className="mx-auto w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center mb-4">
             <Container className="w-6 h-6 text-gray-400" />
           </div>
@@ -114,7 +114,7 @@ export default function JobsPageClient({
   return (
     <div className="space-y-6">
       {/* Page Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-y-2">
         <div>
           <h1 className="text-2xl font-semibold text-black">container jobs</h1>
           <p className="text-sm text-gray-500 mt-1">
@@ -123,7 +123,7 @@ export default function JobsPageClient({
         </div>
 
         {/* Stats Summary */}
-        <div className="flex items-center gap-6 text-sm">
+        <div className="flex items-center gap-3 sm:gap-6 text-sm">
           <div className="flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-green-500" />
             <span className="text-gray-500">
