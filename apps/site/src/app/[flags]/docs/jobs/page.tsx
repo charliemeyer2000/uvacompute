@@ -1,4 +1,5 @@
 import { Metadata } from "next";
+import { CodeBlock } from "../_components/code-block";
 
 export const metadata: Metadata = {
   title: "container jobs | uvacompute docs",
@@ -33,7 +34,7 @@ export default function JobsDocsPage() {
         </ul>
       </section>
 
-      <section className="border border-gray-200 p-6 space-y-6">
+      <section className="border border-gray-200 p-4 sm:p-6 space-y-6">
         <div>
           <div className="flex items-center gap-3 mb-2">
             <span className="text-2xl font-semibold text-black">1</span>
@@ -45,11 +46,11 @@ export default function JobsDocsPage() {
             <p className="text-sm text-gray-600 mb-3">
               execute a command in any docker image:
             </p>
-            <div className="bg-gray-50 border border-gray-200 p-4 space-y-2">
+            <CodeBlock className="space-y-2">
               <code className="text-sm text-black block">
                 uva jobs run alpine echo &quot;hello world&quot;
               </code>
-            </div>
+            </CodeBlock>
           </div>
         </div>
 
@@ -64,7 +65,7 @@ export default function JobsDocsPage() {
             <p className="text-sm text-gray-600 mb-3">
               run python, node, or any container image from docker hub:
             </p>
-            <div className="bg-gray-50 border border-gray-200 p-4 space-y-2">
+            <CodeBlock className="space-y-2">
               <code className="text-sm text-black block">
                 uva jobs run python:3.11 python -c &quot;print(1+1)&quot;
               </code>
@@ -72,7 +73,7 @@ export default function JobsDocsPage() {
                 uva jobs run node:20 node -e
                 &quot;console.log(&apos;hello&apos;)&quot;
               </code>
-            </div>
+            </CodeBlock>
           </div>
         </div>
       </section>
@@ -83,31 +84,31 @@ export default function JobsDocsPage() {
         <div className="space-y-4">
           <div>
             <h4 className="font-medium mb-2">run a python script</h4>
-            <div className="bg-gray-50 border border-gray-200 p-4">
+            <CodeBlock>
               <code className="text-sm text-black">
                 uva jobs run python:3.11 python -c &quot;import torch;
                 print(torch.cuda.is_available())&quot;
               </code>
-            </div>
+            </CodeBlock>
           </div>
 
           <div>
             <h4 className="font-medium mb-2">run with gpu support</h4>
-            <div className="bg-gray-50 border border-gray-200 p-4">
+            <CodeBlock>
               <code className="text-sm text-black">
                 uva jobs run --gpu pytorch/pytorch:latest python train.py
               </code>
-            </div>
+            </CodeBlock>
           </div>
 
           <div>
             <h4 className="font-medium mb-2">run a bash script</h4>
-            <div className="bg-gray-50 border border-gray-200 p-4">
+            <CodeBlock>
               <code className="text-sm text-black">
                 uva jobs run ubuntu:22.04 bash -c &quot;apt update &amp;&amp;
                 apt install -y curl&quot;
               </code>
-            </div>
+            </CodeBlock>
           </div>
         </div>
       </section>
@@ -118,27 +119,27 @@ export default function JobsDocsPage() {
         <div className="space-y-4">
           <div>
             <h4 className="font-medium mb-2">list your jobs</h4>
-            <div className="bg-gray-50 border border-gray-200 p-4">
+            <CodeBlock>
               <code className="text-sm text-black">uva jobs list</code>
-            </div>
+            </CodeBlock>
           </div>
 
           <div>
             <h4 className="font-medium mb-2">view job logs</h4>
-            <div className="bg-gray-50 border border-gray-200 p-4">
+            <CodeBlock>
               <code className="text-sm text-black">
                 uva jobs logs &lt;job-id&gt;
               </code>
-            </div>
+            </CodeBlock>
           </div>
 
           <div>
             <h4 className="font-medium mb-2">cancel a running job</h4>
-            <div className="bg-gray-50 border border-gray-200 p-4">
+            <CodeBlock>
               <code className="text-sm text-black">
                 uva jobs cancel &lt;job-id&gt;
               </code>
-            </div>
+            </CodeBlock>
           </div>
         </div>
       </section>
@@ -175,7 +176,7 @@ export default function JobsDocsPage() {
             <p className="text-sm text-gray-600 mb-2">
               download and run the helper script:
             </p>
-            <div className="bg-gray-50 border border-gray-200 p-4 space-y-2">
+            <CodeBlock className="space-y-2">
               <code className="text-sm text-black block">
                 curl -fsSL
                 https://raw.githubusercontent.com/charliemeyer2000/uvacompute/main/apps/site/public/gh-runner.sh
@@ -184,26 +185,26 @@ export default function JobsDocsPage() {
               <code className="text-sm text-black block mt-2">
                 ./gh-runner.sh --repo your-org/your-repo
               </code>
-            </div>
+            </CodeBlock>
           </div>
 
           <div>
             <h4 className="font-medium mb-2">with gpu and custom resources</h4>
-            <div className="bg-gray-50 border border-gray-200 p-4">
+            <CodeBlock>
               <code className="text-sm text-black">
                 ./gh-runner.sh --repo your-org/your-repo --gpu 1 --cpus 4 --ram
                 16
               </code>
-            </div>
+            </CodeBlock>
           </div>
 
           <div>
             <h4 className="font-medium mb-2">org-level runner</h4>
-            <div className="bg-gray-50 border border-gray-200 p-4">
+            <CodeBlock>
               <code className="text-sm text-black">
                 ./gh-runner.sh --org your-org
               </code>
-            </div>
+            </CodeBlock>
           </div>
 
           <div>
@@ -213,14 +214,14 @@ export default function JobsDocsPage() {
               <code className="bg-gray-100 px-1">self-hosted</code> and{" "}
               <code className="bg-gray-100 px-1">uvacompute</code> labels:
             </p>
-            <div className="bg-gray-50 border border-gray-200 p-4">
+            <CodeBlock>
               <pre className="text-sm text-black whitespace-pre">{`jobs:
   build:
     runs-on: [self-hosted, uvacompute]
     steps:
       - uses: actions/checkout@v4
       - run: echo "Running on uvacompute!"`}</pre>
-            </div>
+            </CodeBlock>
           </div>
 
           <div>
