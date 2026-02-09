@@ -1,4 +1,5 @@
 import { Metadata } from "next";
+import { CodeBlock } from "../_components/code-block";
 
 export const metadata: Metadata = {
   title: "virtual machines | uvacompute docs",
@@ -35,7 +36,7 @@ export default function VMsDocsPage() {
 
       <section
         id="create-a-vm"
-        className="border border-gray-200 p-6 space-y-6"
+        className="border border-gray-200 p-4 sm:p-6 space-y-6"
       >
         <div>
           <div className="flex items-center gap-3 mb-2">
@@ -46,11 +47,11 @@ export default function VMsDocsPage() {
             <p className="text-sm text-gray-600 mb-3">
               provision a new virtual machine:
             </p>
-            <div className="bg-gray-50 border border-gray-200 p-4">
+            <CodeBlock>
               <code className="text-sm text-black">
                 uva vm create -h 1 -n my-vm
               </code>
-            </div>
+            </CodeBlock>
             <p className="text-xs text-gray-500 mt-2">
               -h specifies the number of hours, -n sets the vm name
             </p>
@@ -68,9 +69,9 @@ export default function VMsDocsPage() {
             <p className="text-sm text-gray-600 mb-3">
               ssh into your running vm:
             </p>
-            <div className="bg-gray-50 border border-gray-200 p-4">
+            <CodeBlock>
               <code className="text-sm text-black">uva vm ssh my-vm</code>
-            </div>
+            </CodeBlock>
           </div>
         </div>
       </section>
@@ -81,23 +82,23 @@ export default function VMsDocsPage() {
         <div className="space-y-4">
           <div>
             <h4 className="font-medium mb-2">list your vms</h4>
-            <div className="bg-gray-50 border border-gray-200 p-4">
+            <CodeBlock>
               <code className="text-sm text-black">uva vm list</code>
-            </div>
+            </CodeBlock>
           </div>
 
           <div>
             <h4 className="font-medium mb-2">check vm status</h4>
-            <div className="bg-gray-50 border border-gray-200 p-4">
+            <CodeBlock>
               <code className="text-sm text-black">uva vm status my-vm</code>
-            </div>
+            </CodeBlock>
           </div>
 
           <div>
             <h4 className="font-medium mb-2">delete a vm</h4>
-            <div className="bg-gray-50 border border-gray-200 p-4">
+            <CodeBlock>
               <code className="text-sm text-black">uva vm delete my-vm</code>
-            </div>
+            </CodeBlock>
           </div>
         </div>
       </section>
