@@ -5,35 +5,12 @@ import { usePreloadedQuery, useMutation, Preloaded } from "convex/react";
 import { authClient } from "@/lib/auth-client";
 import { api } from "../../../../../convex/_generated/api";
 import { Button } from "@/components/ui/button";
+import { NavLink } from "@/components/nav-link";
 import Link from "next/link";
 import { toast } from "sonner";
 import { EarlyAccessProvider } from "./early-access-context";
 import { ViewTransition } from "react";
 import { useRedirectLogic } from "./use-redirect-logic";
-
-function NavLink({
-  href,
-  isActive,
-  children,
-}: {
-  href: string;
-  isActive: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <Link
-      href={href}
-      className={`relative py-2 text-sm transition-colors ${
-        isActive ? "text-black" : "text-gray-500 hover:text-black"
-      }`}
-    >
-      {children}
-      {isActive && (
-        <span className="absolute bottom-0 left-0 right-0 h-[2px] bg-orange-accent" />
-      )}
-    </Link>
-  );
-}
 
 export default function ProtectedLayout({
   children,
@@ -95,7 +72,7 @@ export default function ProtectedLayout({
 
   return (
     <EarlyAccessProvider earlyAccessEnabled={earlyAccessEnabled}>
-      <main className="max-w-7xl mx-auto px-8 py-8 min-h-screen font-mono">
+      <main className="max-w-7xl mx-auto px-4 py-6 sm:px-8 sm:py-8 min-h-screen font-mono">
         <div>
           {/* Header Section */}
           <div className="mb-8">
@@ -103,7 +80,7 @@ export default function ProtectedLayout({
             <div className="flex items-center justify-between">
               <Link
                 href="/vms"
-                className="text-3xl font-normal tracking-tight hover:text-gray-700 transition-colors"
+                className="text-2xl sm:text-3xl font-normal tracking-tight hover:text-gray-700 transition-colors"
               >
                 uvacompute
               </Link>
@@ -121,9 +98,9 @@ export default function ProtectedLayout({
             <div className="h-[3px] bg-orange-accent mt-4 mb-4" />
 
             {/* Navigation Row */}
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between flex-wrap gap-y-2">
               {/* Main Navigation */}
-              <nav className="flex items-center gap-6">
+              <nav className="flex items-center gap-3 sm:gap-6">
                 {isRedirecting ? (
                   <>
                     <span className="h-5 w-12" />
@@ -154,7 +131,7 @@ export default function ProtectedLayout({
               </nav>
 
               {/* User Actions */}
-              <div className="flex items-center gap-6">
+              <div className="flex items-center gap-3 sm:gap-6">
                 {isRedirecting ? (
                   <>
                     <span className="h-5 w-14" />
@@ -164,7 +141,9 @@ export default function ProtectedLayout({
                   <>
                     {(!isOnOnboarding || hasEarlyAccess) && (
                       <>
-                        <span className="text-gray-200">|</span>
+                        <span className="text-gray-200 hidden sm:inline">
+                          |
+                        </span>
                         <NavLink
                           href="/profile"
                           isActive={isOnProfile ?? false}

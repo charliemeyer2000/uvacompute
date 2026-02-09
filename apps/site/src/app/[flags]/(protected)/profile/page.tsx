@@ -30,8 +30,8 @@ export default function ProfilePage() {
         </div>
 
         {/* Profile Card Skeleton */}
-        <div className="bg-white border border-gray-200 p-6">
-          <div className="flex items-start gap-5">
+        <div className="bg-white border border-gray-200 p-4 sm:p-6">
+          <div className="flex items-start gap-4">
             <div className="w-16 h-16 bg-gray-100 animate-pulse" />
             <div className="flex-1">
               <div className="h-6 w-40 bg-gray-100 animate-pulse mb-2" />
@@ -42,14 +42,14 @@ export default function ProfilePage() {
 
         {/* Info Cards Skeleton */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="bg-white border border-gray-200 p-5">
+          <div className="bg-white border border-gray-200 p-4 sm:p-5">
             <div className="h-4 w-24 bg-gray-100 animate-pulse mb-4" />
             <div className="space-y-3">
               <div className="h-4 w-full bg-gray-100 animate-pulse" />
               <div className="h-4 w-3/4 bg-gray-100 animate-pulse" />
             </div>
           </div>
-          <div className="bg-white border border-gray-200 p-5">
+          <div className="bg-white border border-gray-200 p-4 sm:p-5">
             <div className="h-4 w-24 bg-gray-100 animate-pulse mb-4" />
             <div className="space-y-3">
               <div className="h-4 w-full bg-gray-100 animate-pulse" />
@@ -70,8 +70,8 @@ export default function ProfilePage() {
       </div>
 
       {/* Profile Header Card */}
-      <div className="bg-white border border-gray-200 p-6">
-        <div className="flex items-start gap-5">
+      <div className="bg-white border border-gray-200 p-4 sm:p-6">
+        <div className="flex items-start gap-4">
           {/* Avatar */}
           <div className="w-16 h-16 bg-orange-accent flex items-center justify-center flex-shrink-0">
             <span className="text-white text-xl font-semibold">
@@ -102,14 +102,14 @@ export default function ProfilePage() {
       {/* Info Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Account Section */}
-        <div className="bg-white border border-gray-200 p-5">
+        <div className="bg-white border border-gray-200 p-4 sm:p-5">
           <h3 className="text-xs text-gray-400 uppercase tracking-wide mb-4">
             account
           </h3>
           <div className="space-y-3">
             <div className="flex justify-between text-sm">
               <span className="text-gray-500">user id</span>
-              <span className="text-black font-mono text-xs truncate max-w-[200px]">
+              <span className="text-black font-mono text-xs truncate max-w-[140px] sm:max-w-[200px]">
                 {user._id}
               </span>
             </div>
@@ -127,7 +127,7 @@ export default function ProfilePage() {
         </div>
 
         {/* Activity Section */}
-        <div className="bg-white border border-gray-200 p-5">
+        <div className="bg-white border border-gray-200 p-4 sm:p-5">
           <h3 className="text-xs text-gray-400 uppercase tracking-wide mb-4">
             activity
           </h3>
