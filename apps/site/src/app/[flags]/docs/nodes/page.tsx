@@ -1,4 +1,5 @@
 import { Metadata } from "next";
+import { CodeBlock } from "../_components/code-block";
 
 export const metadata: Metadata = {
   title: "node management | uvacompute docs",
@@ -34,7 +35,7 @@ export default function NodesDocsPage() {
 
       <section
         id="installing-a-node"
-        className="border border-gray-200 p-6 space-y-6"
+        className="border border-gray-200 p-4 sm:p-6 space-y-6"
       >
         <h3 className="text-lg font-semibold mb-2">installing a node</h3>
 
@@ -49,9 +50,9 @@ export default function NodesDocsPage() {
             <p className="text-sm text-gray-600 mb-3">
               install nvidia drivers and check system requirements:
             </p>
-            <div className="bg-gray-50 border border-gray-200 p-4">
+            <CodeBlock>
               <code className="text-sm text-black">sudo uva node prepare</code>
-            </div>
+            </CodeBlock>
             <p className="text-xs text-gray-500 mt-2">
               this installs nvidia drivers and verifies iommu support
             </p>
@@ -69,9 +70,9 @@ export default function NodesDocsPage() {
             <p className="text-sm text-gray-600 mb-3">
               generate a token for node registration:
             </p>
-            <div className="bg-gray-50 border border-gray-200 p-4">
+            <CodeBlock>
               <code className="text-sm text-black">uva node token create</code>
-            </div>
+            </CodeBlock>
             <p className="text-xs text-gray-500 mt-2">
               tokens are single-use and expire after 24 hours
             </p>
@@ -89,9 +90,9 @@ export default function NodesDocsPage() {
             <p className="text-sm text-gray-600 mb-3">
               install k3s, kubevirt, and register with uvacompute:
             </p>
-            <div className="bg-gray-50 border border-gray-200 p-4">
+            <CodeBlock>
               <code className="text-sm text-black">sudo uva node install</code>
-            </div>
+            </CodeBlock>
             <p className="text-xs text-gray-500 mt-2">
               you&apos;ll be prompted for the registration token from step 2
             </p>
@@ -101,7 +102,7 @@ export default function NodesDocsPage() {
 
       <section
         id="pausing-a-node"
-        className="border border-gray-200 p-6 space-y-6"
+        className="border border-gray-200 p-4 sm:p-6 space-y-6"
       >
         <h3 className="text-lg font-semibold mb-2">pausing a node</h3>
         <p className="text-sm text-gray-600 mb-4">
@@ -111,9 +112,9 @@ export default function NodesDocsPage() {
 
         <div>
           <h4 className="font-medium mb-2">via cli</h4>
-          <div className="bg-gray-50 border border-gray-200 p-4">
+          <CodeBlock>
             <code className="text-sm text-black">uva node pause</code>
-          </div>
+          </CodeBlock>
         </div>
 
         <div className="mt-4">
@@ -141,7 +142,7 @@ export default function NodesDocsPage() {
 
       <section
         id="resuming-a-node"
-        className="border border-gray-200 p-6 space-y-6"
+        className="border border-gray-200 p-4 sm:p-6 space-y-6"
       >
         <h3 className="text-lg font-semibold mb-2">resuming a node</h3>
         <p className="text-sm text-gray-600 mb-4">
@@ -150,9 +151,9 @@ export default function NodesDocsPage() {
 
         <div>
           <h4 className="font-medium mb-2">via cli</h4>
-          <div className="bg-gray-50 border border-gray-200 p-4">
+          <CodeBlock>
             <code className="text-sm text-black">uva node resume</code>
-          </div>
+          </CodeBlock>
         </div>
 
         <div className="mt-4">
@@ -172,7 +173,7 @@ export default function NodesDocsPage() {
 
       <section
         id="uninstalling-a-node"
-        className="border border-gray-200 p-6 space-y-6"
+        className="border border-gray-200 p-4 sm:p-6 space-y-6"
       >
         <h3 className="text-lg font-semibold mb-2">uninstalling a node</h3>
         <p className="text-sm text-gray-600 mb-4">
@@ -190,9 +191,9 @@ export default function NodesDocsPage() {
             <p className="text-sm text-gray-600 mb-3">
               pause the node and wait for existing workloads to complete:
             </p>
-            <div className="bg-gray-50 border border-gray-200 p-4">
+            <CodeBlock>
               <code className="text-sm text-black">uva node pause</code>
-            </div>
+            </CodeBlock>
           </div>
         </div>
 
@@ -207,11 +208,11 @@ export default function NodesDocsPage() {
             <p className="text-sm text-gray-600 mb-3">
               remove k3s, kubevirt, and all uvacompute components:
             </p>
-            <div className="bg-gray-50 border border-gray-200 p-4">
+            <CodeBlock>
               <code className="text-sm text-black">
                 sudo uva node uninstall
               </code>
-            </div>
+            </CodeBlock>
             <p className="text-xs text-gray-500 mt-2">
               this removes k3s, kubevirt, ssh tunnel service, and gpu scripts
             </p>
@@ -275,16 +276,16 @@ export default function NodesDocsPage() {
         <div className="space-y-4">
           <div>
             <h4 className="font-medium mb-2">list your tokens</h4>
-            <div className="bg-gray-50 border border-gray-200 p-4">
+            <CodeBlock>
               <code className="text-sm text-black">uva node token list</code>
-            </div>
+            </CodeBlock>
           </div>
 
           <div>
             <h4 className="font-medium mb-2">check node status</h4>
-            <div className="bg-gray-50 border border-gray-200 p-4">
+            <CodeBlock>
               <code className="text-sm text-black">uva node status</code>
-            </div>
+            </CodeBlock>
           </div>
         </div>
       </section>

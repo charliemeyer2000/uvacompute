@@ -1,4 +1,5 @@
 import { Metadata } from "next";
+import { CodeBlock } from "./_components/code-block";
 
 export const metadata: Metadata = {
   title: "getting started | uvacompute docs",
@@ -16,7 +17,7 @@ export default function DocsPage() {
         </p>
       </section>
 
-      <section className="border border-gray-200 p-6 space-y-6">
+      <section className="border border-gray-200 p-4 sm:p-6 space-y-6">
         <div id="install-the-cli">
           <div className="flex items-center gap-3 mb-2">
             <span className="text-2xl font-semibold text-black">1</span>
@@ -28,11 +29,11 @@ export default function DocsPage() {
             <p className="text-sm text-gray-600 mb-3">
               run this command in your terminal to install the uva cli:
             </p>
-            <div className="bg-gray-50 border border-gray-200 p-4">
+            <CodeBlock>
               <code className="text-sm text-black">
                 curl -fsSL https://uvacompute.com/install.sh | bash
               </code>
-            </div>
+            </CodeBlock>
           </div>
         </div>
 
@@ -47,14 +48,14 @@ export default function DocsPage() {
             <p className="text-sm text-gray-600 mb-3">
               sign up for uvacompute if you haven&apos;t already:
             </p>
-            <div className="bg-gray-50 border border-gray-200 p-4">
+            <CodeBlock>
               <code className="text-sm text-black">
                 visit{" "}
                 <a href="/signup" className="text-orange-accent underline">
                   uvacompute.com/signup
                 </a>
               </code>
-            </div>
+            </CodeBlock>
           </div>
         </div>
 
@@ -69,9 +70,9 @@ export default function DocsPage() {
             <p className="text-sm text-gray-600 mb-3">
               link your cli to your account:
             </p>
-            <div className="bg-gray-50 border border-gray-200 p-4">
+            <CodeBlock>
               <code className="text-sm text-black">uva login</code>
-            </div>
+            </CodeBlock>
             <p className="text-xs text-gray-500 mt-2">
               this will open a browser window for authentication
             </p>
