@@ -1,4 +1,5 @@
 import { Metadata } from "next";
+import { CodeBlock } from "../_components/code-block";
 
 export const metadata: Metadata = {
   title: "configuration | uvacompute docs",
@@ -19,7 +20,7 @@ export default function ConfigurationDocsPage() {
 
       <section
         id="cli-configuration"
-        className="border border-gray-200 p-6 space-y-6"
+        className="border border-gray-200 p-4 sm:p-6 space-y-6"
       >
         <h3 className="text-lg font-semibold mb-2">
           cli configuration (~/.uvacompute/)
@@ -79,7 +80,7 @@ export default function ConfigurationDocsPage() {
 
       <section
         id="node-system-configuration"
-        className="border border-gray-200 p-6 space-y-6"
+        className="border border-gray-200 p-4 sm:p-6 space-y-6"
       >
         <h3 className="text-lg font-semibold mb-2">
           node system configuration (/etc/uvacompute/)
@@ -146,7 +147,7 @@ export default function ConfigurationDocsPage() {
 
       <section
         id="node-data-storage"
-        className="border border-gray-200 p-6 space-y-6"
+        className="border border-gray-200 p-4 sm:p-6 space-y-6"
       >
         <h3 className="text-lg font-semibold mb-2">
           node data storage (/var/lib/uvacompute/)
@@ -188,7 +189,10 @@ export default function ConfigurationDocsPage() {
         </div>
       </section>
 
-      <section id="ssh-keys" className="border border-gray-200 p-6 space-y-6">
+      <section
+        id="ssh-keys"
+        className="border border-gray-200 p-4 sm:p-6 space-y-6"
+      >
         <h3 className="text-lg font-semibold mb-2">ssh keys (~/.ssh/)</h3>
         <p className="text-sm text-gray-600 mb-4">
           ssh keys used for secure communication between nodes and the hub.
@@ -228,7 +232,7 @@ export default function ConfigurationDocsPage() {
 
       <section
         id="gpu-mode-scripts"
-        className="border border-gray-200 p-6 space-y-6"
+        className="border border-gray-200 p-4 sm:p-6 space-y-6"
       >
         <h3 className="text-lg font-semibold mb-2">gpu mode scripts</h3>
         <p className="text-sm text-gray-600 mb-4">
@@ -280,7 +284,7 @@ export default function ConfigurationDocsPage() {
 
         <div>
           <h4 className="font-medium mb-2">example usage</h4>
-          <div className="bg-gray-50 border border-gray-200 p-4 space-y-2">
+          <CodeBlock className="space-y-2">
             <code className="text-sm text-black block">
               sudo gpu-mode-status
             </code>
@@ -288,7 +292,7 @@ export default function ConfigurationDocsPage() {
               sudo gpu-mode-nvidia
             </code>
             <code className="text-sm text-black block">sudo gpu-mode-vfio</code>
-          </div>
+          </CodeBlock>
         </div>
       </section>
 
