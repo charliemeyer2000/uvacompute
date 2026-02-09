@@ -9,7 +9,7 @@ import { api } from "../../../../../convex/_generated/api";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { AnimatePresence, motion } from "motion/react";
-import { ViewTransition } from "react";
+import { useState, ViewTransition } from "react";
 
 const docNavItems = [
   {
@@ -157,15 +157,17 @@ export default function DocsLayoutClient(props: DocsLayoutClientProps) {
     return pathname?.includes(href) ?? false;
   }
 
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
   return (
-    <main className="max-w-7xl mx-auto px-8 py-8 min-h-screen font-mono">
+    <main className="max-w-7xl mx-auto px-4 py-6 sm:px-8 sm:py-8 min-h-screen font-mono">
       <div>
         {/* Header Section */}
         <div className="mb-8">
           <div className="flex items-center justify-between">
             <Link
               href={isLoggedIn ? "/vms" : "/"}
-              className="text-3xl font-normal tracking-tight hover:text-gray-700 transition-colors"
+              className="text-2xl sm:text-3xl font-normal tracking-tight hover:text-gray-700 transition-colors"
             >
               uvacompute
             </Link>
@@ -197,7 +199,7 @@ export default function DocsLayoutClient(props: DocsLayoutClientProps) {
           <div className="h-[3px] bg-orange-accent mt-4 mb-4" />
 
           <div className="flex items-center justify-between">
-            <nav className="flex items-center gap-6">
+            <nav className="flex items-center gap-3 sm:gap-6">
               {isLoggedIn ? (
                 <>
                   <NavLink href="/vms" isActive={false}>
@@ -225,10 +227,10 @@ export default function DocsLayoutClient(props: DocsLayoutClientProps) {
               )}
             </nav>
 
-            <div className="flex items-center gap-6">
+            <div className="flex items-center gap-3 sm:gap-6">
               {isLoggedIn ? (
                 <>
-                  <span className="text-gray-200">|</span>
+                  <span className="text-gray-200 hidden sm:inline">|</span>
                   <NavLink href="/profile" isActive={false}>
                     profile
                   </NavLink>
@@ -249,10 +251,18 @@ export default function DocsLayoutClient(props: DocsLayoutClientProps) {
           </div>
         </div>
 
+        {/* Mobile sidebar toggle */}
+        <button
+          onClick={() => setSidebarOpen(!sidebarOpen)}
+          className="md:hidden text-sm text-gray-500 hover:text-black transition-colors mb-4"
+        >
+          {sidebarOpen ? "— hide menu" : "+ show menu"}
+        </button>
+
         {/* Docs Content with Sidebar */}
-        <div className="flex gap-8">
-          {/* Sidebar Navigation */}
-          <nav className="w-48 flex-shrink-0">
+        <div className="flex flex-col md:flex-row gap-4 md:gap-8">
+          {/* Sidebar Navigation (desktop) */}
+          <nav className="hidden md:block w-48 flex-shrink-0">
             <ul className="space-y-1">
               {docNavItems.map((item) => {
                 const isActive = isActiveDocSection(item.href);
@@ -304,6 +314,72 @@ export default function DocsLayoutClient(props: DocsLayoutClientProps) {
               })}
             </ul>
           </nav>
+
+          {/* Sidebar Navigation (mobile) */}
+          <AnimatePresence>
+            {sidebarOpen && (
+              <motion.nav
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.2, ease: "easeInOut" }}
+                className="md:hidden w-full overflow-hidden"
+              >
+                <ul className="space-y-1">
+                  {docNavItems.map((item, index) => {
+                    const isActive = isActiveDocSection(item.href);
+                    return (
+                      <motion.li
+                        key={item.href}
+                        initial={{ opacity: 0, x: -8 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{
+                          duration: 0.15,
+                          delay: 0.03 + index * 0.04,
+                        }}
+                      >
+                        <Link
+                          href={item.href}
+                          onClick={() => setSidebarOpen(false)}
+                          className={cn(
+                            "block py-2 px-3 text-sm border-l-2 transition-colors",
+                            isActive
+                              ? "border-orange-accent bg-orange-accent/5 text-black font-medium"
+                              : "border-transparent text-gray-500 hover:border-gray-300 hover:text-black",
+                          )}
+                        >
+                          {item.label}
+                        </Link>
+                        {isActive && item.subheadings.length > 0 && (
+                          <ul>
+                            {item.subheadings.map((sub, i) => (
+                              <motion.li
+                                key={sub.id}
+                                initial={{ opacity: 0, x: -4 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                transition={{
+                                  duration: 0.15,
+                                  delay: 0.08 + index * 0.04 + i * 0.03,
+                                }}
+                              >
+                                <a
+                                  href={`#${sub.id}`}
+                                  onClick={() => setSidebarOpen(false)}
+                                  className="block py-1 pl-6 pr-3 text-xs border-l-2 border-transparent text-gray-400 hover:text-gray-700 transition-colors"
+                                >
+                                  {sub.label}
+                                </a>
+                              </motion.li>
+                            ))}
+                          </ul>
+                        )}
+                      </motion.li>
+                    );
+                  })}
+                </ul>
+              </motion.nav>
+            )}
+          </AnimatePresence>
 
           {/* Main Content */}
           <ViewTransition name="docs-content">
