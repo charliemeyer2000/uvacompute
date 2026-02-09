@@ -161,7 +161,7 @@ export default function VMDetailPageClient({
           back to vms
         </Link>
 
-        <div className="border border-gray-200 bg-white p-12 text-center">
+        <div className="border border-gray-200 bg-white p-6 sm:p-12 text-center">
           <div className="mx-auto w-12 h-12 bg-gray-100 flex items-center justify-center mb-4">
             <Monitor className="w-6 h-6 text-gray-400" />
           </div>
@@ -192,7 +192,7 @@ export default function VMDetailPageClient({
         vms / {vm.name || vm.vmId}
       </Link>
 
-      <div className="flex items-start justify-between">
+      <div className="flex items-start justify-between flex-wrap gap-4">
         <div>
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-semibold text-black">
