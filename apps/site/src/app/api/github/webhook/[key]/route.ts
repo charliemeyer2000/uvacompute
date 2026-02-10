@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { createAuthHeaders } from "@/lib/orchestration-auth";
-import { fetchMutation } from "convex/nextjs";
-import { api } from "../../../../../convex/_generated/api";
+import { fetchMutation, fetchQuery } from "convex/nextjs";
+import { api } from "../../../../../../convex/_generated/api";
 
 const VM_ORCHESTRATION_SERVICE_URL =
   process.env.VM_ORCHESTRATION_SERVICE_URL || "http://localhost:8080";
@@ -12,9 +12,9 @@ const RUNNER_VERSION = "2.322.0";
 function verifyGitHubWebhook(
   payload: string,
   signature: string | null,
+  secret: string,
 ): boolean {
-  const secret = process.env.GITHUB_WEBHOOK_SECRET;
-  if (!secret || !signature) return false;
+  if (!signature) return false;
   const expected =
     "sha256=" +
     crypto.createHmac("sha256", secret).update(payload).digest("hex");
@@ -65,17 +65,40 @@ function buildBootstrapScript(): string {
     'curl -fsSL -o runner.tar.gz "https://github.com/actions/runner/releases/download/v${RUNNER_VERSION}/actions-runner-linux-${RUNNER_ARCH}-${RUNNER_VERSION}.tar.gz"',
     "tar xzf runner.tar.gz && rm -f runner.tar.gz",
     "chown -R runner:runner /home/runner/actions-runner",
-    'su runner -c "cd /home/runner/actions-runner && ./run.sh --jitconfig $JIT_CONFIG"',
+    // Write JIT config to file to avoid shell expansion issues with large base64 strings
+    'echo "$JIT_CONFIG" > /home/runner/actions-runner/.jitconfig',
+    "chown runner:runner /home/runner/actions-runner/.jitconfig",
+    'su runner -c "cd /home/runner/actions-runner && ./run.sh --jitconfig $(cat .jitconfig)"',
   ].join("\n");
 }
 
-export async function POST(request: NextRequest) {
+export async function POST(
+  request: NextRequest,
+  { params }: { params: Promise<{ key: string }> },
+) {
+  const { key: keyPrefix } = await params;
+
+  // Look up API key by prefix
+  const apiKey = await fetchQuery(api.apiKeys.validateByPrefix, { keyPrefix });
+  if (!apiKey) {
+    console.error(`[github-webhook] Invalid API key prefix: ${keyPrefix}`);
+    return NextResponse.json({ error: "Invalid API key" }, { status: 401 });
+  }
+
   const body = await request.text();
 
+  // Verify webhook signature using per-key secret
   const signature = request.headers.get("x-hub-signature-256");
-  if (!verifyGitHubWebhook(body, signature)) {
-    console.error("GitHub webhook signature verification failed");
+  if (!verifyGitHubWebhook(body, signature, apiKey.webhookSecret)) {
+    console.error("[github-webhook] Webhook signature verification failed");
     return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
+  }
+
+  // Record API key usage
+  try {
+    await fetchMutation(api.apiKeys.recordUsage, { keyId: apiKey._id });
+  } catch {
+    // Non-fatal
   }
 
   const event = request.headers.get("x-github-event");
@@ -109,7 +132,7 @@ export async function POST(request: NextRequest) {
   const resources = parseResourcesFromLabels(labels);
 
   console.log(
-    `[github-webhook] Provisioning runner for ${repoFullName} job ${workflowJobId}`,
+    `[github-webhook] Provisioning runner for ${repoFullName} job ${workflowJobId} (user: ${apiKey.userId})`,
     { labels, resources },
   );
 
@@ -161,7 +184,7 @@ export async function POST(request: NextRequest) {
 
   const jobRequest = {
     jobId,
-    userId: "system-github-runner",
+    userId: apiKey.userId,
     image: "ubuntu:22.04",
     name: jobName,
     cpus: resources.cpus,
@@ -198,11 +221,11 @@ export async function POST(request: NextRequest) {
 
   const orchData = await orchResponse.json();
 
-  // Save to Convex for dashboard visibility
+  // Save to Convex for dashboard visibility under the real user
   if (orchData.status === "success" && orchData.jobId) {
     try {
       await fetchMutation(api.jobs.create, {
-        userId: "system-github-runner",
+        userId: apiKey.userId,
         jobId: orchData.jobId,
         name: jobName,
         image: "ubuntu:22.04",
@@ -212,13 +235,12 @@ export async function POST(request: NextRequest) {
         disk: resources.disk,
       });
     } catch (e) {
-      // Non-fatal: job is running, just not visible in dashboard
       console.error("[github-webhook] Failed to save to Convex:", e);
     }
   }
 
   console.log(
-    `[github-webhook] Runner provisioned: ${jobName} for ${repoFullName}`,
+    `[github-webhook] Runner provisioned: ${jobName} for ${repoFullName} (user: ${apiKey.userId})`,
     { jobId: orchData.jobId, resources },
   );
 

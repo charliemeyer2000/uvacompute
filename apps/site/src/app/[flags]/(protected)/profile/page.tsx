@@ -1,16 +1,35 @@
 "use client";
 
-import { useQuery } from "convex/react";
+import { useState } from "react";
+import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../../../convex/_generated/api";
-import { Skeleton } from "@/components/ui/skeleton";
 import { authClient } from "@/lib/auth-client";
-import { CheckCircle, User } from "lucide-react";
+import { CheckCircle, Plus, Copy, Check, X, Key } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { toast } from "sonner";
+import { Id } from "../../../../../convex/_generated/dataModel";
 
 export default function ProfilePage() {
   const { data: session } = authClient.useSession();
   const user = useQuery(api.auth.getCurrentUser, session?.user ? {} : "skip");
+  const apiKeys = useQuery(
+    api.apiKeys.listForUser,
+    session?.user ? {} : "skip",
+  );
+  const revokeKey = useMutation(api.apiKeys.revokeForUser);
 
-  // Get initials for avatar
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [newKeyName, setNewKeyName] = useState("");
+  const [isCreating, setIsCreating] = useState(false);
+  const [createdKey, setCreatedKey] = useState<{
+    key: string;
+    keyPrefix: string;
+    webhookSecret: string;
+  } | null>(null);
+  const [copiedField, setCopiedField] = useState<string | null>(null);
+  const [confirmingRevoke, setConfirmingRevoke] = useState<string | null>(null);
+
   const getInitials = (name?: string) => {
     if (!name) return "??";
     const parts = name.split(" ");
@@ -20,16 +39,57 @@ export default function ProfilePage() {
     return name.slice(0, 2).toUpperCase();
   };
 
+  const handleCreateKey = async () => {
+    setIsCreating(true);
+    try {
+      const res = await fetch("/api/api-keys", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: newKeyName || "Unnamed Key" }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Failed to create API key");
+      }
+      const data = await res.json();
+      setCreatedKey(data);
+      setShowCreateForm(false);
+      setNewKeyName("");
+      toast.success("api key created");
+    } catch (error) {
+      toast.error("failed to create api key", {
+        description: error instanceof Error ? error.message : "unknown error",
+      });
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
+  const handleCopy = async (text: string, field: string) => {
+    await navigator.clipboard.writeText(text);
+    setCopiedField(field);
+    setTimeout(() => setCopiedField(null), 2000);
+  };
+
+  const handleRevoke = async (keyId: string) => {
+    try {
+      await revokeKey({ keyId: keyId as Id<"apiKeys"> });
+      setConfirmingRevoke(null);
+      toast.success("api key revoked");
+    } catch (error) {
+      toast.error("failed to revoke api key", {
+        description: error instanceof Error ? error.message : "unknown error",
+      });
+    }
+  };
+
   if (!user) {
     return (
       <div className="space-y-6">
-        {/* Page Header Skeleton */}
         <div>
           <div className="h-8 w-32 bg-gray-100 animate-pulse mb-2" />
           <div className="h-4 w-56 bg-gray-100 animate-pulse" />
         </div>
-
-        {/* Profile Card Skeleton */}
         <div className="bg-white border border-gray-200 p-4 sm:p-6">
           <div className="flex items-start gap-4">
             <div className="w-16 h-16 bg-gray-100 animate-pulse" />
@@ -39,8 +99,6 @@ export default function ProfilePage() {
             </div>
           </div>
         </div>
-
-        {/* Info Cards Skeleton */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="bg-white border border-gray-200 p-4 sm:p-5">
             <div className="h-4 w-24 bg-gray-100 animate-pulse mb-4" />
@@ -72,14 +130,11 @@ export default function ProfilePage() {
       {/* Profile Header Card */}
       <div className="bg-white border border-gray-200 p-4 sm:p-6">
         <div className="flex items-start gap-4">
-          {/* Avatar */}
           <div className="w-16 h-16 bg-orange-accent flex items-center justify-center flex-shrink-0">
             <span className="text-white text-xl font-semibold">
               {getInitials(user.name)}
             </span>
           </div>
-
-          {/* Name and Email */}
           <div className="flex-1 min-w-0">
             <h2 className="text-lg font-semibold text-black truncate">
               {user.name || "unnamed user"}
@@ -101,7 +156,6 @@ export default function ProfilePage() {
 
       {/* Info Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* Account Section */}
         <div className="bg-white border border-gray-200 p-4 sm:p-5">
           <h3 className="text-xs text-gray-400 uppercase tracking-wide mb-4">
             account
@@ -126,7 +180,6 @@ export default function ProfilePage() {
           </div>
         </div>
 
-        {/* Activity Section */}
         <div className="bg-white border border-gray-200 p-4 sm:p-5">
           <h3 className="text-xs text-gray-400 uppercase tracking-wide mb-4">
             activity
@@ -154,6 +207,231 @@ export default function ProfilePage() {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* API Keys Section */}
+      <div className="bg-white border border-gray-200 p-4 sm:p-5">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-xs text-gray-400 uppercase tracking-wide">
+            api keys
+          </h3>
+          {!showCreateForm && !createdKey && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowCreateForm(true)}
+            >
+              <Plus className="w-3.5 h-3.5" />
+              create key
+            </Button>
+          )}
+        </div>
+
+        {/* Create Form */}
+        {showCreateForm && (
+          <div className="border border-gray-200 p-4 mb-4">
+            <div className="flex gap-2">
+              <Input
+                placeholder="key name (e.g. github runners)"
+                value={newKeyName}
+                onChange={(e) => setNewKeyName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleCreateKey();
+                  if (e.key === "Escape") {
+                    setShowCreateForm(false);
+                    setNewKeyName("");
+                  }
+                }}
+                autoFocus
+              />
+              <Button onClick={handleCreateKey} disabled={isCreating} size="sm">
+                {isCreating ? "creating..." : "create"}
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                onClick={() => {
+                  setShowCreateForm(false);
+                  setNewKeyName("");
+                }}
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Newly Created Key Display */}
+        {createdKey && (
+          <div className="border border-orange-accent bg-orange-50 p-4 mb-4">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-xs font-semibold uppercase tracking-wide text-orange-accent">
+                save these values — shown once only
+              </span>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                onClick={() => setCreatedKey(null)}
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <span className="text-xs text-gray-500 block mb-1">
+                  api key
+                </span>
+                <div className="flex items-center gap-2">
+                  <code className="text-xs font-mono bg-white border border-gray-200 px-2 py-1.5 flex-1 break-all">
+                    {createdKey.key}
+                  </code>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    onClick={() => handleCopy(createdKey.key, "key")}
+                  >
+                    {copiedField === "key" ? (
+                      <Check className="w-3.5 h-3.5 text-green-600" />
+                    ) : (
+                      <Copy className="w-3.5 h-3.5" />
+                    )}
+                  </Button>
+                </div>
+              </div>
+              <div>
+                <span className="text-xs text-gray-500 block mb-1">
+                  webhook secret
+                </span>
+                <div className="flex items-center gap-2">
+                  <code className="text-xs font-mono bg-white border border-gray-200 px-2 py-1.5 flex-1 break-all">
+                    {createdKey.webhookSecret}
+                  </code>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    onClick={() =>
+                      handleCopy(createdKey.webhookSecret, "secret")
+                    }
+                  >
+                    {copiedField === "secret" ? (
+                      <Check className="w-3.5 h-3.5 text-green-600" />
+                    ) : (
+                      <Copy className="w-3.5 h-3.5" />
+                    )}
+                  </Button>
+                </div>
+              </div>
+              <div>
+                <span className="text-xs text-gray-500 block mb-1">
+                  github webhook url
+                </span>
+                <div className="flex items-center gap-2">
+                  <code className="text-xs font-mono bg-white border border-gray-200 px-2 py-1.5 flex-1 break-all">
+                    https://uvacompute.com/api/github/webhook/
+                    {createdKey.keyPrefix}
+                  </code>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    onClick={() =>
+                      handleCopy(
+                        `https://uvacompute.com/api/github/webhook/${createdKey.keyPrefix}`,
+                        "url",
+                      )
+                    }
+                  >
+                    {copiedField === "url" ? (
+                      <Check className="w-3.5 h-3.5 text-green-600" />
+                    ) : (
+                      <Copy className="w-3.5 h-3.5" />
+                    )}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Key List */}
+        {apiKeys === undefined ? (
+          <div className="space-y-3">
+            <div className="h-10 bg-gray-100 animate-pulse" />
+            <div className="h-10 bg-gray-100 animate-pulse" />
+          </div>
+        ) : apiKeys.length === 0 && !createdKey ? (
+          <div className="text-sm text-gray-400 py-4 text-center">
+            <Key className="w-5 h-5 mx-auto mb-2 text-gray-300" />
+            no api keys. create one to use github actions runners.
+          </div>
+        ) : (
+          <div className="divide-y divide-gray-100">
+            {apiKeys.map((key) => (
+              <div
+                key={key._id}
+                className="flex items-center justify-between py-3 first:pt-0 last:pb-0"
+              >
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-black font-medium truncate">
+                      {key.name}
+                    </span>
+                    <span className="text-xs font-mono text-gray-400">
+                      {key.keyPrefix}****
+                    </span>
+                  </div>
+                  <div className="flex gap-3 mt-0.5">
+                    <span className="text-xs text-gray-400">
+                      created{" "}
+                      {new Date(key.createdAt).toLocaleDateString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                        year: "numeric",
+                      })}
+                    </span>
+                    {key.lastUsedAt && (
+                      <span className="text-xs text-gray-400">
+                        last used{" "}
+                        {new Date(key.lastUsedAt).toLocaleDateString("en-US", {
+                          month: "short",
+                          day: "numeric",
+                          year: "numeric",
+                        })}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                {confirmingRevoke === key._id ? (
+                  <div className="flex items-center gap-1">
+                    <span className="text-xs text-red-600 mr-1">revoke?</span>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => handleRevoke(key._id)}
+                    >
+                      yes
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setConfirmingRevoke(null)}
+                    >
+                      no
+                    </Button>
+                  </div>
+                ) : (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-gray-400 hover:text-red-600"
+                    onClick={() => setConfirmingRevoke(key._id)}
+                  >
+                    revoke
+                  </Button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
