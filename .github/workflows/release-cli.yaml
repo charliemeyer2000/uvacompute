@@ -24,10 +24,15 @@ permissions:
 
 jobs:
   release:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, uvacompute]
     outputs:
       version: ${{ steps.version.outputs.new_version }}
     steps:
+      - name: Install system dependencies
+        run: |
+          apt-get update -qq
+          apt-get install -y -qq git jq unzip >/dev/null 2>&1
+
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -78,8 +83,7 @@ jobs:
           cat package.json
 
           RELEASE_DATE=$(date '+%B %Y')
-          sed -i.bak "s/^\.TH UVA 1 \"[^\"]*\" \"uvacompute [^\"]*\"/.TH UVA 1 \"${RELEASE_DATE}\" \"uvacompute ${{ steps.version.outputs.new_version }}\"/" uva.1
-          rm uva.1.bak
+          sed -i "s/^\.TH UVA 1 \"[^\"]*\" \"uvacompute [^\"]*\"/.TH UVA 1 \"${RELEASE_DATE}\" \"uvacompute ${{ steps.version.outputs.new_version }}\"/" uva.1
 
       - name: Commit version bump
         run: |
@@ -91,21 +95,13 @@ jobs:
 
   build:
     needs: release
-    strategy:
-      matrix:
-        include:
-          - os: ubuntu-latest
-            target: linux-x64
-            artifact: uvacompute-linux
-          - os: macos-latest
-            target: darwin-x64
-            artifact: uvacompute-macos
-          - os: windows-latest
-            target: win32-x64
-            artifact: uvacompute-windows.exe
-
-    runs-on: ${{ matrix.os }}
+    runs-on: [self-hosted, uvacompute]
     steps:
+      - name: Install system dependencies
+        run: |
+          apt-get update -qq
+          apt-get install -y -qq git unzip >/dev/null 2>&1
+
       - uses: actions/checkout@v4
         with:
           ref: cli-v${{ needs.release.outputs.version }}
@@ -116,21 +112,47 @@ jobs:
         run: bun install
         working-directory: ./apps/cli
 
-      - name: Build binary
-        run: bun build --compile --define process.env.NODE_ENV='"production"' ./index.ts --outfile ./dist/${{ matrix.artifact }}
+      - name: Build all platform binaries
+        run: |
+          mkdir -p dist
+          echo "Building Linux x64 binary..."
+          bun build --compile --target=bun-linux-x64 --define process.env.NODE_ENV='"production"' ./index.ts --outfile ./dist/uvacompute-linux
+          echo "Building macOS x64 binary..."
+          bun build --compile --target=bun-darwin-x64 --define process.env.NODE_ENV='"production"' ./index.ts --outfile ./dist/uvacompute-macos
+          echo "Building Windows x64 binary..."
+          bun build --compile --target=bun-windows-x64 --define process.env.NODE_ENV='"production"' ./index.ts --outfile ./dist/uvacompute-windows.exe
         working-directory: ./apps/cli
 
-      - name: Upload artifact
+      - name: Upload Linux binary
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.artifact }}
-          path: ./apps/cli/dist/${{ matrix.artifact }}
+          name: uvacompute-linux
+          path: ./apps/cli/dist/uvacompute-linux
+          retention-days: 1
+
+      - name: Upload macOS binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: uvacompute-macos
+          path: ./apps/cli/dist/uvacompute-macos
+          retention-days: 1
+
+      - name: Upload Windows binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: uvacompute-windows.exe
+          path: ./apps/cli/dist/uvacompute-windows.exe
           retention-days: 1
 
   upload-man-page:
     needs: release
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, uvacompute]
     steps:
+      - name: Install system dependencies
+        run: |
+          apt-get update -qq
+          apt-get install -y -qq git >/dev/null 2>&1
+
       - uses: actions/checkout@v4
         with:
           ref: cli-v${{ needs.release.outputs.version }}
@@ -144,8 +166,13 @@ jobs:
 
   create-release:
     needs: [release, build, upload-man-page]
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, uvacompute]
     steps:
+      - name: Install system dependencies
+        run: |
+          apt-get update -qq
+          apt-get install -y -qq git >/dev/null 2>&1
+
       - uses: actions/checkout@v4
         with:
           ref: cli-v${{ needs.release.outputs.version }}
