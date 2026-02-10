@@ -31,3 +31,4 @@ this will open a browser window for authentication.
 - [virtual machines](./vms.md) - create and manage gpu-powered vms
 - [container jobs](./jobs.md) - run docker containers on demand
 - [node management](./nodes.md) - contribute your hardware to the network
+- [configuration](./configuration.md) - configuration file locations and reference
