@@ -21,6 +21,11 @@ sudo uva node prepare
 
 this installs nvidia drivers and verifies iommu support.
 
+| flag           | description                                    |
+| -------------- | ---------------------------------------------- |
+| `--check`      | show what would be done without making changes |
+| `--skip-iommu` | skip iommu verification checks                 |
+
 ### 2. create a registration token
 
 generate a token for node registration:
@@ -107,14 +112,38 @@ this removes k3s, kubevirt, ssh tunnel service, and gpu scripts.
 
 ## additional commands
 
-### list your tokens
+### list your contributed nodes
 
 ```bash
-uva node token list
+uva node list
 ```
+
+shows all nodes you've contributed to the network with their status and resources.
 
 ### check node status
 
 ```bash
 uva node status
+```
+
+### view workloads on a node
+
+```bash
+uva node workloads <nodeId>
+```
+
+shows active vms and jobs running on a specific contributed node.
+
+### configure resource sharing
+
+```bash
+uva node config
+```
+
+interactively configure how many cpus, ram, and gpus to share with the network.
+
+### list your tokens
+
+```bash
+uva node token list
 ```

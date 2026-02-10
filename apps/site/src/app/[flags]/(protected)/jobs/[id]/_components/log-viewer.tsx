@@ -49,14 +49,6 @@ const LEVEL_ROW_STYLES: Record<string, string> = {
   default: "hover:bg-gray-50 border-l-2 border-l-transparent",
 };
 
-const LEVEL_BADGE_STYLES: Record<string, string> = {
-  error: "bg-red-100 text-red-700",
-  warn: "bg-amber-100 text-amber-700",
-  info: "bg-blue-100 text-blue-600",
-  debug: "bg-gray-100 text-gray-400",
-  default: "bg-gray-100 text-gray-500",
-};
-
 const LEVEL_TEXT_STYLES: Record<string, string> = {
   error: "text-red-700",
   warn: "text-amber-700",
@@ -418,9 +410,9 @@ export function LogViewer({ job }: LogViewerProps) {
   return (
     <div className="bg-white border border-gray-200 flex flex-col">
       {/* Toolbar */}
-      <div className="border-b border-gray-200 px-4 py-2.5 flex items-center gap-3">
+      <div className="border-b border-gray-200 px-2 sm:px-4 py-2.5 flex flex-wrap items-center gap-2 sm:gap-3">
         {/* Search */}
-        <div className="relative flex-1">
+        <div className="relative w-full sm:w-auto sm:flex-1 order-first">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
           <input
             type="text"
@@ -557,10 +549,9 @@ export function LogViewer({ job }: LogViewerProps) {
 
       {/* Table Header */}
       {hasLogs && (
-        <div className="border-b border-gray-200 px-4 py-1.5 flex items-center gap-4 text-[10px] uppercase tracking-wider text-gray-400 bg-gray-50/50">
-          <span className="w-16 text-right">#</span>
-          <span className="w-24">time</span>
-          <span className="w-14">level</span>
+        <div className="border-b border-gray-200 px-2 sm:px-4 py-1.5 flex items-center gap-2 sm:gap-4 text-[10px] uppercase tracking-wider text-gray-400 bg-gray-50/50">
+          <span className="w-10 sm:w-16 text-right">#</span>
+          <span className="w-24 hidden sm:inline">time</span>
           <span className="flex-1">message</span>
         </div>
       )}
@@ -571,7 +562,7 @@ export function LogViewer({ job }: LogViewerProps) {
         <div
           ref={logContainerRef}
           onScroll={handleScroll}
-          className="flex-1 h-[500px] overflow-auto font-mono text-[13px] leading-[1.6]"
+          className="flex-1 h-[300px] sm:h-[500px] overflow-auto font-mono text-[13px] leading-[1.6]"
         >
           {isLoading && !logs ? (
             <div className="flex items-center justify-center h-full gap-3">
@@ -592,30 +583,15 @@ export function LogViewer({ job }: LogViewerProps) {
                 <div
                   key={line.lineNumber}
                   onClick={() => handleRowClick(index)}
-                  className={`flex items-start gap-4 px-4 py-[3px] cursor-pointer transition-colors ${
+                  className={`flex items-start gap-2 sm:gap-4 px-2 sm:px-4 py-[3px] cursor-pointer transition-colors ${
                     LEVEL_ROW_STYLES[line.level]
                   } ${selectedLineIndex === index ? "!bg-orange-accent/8 border-l-orange-accent" : ""}`}
                 >
-                  <span className="w-16 text-right text-gray-300 select-none flex-shrink-0 tabular-nums">
+                  <span className="w-10 sm:w-16 text-right text-gray-300 select-none flex-shrink-0 tabular-nums">
                     {line.lineNumber}
                   </span>
-                  <span className="w-24 text-gray-400 flex-shrink-0 text-[12px]">
+                  <span className="w-24 text-gray-400 flex-shrink-0 text-[12px] hidden sm:inline">
                     {line.timestamp ? formatTimestamp(line.timestamp) : "—"}
-                  </span>
-                  <span className="w-14 flex-shrink-0">
-                    {line.level !== "default" && (
-                      <span
-                        className={`inline-block px-1.5 py-px text-[10px] font-medium uppercase ${LEVEL_BADGE_STYLES[line.level]}`}
-                      >
-                        {line.level === "error"
-                          ? "ERR"
-                          : line.level === "warn"
-                            ? "WRN"
-                            : line.level === "debug"
-                              ? "DBG"
-                              : "INF"}
-                      </span>
-                    )}
                   </span>
                   <span
                     className={`flex-1 whitespace-pre-wrap break-all ${LEVEL_TEXT_STYLES[line.level]} ${
