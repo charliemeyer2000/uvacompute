@@ -87,44 +87,23 @@ uva jobs cancel <jobId>
 
 ---
 
-## GitHub Actions Self-Hosted Runner
+## GitHub Actions Runners
 
-Use uvacompute as a self-hosted GitHub Actions runner. This spins up an ephemeral runner that picks up one workflow job, executes it, then exits.
+Use uvacompute as a self-hosted GitHub Actions runner. Add `uvacompute` to your workflow's `runs-on` labels and runners are automatically provisioned via webhook.
 
-### Prerequisites
+### Setup
 
-- [gh cli](https://cli.github.com) installed and authenticated
-- uva cli installed and authenticated
-
-### Quick Start
-
-Download the helper script and run it:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/charliemeyer2000/uvacompute/main/apps/site/public/gh-runner.sh \
-  -o gh-runner.sh && chmod +x gh-runner.sh
-
-# repo-level runner
-./gh-runner.sh --repo your-org/your-repo
-
-# org-level runner
-./gh-runner.sh --org your-org
-```
-
-### With GPU and Custom Resources
-
-```bash
-./gh-runner.sh --repo your-org/your-repo --gpu 1 --cpus 4 --ram 16
-```
+1. Create an API key: `uva api-key create "GitHub Runners"`
+2. Add a webhook to your GitHub repo (Settings → Webhooks → Add webhook):
+   - **Payload URL:** `https://uvacompute.com/api/github/webhook/<your-key-prefix>`
+   - **Content type:** `application/json`
+   - **Secret:** your webhook secret from step 1
+   - **Events:** select "Workflow jobs" only
+3. Use `uvacompute` in your workflow's `runs-on`
 
 ### Workflow Configuration
 
-In your GitHub Actions workflow, target the runner with `self-hosted` and `uvacompute` labels:
-
 ```yaml
-name: My Workflow
-on: [push]
-
 jobs:
   build:
     runs-on: [self-hosted, uvacompute]
@@ -133,38 +112,34 @@ jobs:
       - run: echo "Running on uvacompute!"
 ```
 
-If you requested a GPU, the `gpu` label is added automatically:
+### Resource Labels
+
+Customize resources by adding labels to `runs-on`:
+
+| Label               | Effect                                     |
+| ------------------- | ------------------------------------------ |
+| `uvacompute`        | Default runner (4 cpu, 8gb ram, 32gb disk) |
+| `uvacompute-gpu`    | Adds 1 GPU                                 |
+| `uvacompute-8cpu`   | Set to 8 CPUs                              |
+| `uvacompute-16gb`   | Set to 16gb RAM                            |
+| `uvacompute-64disk` | Set to 64gb disk                           |
+
+Example with GPU and extra RAM:
 
 ```yaml
-jobs:
-  train:
-    runs-on: [self-hosted, uvacompute, gpu]
-    steps:
-      - run: nvidia-smi
+runs-on: [self-hosted, uvacompute, uvacompute-gpu, uvacompute-32gb]
 ```
-
-### Script Options
-
-| Flag         | Description                           | Default    |
-| ------------ | ------------------------------------- | ---------- |
-| `--repo`     | GitHub repo (e.g. myorg/myrepo)       | —          |
-| `--org`      | GitHub org for org-level runner       | —          |
-| `--cpus`     | Number of CPUs                        | 4          |
-| `--ram`      | RAM in GB                             | 16         |
-| `--disk`     | Disk in GB                            | 64         |
-| `--gpu`      | Number of GPUs                        | 0          |
-| `--gpu-type` | GPU type                              | 5090       |
-| `--labels`   | Extra runner labels (comma-separated) | uvacompute |
 
 ### How It Works
 
-1. The script gets a runner registration token from GitHub using the `gh` CLI
-2. It launches a container job on uvacompute running `ubuntu:22.04`
-3. Inside the container, it downloads and configures the GitHub Actions runner in `--ephemeral` mode
-4. The runner picks up one queued workflow job, executes it, then exits
-5. The container job completes when the runner finishes
+1. When a workflow job with `uvacompute` label is queued, GitHub sends a webhook event
+2. The webhook handler validates the API key and generates a JIT runner config
+3. A container job is provisioned on uvacompute with the requested resources
+4. The ephemeral runner picks up one job, executes it, then exits
 
-**Note:** Runners are ephemeral — each one handles a single workflow job. To process multiple queued jobs, run the script multiple times.
+**Note:** Runners are ephemeral — each one handles a single workflow job. For workflows with multiple jobs, each gets its own runner automatically.
+
+**Tip:** Runner containers start from bare `ubuntu:22.04`. Use `sudo apt-get install` for system dependencies your workflow needs.
 
 ---
 
