@@ -84,7 +84,7 @@ JOB_NAME="gh-runner-$(date +%s)-$$"
 echo "==> creating uvacompute runner job: ${JOB_NAME}"
 echo "    cpus=${VM_CPUS} ram=${VM_RAM}gb disk=${VM_DISK}gb gpus=${VM_GPUS}"
 
-RUNNER_VERSION="2.322.0"
+RUNNER_VERSION="2.331.0"
 
 # build job args
 JOB_ARGS=(
