@@ -227,6 +227,30 @@ export const ApiErrorResponseSchema = z.object({
   message: z.string().optional(),
 });
 
+// API Key schemas
+
+export const ApiKeySchema = z.object({
+  _id: z.string(),
+  keyPrefix: z.string(),
+  name: z.string(),
+  createdAt: z.number(),
+  lastUsedAt: z.number().optional(),
+});
+
+export const ApiKeyListResponseSchema = z.object({
+  keys: z.array(ApiKeySchema),
+});
+
+export const ApiKeyCreateResponseSchema = z.object({
+  key: z.string(),
+  keyPrefix: z.string(),
+  webhookSecret: z.string(),
+});
+
+export const ApiKeyRevokeResponseSchema = z.object({
+  success: z.boolean(),
+});
+
 export const SSHKeyRemoveResponseSchema = z.object({
   success: z.boolean(),
   message: z.string().optional(),
