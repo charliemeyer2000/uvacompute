@@ -40,7 +40,7 @@ const docNavItems = [
       { label: "prerequisites", id: "prerequisites" },
       { label: "examples", id: "examples" },
       { label: "managing jobs", id: "managing-jobs" },
-      { label: "github actions runner", id: "github-actions-runner" },
+      { label: "github actions runners", id: "github-actions-runner" },
       { label: "job options", id: "job-options" },
     ],
   },
