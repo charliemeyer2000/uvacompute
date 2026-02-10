@@ -145,146 +145,177 @@ export default function JobsDocsPage() {
       </section>
 
       <section id="github-actions-runner">
-        <h3 className="text-lg font-semibold mb-4">
-          github actions self-hosted runner
-        </h3>
+        <h3 className="text-lg font-semibold mb-4">github actions runners</h3>
         <p className="text-gray-600 mb-4">
-          use uvacompute as a self-hosted github actions runner. this spins up
-          an ephemeral runner that picks up one job from your repo&apos;s
-          workflow queue, executes it, then exits.
+          use uvacompute as a self-hosted github actions runner. add{" "}
+          <code className="bg-gray-100 px-1">uvacompute</code> to your
+          workflow&apos;s <code className="bg-gray-100 px-1">runs-on</code>{" "}
+          labels and uvacompute automatically provisions an ephemeral runner for
+          each job via webhook.
         </p>
 
-        <div className="space-y-4">
-          <div>
-            <h4 className="font-medium mb-2">prerequisites</h4>
-            <ul className="list-disc ml-6 space-y-1 text-sm text-gray-600">
-              <li>
-                <a
-                  href="https://cli.github.com"
-                  className="text-orange-accent underline"
-                >
-                  gh cli
-                </a>{" "}
-                installed and authenticated
-              </li>
-              <li>uva cli installed and authenticated</li>
-            </ul>
-          </div>
+        <div className="space-y-6">
+          <div className="border border-gray-200 p-4 sm:p-6 space-y-6">
+            <div>
+              <div className="flex items-center gap-3 mb-2">
+                <span className="text-2xl font-semibold text-black">1</span>
+                <h4 className="text-lg font-semibold text-black">
+                  create an api key
+                </h4>
+              </div>
+              <div className="pl-9">
+                <p className="text-sm text-gray-600 mb-3">
+                  generate an api key from the cli or the{" "}
+                  <a href="/profile" className="text-orange-accent underline">
+                    profile page
+                  </a>
+                  . save the key, webhook secret, and webhook url — they are
+                  shown once.
+                </p>
+                <CodeBlock>
+                  <code className="text-sm text-black">
+                    uva api-key create &quot;GitHub Runners&quot;
+                  </code>
+                </CodeBlock>
+              </div>
+            </div>
 
-          <div>
-            <h4 className="font-medium mb-2">quick start</h4>
-            <p className="text-sm text-gray-600 mb-2">
-              download and run the helper script:
-            </p>
-            <CodeBlock className="space-y-2">
-              <code className="text-sm text-black block">
-                curl -fsSL
-                https://raw.githubusercontent.com/charliemeyer2000/uvacompute/main/apps/site/public/gh-runner.sh
-                -o gh-runner.sh &amp;&amp; chmod +x gh-runner.sh
-              </code>
-              <code className="text-sm text-black block mt-2">
-                ./gh-runner.sh --repo your-org/your-repo
-              </code>
-            </CodeBlock>
-          </div>
+            <div>
+              <div className="flex items-center gap-3 mb-2">
+                <span className="text-2xl font-semibold text-black">2</span>
+                <h4 className="text-lg font-semibold text-black">
+                  add a github webhook
+                </h4>
+              </div>
+              <div className="pl-9">
+                <p className="text-sm text-gray-600 mb-3">
+                  go to your repo&apos;s{" "}
+                  <strong>settings &rarr; webhooks &rarr; add webhook</strong>{" "}
+                  and configure:
+                </p>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm border border-gray-200">
+                    <tbody>
+                      <tr>
+                        <td className="p-3 border-b border-gray-200 font-medium w-36">
+                          payload url
+                        </td>
+                        <td className="p-3 border-b border-gray-200">
+                          <code className="text-xs">
+                            https://uvacompute.com/api/github/webhook/&lt;your-key-prefix&gt;
+                          </code>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="p-3 border-b border-gray-200 font-medium">
+                          content type
+                        </td>
+                        <td className="p-3 border-b border-gray-200">
+                          <code className="text-xs">application/json</code>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="p-3 border-b border-gray-200 font-medium">
+                          secret
+                        </td>
+                        <td className="p-3 border-b border-gray-200">
+                          your webhook secret from step 1
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="p-3 font-medium">events</td>
+                        <td className="p-3">
+                          select <strong>workflow jobs</strong> only
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
 
-          <div>
-            <h4 className="font-medium mb-2">with gpu and custom resources</h4>
-            <CodeBlock>
-              <code className="text-sm text-black">
-                ./gh-runner.sh --repo your-org/your-repo --gpu 1 --cpus 4 --ram
-                16
-              </code>
-            </CodeBlock>
-          </div>
-
-          <div>
-            <h4 className="font-medium mb-2">org-level runner</h4>
-            <CodeBlock>
-              <code className="text-sm text-black">
-                ./gh-runner.sh --org your-org
-              </code>
-            </CodeBlock>
-          </div>
-
-          <div>
-            <h4 className="font-medium mb-2">workflow configuration</h4>
-            <p className="text-sm text-gray-600 mb-2">
-              in your github actions workflow, use the{" "}
-              <code className="bg-gray-100 px-1">self-hosted</code> and{" "}
-              <code className="bg-gray-100 px-1">uvacompute</code> labels:
-            </p>
-            <CodeBlock>
-              <pre className="text-sm text-black whitespace-pre">{`jobs:
+            <div>
+              <div className="flex items-center gap-3 mb-2">
+                <span className="text-2xl font-semibold text-black">3</span>
+                <h4 className="text-lg font-semibold text-black">
+                  use in your workflow
+                </h4>
+              </div>
+              <div className="pl-9">
+                <p className="text-sm text-gray-600 mb-3">
+                  add the <code className="bg-gray-100 px-1">uvacompute</code>{" "}
+                  label to <code className="bg-gray-100 px-1">runs-on</code>.
+                  when the job is queued, a runner is automatically provisioned:
+                </p>
+                <CodeBlock>
+                  <pre className="text-sm text-black whitespace-pre">{`jobs:
   build:
     runs-on: [self-hosted, uvacompute]
     steps:
       - uses: actions/checkout@v4
       - run: echo "Running on uvacompute!"`}</pre>
-            </CodeBlock>
+                </CodeBlock>
+              </div>
+            </div>
           </div>
 
           <div>
-            <h4 className="font-medium mb-2">script options</h4>
+            <h4 className="font-medium mb-2">resource labels</h4>
+            <p className="text-sm text-gray-600 mb-3">
+              customize runner resources by adding labels to{" "}
+              <code className="bg-gray-100 px-1">runs-on</code>. labels starting
+              with <code className="bg-gray-100 px-1">uvacompute-</code> are
+              parsed for cpu, ram, disk, and gpu settings.
+            </p>
             <div className="overflow-x-auto">
               <table className="w-full text-sm border border-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
                     <th className="text-left p-3 border-b border-gray-200">
-                      flag
+                      label
                     </th>
                     <th className="text-left p-3 border-b border-gray-200">
-                      description
+                      effect
                     </th>
                   </tr>
                 </thead>
                 <tbody>
                   <tr>
                     <td className="p-3 border-b border-gray-200">
-                      <code>--repo</code>
+                      <code>uvacompute</code>
                     </td>
                     <td className="p-3 border-b border-gray-200">
-                      github repo (e.g. myorg/myrepo)
-                    </td>
-                  </tr>
-                  <tr>
-                    <td className="p-3 border-b border-gray-200">
-                      <code>--org</code>
-                    </td>
-                    <td className="p-3 border-b border-gray-200">
-                      github org for org-level runner
+                      default runner (4 cpu, 8gb ram, 32gb disk)
                     </td>
                   </tr>
                   <tr>
                     <td className="p-3 border-b border-gray-200">
-                      <code>--cpus</code>
+                      <code>uvacompute-gpu</code>
+                    </td>
+                    <td className="p-3 border-b border-gray-200">adds 1 gpu</td>
+                  </tr>
+                  <tr>
+                    <td className="p-3 border-b border-gray-200">
+                      <code>uvacompute-8cpu</code>
                     </td>
                     <td className="p-3 border-b border-gray-200">
-                      number of CPUs (default: 4)
+                      set to 8 cpus
                     </td>
                   </tr>
                   <tr>
                     <td className="p-3 border-b border-gray-200">
-                      <code>--ram</code>
+                      <code>uvacompute-16gb</code>
                     </td>
                     <td className="p-3 border-b border-gray-200">
-                      RAM in GB (default: 16)
-                    </td>
-                  </tr>
-                  <tr>
-                    <td className="p-3 border-b border-gray-200">
-                      <code>--gpu</code>
-                    </td>
-                    <td className="p-3 border-b border-gray-200">
-                      number of GPUs (default: 0)
+                      set to 16gb ram
                     </td>
                   </tr>
                   <tr>
                     <td className="p-3 border-b border-gray-200">
-                      <code>--labels</code>
+                      <code>uvacompute-64disk</code>
                     </td>
                     <td className="p-3 border-b border-gray-200">
-                      extra runner labels, comma-separated (default: uvacompute)
+                      set to 64gb disk
                     </td>
                   </tr>
                 </tbody>
@@ -292,11 +323,54 @@ export default function JobsDocsPage() {
             </div>
           </div>
 
-          <div className="bg-gray-50 border border-gray-200 p-4">
+          <div>
+            <h4 className="font-medium mb-2">examples</h4>
+            <div className="space-y-3">
+              <div>
+                <p className="text-xs text-gray-500 mb-1">
+                  gpu runner with extra ram:
+                </p>
+                <CodeBlock>
+                  <pre className="text-sm text-black whitespace-pre">{`runs-on: [self-hosted, uvacompute, uvacompute-gpu, uvacompute-32gb]`}</pre>
+                </CodeBlock>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500 mb-1">
+                  high-cpu build runner:
+                </p>
+                <CodeBlock>
+                  <pre className="text-sm text-black whitespace-pre">{`runs-on: [self-hosted, uvacompute, uvacompute-8cpu, uvacompute-16gb]`}</pre>
+                </CodeBlock>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <h4 className="font-medium mb-2">managing api keys</h4>
+            <CodeBlock className="space-y-2">
+              <code className="text-sm text-black block">
+                uva api-key create &quot;my runners&quot;
+              </code>
+              <code className="text-sm text-gray-500 block">
+                uva api-key list
+              </code>
+              <code className="text-sm text-gray-500 block">
+                uva api-key revoke &lt;key-id&gt;
+              </code>
+            </CodeBlock>
+          </div>
+
+          <div className="bg-gray-50 border border-gray-200 p-4 space-y-2">
             <p className="text-sm text-gray-600">
               <strong>note:</strong> runners are ephemeral — each runner picks
-              up one workflow job then exits. to handle multiple queued jobs,
-              run the script multiple times.
+              up one workflow job then exits. for workflows with multiple jobs,
+              each job automatically gets its own runner.
+            </p>
+            <p className="text-sm text-gray-600">
+              <strong>tip:</strong> runner containers start from a bare{" "}
+              <code className="bg-gray-100 px-1">ubuntu:22.04</code> image. use{" "}
+              <code className="bg-gray-100 px-1">sudo apt-get install</code> to
+              install system dependencies your workflow needs.
             </p>
           </div>
         </div>
