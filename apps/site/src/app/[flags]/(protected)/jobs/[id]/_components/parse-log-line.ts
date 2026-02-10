@@ -20,10 +20,52 @@ const LEVEL_PATTERNS: { pattern: RegExp; level: LogLevel }[] = [
   { pattern: /\b(?:INFO|NOTICE)\b/i, level: "info" },
 ];
 
+const TOOL_ERROR_PATTERNS: RegExp[] = [
+  /^E:\s/, // apt-get errors
+  /^fatal:\s/i, // git fatal
+  /^npm ERR!/i, // npm errors
+];
+
+const HTTP_STATUS_REGEX =
+  /(?:HTTP\/[\d.]+\s+|HTTP\s+|status[=: ]\s*)(\d{3})\b/i;
+
+const EXIT_CODE_REGEX =
+  /(?:exit\s*(?:code|status)|exited\s+with|return\s*code|rc[= ])\s*(\d+)/i;
+
+function classifyHttpStatus(code: number): LogLevel {
+  if (code >= 500) return "error";
+  if (code >= 400) return "warn";
+  return "default";
+}
+
 function detectLevel(text: string): LogLevel {
+  // 1. Keyword-based detection (highest priority)
   for (const { pattern, level } of LEVEL_PATTERNS) {
     if (pattern.test(text)) return level;
   }
+
+  // 2. Tool-specific error prefixes
+  for (const pattern of TOOL_ERROR_PATTERNS) {
+    if (pattern.test(text)) return "error";
+  }
+
+  // 3. HTTP status codes (only when clearly labeled)
+  const httpMatch = text.match(HTTP_STATUS_REGEX);
+  if (httpMatch) {
+    const code = parseInt(httpMatch[1], 10);
+    if (code >= 100 && code <= 599) {
+      const level = classifyHttpStatus(code);
+      if (level !== "default") return level;
+    }
+  }
+
+  // 4. Exit/return codes
+  const exitMatch = text.match(EXIT_CODE_REGEX);
+  if (exitMatch) {
+    const code = parseInt(exitMatch[1], 10);
+    if (code !== 0) return "error";
+  }
+
   return "default";
 }
 

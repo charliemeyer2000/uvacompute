@@ -48,6 +48,14 @@ uva jobs run --gpu pytorch/pytorch:latest python train.py
 uva jobs run ubuntu:22.04 bash -c "apt update && apt install -y curl"
 ```
 
+### passing flags to the container
+
+if the container command has its own flags, use `--` to separate uva flags from container flags:
+
+```bash
+uva jobs run --gpu pytorch/pytorch:latest -- python train.py --epochs 10 --lr 0.001
+```
+
 ## managing jobs
 
 ### list your jobs
@@ -56,17 +64,23 @@ uva jobs run ubuntu:22.04 bash -c "apt update && apt install -y curl"
 uva jobs list
 ```
 
+use `-a` or `--all` to include completed and failed jobs.
+
 ### view job logs
 
 ```bash
 uva jobs logs <job-id>
 ```
 
+use `-t <lines>` or `--tail <lines>` to show only the last N lines. use `--no-follow` to disable log streaming.
+
 ### cancel a running job
 
 ```bash
 uva jobs cancel <job-id>
 ```
+
+use `-f` or `--force` to skip the confirmation prompt.
 
 ## job options
 
@@ -80,3 +94,98 @@ uva jobs cancel <job-id>
 | `-e, --env`   | environment variable (can use multiple times) | `--env KEY=value` |
 | `--expose`    | expose port via HTTPS endpoint                | `--expose 8000`   |
 | `--no-follow` | don't stream logs after job starts            | `--no-follow`     |
+
+## github actions runners
+
+use uvacompute as a self-hosted github actions runner. add `uvacompute` to your workflow's `runs-on` labels and uvacompute automatically provisions an ephemeral runner for each job via webhook.
+
+### 1. create an api key
+
+generate an api key from the cli or the [profile page](https://uvacompute.com/profile). save the key, webhook secret, and webhook url — they are shown once.
+
+```bash
+uva api-key create "GitHub Runners"
+```
+
+### 2. add your github token
+
+on the [profile page](https://uvacompute.com/profile), click **add github token** on your api key and paste a [github personal access token](https://github.com/settings/tokens). the token is validated instantly.
+
+- **classic pat:** select the `repo` scope. works across all your accessible repos and orgs.
+- **fine-grained pat:** select the repos you want, then grant `administration: read and write` permission. only works within a single owner (user or org).
+
+### 3. add a github webhook
+
+go to your repo's **settings > webhooks > add webhook** and configure:
+
+| field        | value                                                         |
+| ------------ | ------------------------------------------------------------- |
+| payload url  | `https://uvacompute.com/api/github/webhook/<your-key-prefix>` |
+| content type | `application/json`                                            |
+| secret       | your webhook secret from step 1                               |
+| events       | select **workflow jobs** only                                 |
+
+### 4. use in your workflow
+
+add the `uvacompute` label to `runs-on`. when the job is queued, a runner is automatically provisioned:
+
+```yaml
+jobs:
+  build:
+    runs-on: [self-hosted, uvacompute]
+    steps:
+      - uses: actions/checkout@v4
+      - run: echo "Running on uvacompute!"
+```
+
+### resource labels
+
+customize runner resources by adding labels to `runs-on`:
+
+| label               | effect                                     |
+| ------------------- | ------------------------------------------ |
+| `uvacompute`        | default runner (4 cpu, 8gb ram, 32gb disk) |
+| `uvacompute-gpu`    | adds 1 gpu                                 |
+| `uvacompute-8cpu`   | set to 8 cpus                              |
+| `uvacompute-16gb`   | set to 16gb ram                            |
+| `uvacompute-64disk` | set to 64gb disk                           |
+
+example with gpu and extra ram:
+
+```yaml
+runs-on: [self-hosted, uvacompute, uvacompute-gpu, uvacompute-32gb]
+```
+
+high-cpu build runner:
+
+```yaml
+runs-on: [self-hosted, uvacompute, uvacompute-8cpu, uvacompute-16gb]
+```
+
+> **note:** runners are ephemeral — each runner picks up one workflow job then exits. for workflows with multiple jobs, each job automatically gets its own runner.
+
+> **tip:** runner containers start from a bare `ubuntu:22.04` image. use `sudo apt-get install` to install system dependencies your workflow needs.
+
+## api keys
+
+manage api keys for github actions runners and webhooks.
+
+### create an api key
+
+```bash
+uva api-key create "my runners"
+```
+
+### list api keys
+
+```bash
+uva api-key list
+```
+
+### revoke an api key
+
+```bash
+uva api-key revoke <key-id>
+```
+
+use `-f` or `--force` to skip the confirmation prompt.

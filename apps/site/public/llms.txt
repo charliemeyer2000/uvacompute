@@ -9,5 +9,6 @@ uvacompute provides gpu-powered virtual machines and container jobs. get an ssh 
 - [getting started](https://uvacompute.com/docs/getting-started.md): install the cli, create an account, and authenticate
 - [virtual machines](https://uvacompute.com/docs/vms.md): create and manage gpu-powered vms
 - [container jobs](https://uvacompute.com/docs/jobs.md): run docker containers on demand
+- [github actions runners](https://uvacompute.com/docs/jobs.md#github-actions-runners): use uvacompute as a self-hosted github actions runner
 - [node management](https://uvacompute.com/docs/nodes.md): contribute your hardware to the network
 - [configuration](https://uvacompute.com/docs/configuration.md): configuration file locations and reference
