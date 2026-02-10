@@ -1259,6 +1259,15 @@ await ctx.runMutation(components.betterAuth.userHelpers.updateUserEarlyAccess, {
 });
 ```
 
+## Documentation
+
+When updating features, CLI commands, or API behavior, **always update both documentation sources**:
+
+1. **UI docs** — React pages at `src/app/[flags]/docs/*/page.tsx` (rendered in the web UI)
+2. **Static markdown docs** — Files at `public/docs/*.md` (served at `uvacompute.com/docs/*.md` for coding agents via `llms.txt`)
+
+These must stay in sync. The `public/llms.txt` file is the entry point that links to all markdown docs.
+
 ## Git & Version Control
 
 Git operations are managed by the user. Focus on writing clean, well-structured code.
