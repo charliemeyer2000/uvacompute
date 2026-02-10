@@ -155,6 +155,20 @@ export default defineSchema({
     .index("by_status", ["status"])
     .index("by_ownerId", ["ownerId"]),
 
+  apiKeys: defineTable({
+    userId: v.string(),
+    keyHash: v.string(),
+    keyPrefix: v.string(),
+    name: v.string(),
+    webhookSecret: v.string(),
+    createdAt: v.number(),
+    lastUsedAt: v.optional(v.number()),
+    revokedAt: v.optional(v.number()),
+  })
+    .index("by_keyHash", ["keyHash"])
+    .index("by_keyPrefix", ["keyPrefix"])
+    .index("by_userId", ["userId"]),
+
   nodeRegistrationTokens: defineTable({
     token: v.string(),
     assignedPort: v.number(),

@@ -8,12 +8,14 @@
  * @module
  */
 
+import type * as apiKeys from "../apiKeys.js";
 import type * as auth from "../auth.js";
 import type * as betterAuth__generated_api from "../betterAuth/_generated/api.js";
 import type * as betterAuth__generated_server from "../betterAuth/_generated/server.js";
 import type * as betterAuth_adapter from "../betterAuth/adapter.js";
 import type * as betterAuth_auth from "../betterAuth/auth.js";
 import type * as betterAuth_userHelpers from "../betterAuth/userHelpers.js";
+import type * as crons from "../crons.js";
 import type * as devAccess from "../devAccess.js";
 import type * as earlyAccess from "../earlyAccess.js";
 import type * as earlyAccessTokens from "../earlyAccessTokens.js";
@@ -42,12 +44,14 @@ import type {
  * ```
  */
 declare const fullApi: ApiFromModules<{
+  apiKeys: typeof apiKeys;
   auth: typeof auth;
   "betterAuth/_generated/api": typeof betterAuth__generated_api;
   "betterAuth/_generated/server": typeof betterAuth__generated_server;
   "betterAuth/adapter": typeof betterAuth_adapter;
   "betterAuth/auth": typeof betterAuth_auth;
   "betterAuth/userHelpers": typeof betterAuth_userHelpers;
+  crons: typeof crons;
   devAccess: typeof devAccess;
   earlyAccess: typeof earlyAccess;
   earlyAccessTokens: typeof earlyAccessTokens;

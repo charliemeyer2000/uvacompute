@@ -8,6 +8,7 @@ import { registerUninstallCommand } from "./src/uninstall";
 import { registerUpgradeCommand } from "./src/upgrade";
 import { registerNodeCommands } from "./src/node";
 import { registerJobCommands } from "./src/jobs";
+import { registerApiKeyCommands } from "./src/api-keys";
 import { checkForUpdate } from "./src/lib/version-check";
 import {
   handleCompletion,
@@ -31,6 +32,7 @@ async function main() {
   registerUpgradeCommand(program);
   registerNodeCommands(program);
   registerJobCommands(program);
+  registerApiKeyCommands(program);
   registerCompletionCommands(program);
 
   await handleCompletion();
