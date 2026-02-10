@@ -109,10 +109,11 @@ async function listApiKeys(): Promise<void> {
 
     console.log();
 
-    const headers = ["NAME", "PREFIX", "CREATED", "LAST USED"];
+    const headers = ["NAME", "PREFIX", "GITHUB", "CREATED", "LAST USED"];
     const rows = data.keys.map((key) => [
       key.name,
       theme.accent(key.keyPrefix),
+      key.hasGithubToken ? theme.success("yes") : theme.muted("no"),
       formatAge(new Date(key.createdAt)),
       key.lastUsedAt
         ? formatAge(new Date(key.lastUsedAt))
