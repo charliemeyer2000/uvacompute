@@ -52,8 +52,9 @@ function buildBootstrapScript(): string {
   return [
     "set -ex",
     "export DEBIAN_FRONTEND=noninteractive",
-    "apt-get update -qq && apt-get install -y -qq curl tar libicu-dev >/dev/null 2>&1",
+    "apt-get update -qq && apt-get install -y -qq curl tar libicu-dev sudo >/dev/null 2>&1",
     "useradd -m runner",
+    'echo "runner ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers',
     "mkdir -p /home/runner/actions-runner",
     "cd /home/runner/actions-runner",
     "ARCH=$(uname -m)",
