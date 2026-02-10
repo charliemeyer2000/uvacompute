@@ -7,7 +7,7 @@ import { api } from "../../../../../../convex/_generated/api";
 const VM_ORCHESTRATION_SERVICE_URL =
   process.env.VM_ORCHESTRATION_SERVICE_URL || "http://localhost:8080";
 
-const RUNNER_VERSION = "2.322.0";
+const RUNNER_VERSION = "2.331.0";
 
 function verifyGitHubWebhook(
   payload: string,
