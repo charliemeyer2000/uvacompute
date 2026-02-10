@@ -6,6 +6,7 @@ export const create = mutation({
   args: {
     userId: v.string(),
     name: v.string(),
+    githubToken: v.optional(v.string()),
   },
   returns: v.object({
     key: v.string(),
@@ -43,6 +44,7 @@ export const create = mutation({
       keyPrefix,
       name: args.name,
       webhookSecret,
+      ...(args.githubToken ? { githubToken: args.githubToken } : {}),
       createdAt: Date.now(),
     });
 
@@ -67,6 +69,7 @@ export const list = query({
         _id: k._id,
         keyPrefix: k.keyPrefix,
         name: k.name,
+        hasGithubToken: !!k.githubToken,
         createdAt: k.createdAt,
         lastUsedAt: k.lastUsedAt,
       }));
@@ -91,6 +94,7 @@ export const listForUser = query({
         _id: k._id,
         keyPrefix: k.keyPrefix,
         name: k.name,
+        hasGithubToken: !!k.githubToken,
         createdAt: k.createdAt,
         lastUsedAt: k.lastUsedAt,
       }));
@@ -149,7 +153,46 @@ export const validateByPrefix = query({
       _id: key._id,
       userId: key.userId,
       webhookSecret: key.webhookSecret,
+      githubToken: key.githubToken,
     };
+  },
+});
+
+export const updateGithubToken = mutation({
+  args: {
+    userId: v.string(),
+    keyId: v.id("apiKeys"),
+    githubToken: v.string(),
+  },
+  returns: v.object({ success: v.boolean() }),
+  handler: async (ctx, args) => {
+    const key = await ctx.db.get(args.keyId);
+    if (!key) throw new Error("API key not found");
+    if (key.userId !== args.userId) throw new Error("Unauthorized");
+    if (key.revokedAt) throw new Error("API key is revoked");
+
+    await ctx.db.patch(args.keyId, { githubToken: args.githubToken });
+    return { success: true };
+  },
+});
+
+export const updateGithubTokenForUser = mutation({
+  args: {
+    keyId: v.id("apiKeys"),
+    githubToken: v.string(),
+  },
+  returns: v.object({ success: v.boolean() }),
+  handler: async (ctx, args) => {
+    const user = await authComponent.getAuthUser(ctx);
+    if (!user) throw new Error("Unauthenticated");
+
+    const key = await ctx.db.get(args.keyId);
+    if (!key) throw new Error("API key not found");
+    if (key.userId !== user._id) throw new Error("Unauthorized");
+    if (key.revokedAt) throw new Error("API key is revoked");
+
+    await ctx.db.patch(args.keyId, { githubToken: args.githubToken });
+    return { success: true };
   },
 });
 

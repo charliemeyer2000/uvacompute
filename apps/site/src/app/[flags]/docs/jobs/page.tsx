@@ -184,6 +184,49 @@ export default function JobsDocsPage() {
               <div className="flex items-center gap-3 mb-2">
                 <span className="text-2xl font-semibold text-black">2</span>
                 <h4 className="text-lg font-semibold text-black">
+                  add your github token
+                </h4>
+              </div>
+              <div className="pl-9">
+                <p className="text-sm text-gray-600 mb-3">
+                  on the{" "}
+                  <a href="/profile" className="text-orange-accent underline">
+                    profile page
+                  </a>
+                  , click <strong>add github token</strong> on your api key and
+                  paste a{" "}
+                  <a
+                    href="https://github.com/settings/tokens"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-orange-accent underline"
+                  >
+                    github personal access token
+                  </a>
+                  . the token is validated instantly.
+                </p>
+                <div className="bg-gray-50 border border-gray-200 p-3 text-sm text-gray-600 space-y-1">
+                  <p>
+                    <strong>classic pat:</strong> select the{" "}
+                    <code className="bg-gray-100 px-1">repo</code> scope. works
+                    across all your accessible repos and orgs.
+                  </p>
+                  <p>
+                    <strong>fine-grained pat:</strong> select the repos you
+                    want, then grant{" "}
+                    <code className="bg-gray-100 px-1">
+                      administration: read and write
+                    </code>{" "}
+                    permission. only works within a single owner (user or org).
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <div className="flex items-center gap-3 mb-2">
+                <span className="text-2xl font-semibold text-black">3</span>
+                <h4 className="text-lg font-semibold text-black">
                   add a github webhook
                 </h4>
               </div>
@@ -236,7 +279,7 @@ export default function JobsDocsPage() {
 
             <div>
               <div className="flex items-center gap-3 mb-2">
-                <span className="text-2xl font-semibold text-black">3</span>
+                <span className="text-2xl font-semibold text-black">4</span>
                 <h4 className="text-lg font-semibold text-black">
                   use in your workflow
                 </h4>

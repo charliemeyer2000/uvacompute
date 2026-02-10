@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { authClient } from "@/lib/auth-client";
+import { validateGithubToken } from "@/lib/github-token";
 import { fetchMutation, fetchQuery } from "convex/nextjs";
 import { api } from "../../../../convex/_generated/api";
 
@@ -49,13 +50,40 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const name = body.name || "Unnamed Key";
+    const githubToken = body.githubToken as string | undefined;
+
+    let tokenValidation;
+    if (githubToken) {
+      tokenValidation = await validateGithubToken(githubToken);
+      if (!tokenValidation.valid) {
+        return NextResponse.json(
+          { error: tokenValidation.error },
+          { status: 400 },
+        );
+      }
+    }
 
     const result = await fetchMutation(api.apiKeys.create, {
       userId: session.user.id,
       name,
+      ...(githubToken ? { githubToken } : {}),
     });
 
-    return NextResponse.json(result, { status: 201 });
+    return NextResponse.json(
+      {
+        ...result,
+        ...(tokenValidation
+          ? {
+              githubTokenStatus: {
+                valid: true,
+                username: tokenValidation.username,
+                tokenType: tokenValidation.tokenType,
+              },
+            }
+          : {}),
+      },
+      { status: 201 },
+    );
   } catch (error: any) {
     console.error("Error creating API key:", error);
     return NextResponse.json(

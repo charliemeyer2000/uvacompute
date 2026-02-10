@@ -161,6 +161,7 @@ export default defineSchema({
     keyPrefix: v.string(),
     name: v.string(),
     webhookSecret: v.string(),
+    githubToken: v.optional(v.string()),
     createdAt: v.number(),
     lastUsedAt: v.optional(v.number()),
     revokedAt: v.optional(v.number()),

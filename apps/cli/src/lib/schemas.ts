@@ -233,6 +233,7 @@ export const ApiKeySchema = z.object({
   _id: z.string(),
   keyPrefix: z.string(),
   name: z.string(),
+  hasGithubToken: z.boolean().optional().default(false),
   createdAt: z.number(),
   lastUsedAt: z.number().optional(),
 });
