@@ -137,13 +137,18 @@ export async function POST(
     { labels, resources },
   );
 
-  // Generate JIT runner config via GitHub API
-  const githubToken = process.env.GITHUB_RUNNER_PAT;
+  // Use per-key GitHub token for JIT runner config
+  const githubToken = apiKey.githubToken;
   if (!githubToken) {
-    console.error("GITHUB_RUNNER_PAT not configured");
+    console.error(
+      `[github-webhook] No GitHub token configured for key ${keyPrefix}`,
+    );
     return NextResponse.json(
-      { error: "Runner PAT not configured" },
-      { status: 500 },
+      {
+        error:
+          "GitHub token not configured for this API key. Add one at uvacompute.com/profile.",
+      },
+      { status: 400 },
     );
   }
 
@@ -170,6 +175,18 @@ export async function POST(
       `[github-webhook] JIT config failed: ${jitResponse.status}`,
       errText,
     );
+
+    if (jitResponse.status === 403 || jitResponse.status === 404) {
+      return NextResponse.json(
+        {
+          error:
+            "GitHub token lacks permission for this repo. Ensure your token has the 'repo' scope (classic PAT) or 'Administration: Read and write' permission (fine-grained PAT) for this repository.",
+          details: errText,
+        },
+        { status: 403 },
+      );
+    }
+
     return NextResponse.json(
       { error: "Failed to generate JIT config", details: errText },
       { status: 500 },

@@ -93,13 +93,16 @@ Use uvacompute as a self-hosted GitHub Actions runner. Add `uvacompute` to your 
 
 ### Setup
 
-1. Create an API key: `uva api-key create "GitHub Runners"`
-2. Add a webhook to your GitHub repo (Settings → Webhooks → Add webhook):
+1. Create an API key: `uva api-key create "GitHub Runners"` or via the [profile page](https://uvacompute.com/profile)
+2. Add your GitHub token on the [profile page](https://uvacompute.com/profile) — click "add github token" on your key
+   - **Classic PAT:** select the `repo` scope (works across all your accessible repos and orgs)
+   - **Fine-grained PAT:** select repos, grant `Administration: Read and write` (single owner only)
+3. Add a webhook to your GitHub repo (Settings → Webhooks → Add webhook):
    - **Payload URL:** `https://uvacompute.com/api/github/webhook/<your-key-prefix>`
    - **Content type:** `application/json`
    - **Secret:** your webhook secret from step 1
    - **Events:** select "Workflow jobs" only
-3. Use `uvacompute` in your workflow's `runs-on`
+4. Use `uvacompute` in your workflow's `runs-on`
 
 ### Workflow Configuration
 

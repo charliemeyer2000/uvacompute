@@ -4,7 +4,16 @@ import { useState } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../../../convex/_generated/api";
 import { authClient } from "@/lib/auth-client";
-import { CheckCircle, Plus, Copy, Check, X, Key } from "lucide-react";
+import {
+  CheckCircle,
+  Plus,
+  Copy,
+  Check,
+  X,
+  Key,
+  Github,
+  Loader2,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
@@ -21,14 +30,30 @@ export default function ProfilePage() {
 
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [newKeyName, setNewKeyName] = useState("");
+  const [newGithubToken, setNewGithubToken] = useState("");
   const [isCreating, setIsCreating] = useState(false);
   const [createdKey, setCreatedKey] = useState<{
     key: string;
     keyPrefix: string;
     webhookSecret: string;
+    githubTokenStatus?: {
+      valid: boolean;
+      username: string;
+      tokenType: string;
+    };
   } | null>(null);
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [confirmingRevoke, setConfirmingRevoke] = useState<string | null>(null);
+  const [editingTokenKeyId, setEditingTokenKeyId] = useState<string | null>(
+    null,
+  );
+  const [editGithubToken, setEditGithubToken] = useState("");
+  const [isUpdatingToken, setIsUpdatingToken] = useState(false);
+  const [tokenUpdateResult, setTokenUpdateResult] = useState<{
+    keyId: string;
+    username: string;
+    tokenType: string;
+  } | null>(null);
 
   const getInitials = (name?: string) => {
     if (!name) return "??";
@@ -45,7 +70,12 @@ export default function ProfilePage() {
       const res = await fetch("/api/api-keys", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: newKeyName || "Unnamed Key" }),
+        body: JSON.stringify({
+          name: newKeyName || "Unnamed Key",
+          ...(newGithubToken.trim()
+            ? { githubToken: newGithubToken.trim() }
+            : {}),
+        }),
       });
       if (!res.ok) {
         const err = await res.json();
@@ -55,6 +85,7 @@ export default function ProfilePage() {
       setCreatedKey(data);
       setShowCreateForm(false);
       setNewKeyName("");
+      setNewGithubToken("");
       toast.success("api key created");
     } catch (error) {
       toast.error("failed to create api key", {
@@ -62,6 +93,37 @@ export default function ProfilePage() {
       });
     } finally {
       setIsCreating(false);
+    }
+  };
+
+  const handleUpdateToken = async (keyId: string) => {
+    setIsUpdatingToken(true);
+    try {
+      const res = await fetch(`/api/api-keys/${keyId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ githubToken: editGithubToken.trim() }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Failed to update GitHub token");
+      }
+      const data = await res.json();
+      setEditingTokenKeyId(null);
+      setEditGithubToken("");
+      setTokenUpdateResult({
+        keyId,
+        username: data.githubTokenStatus.username,
+        tokenType: data.githubTokenStatus.tokenType,
+      });
+      setTimeout(() => setTokenUpdateResult(null), 5000);
+      toast.success("github token updated");
+    } catch (error) {
+      toast.error("failed to update github token", {
+        description: error instanceof Error ? error.message : "unknown error",
+      });
+    } finally {
+      setIsUpdatingToken(false);
     }
   };
 
@@ -230,32 +292,65 @@ export default function ProfilePage() {
         {/* Create Form */}
         {showCreateForm && (
           <div className="border border-gray-200 p-4 mb-4">
-            <div className="flex gap-2">
-              <Input
-                placeholder="key name (e.g. github runners)"
-                value={newKeyName}
-                onChange={(e) => setNewKeyName(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") handleCreateKey();
-                  if (e.key === "Escape") {
+            <div className="space-y-3">
+              <div className="flex gap-2">
+                <Input
+                  placeholder="key name (e.g. github runners)"
+                  value={newKeyName}
+                  onChange={(e) => setNewKeyName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) handleCreateKey();
+                    if (e.key === "Escape") {
+                      setShowCreateForm(false);
+                      setNewKeyName("");
+                      setNewGithubToken("");
+                    }
+                  }}
+                  autoFocus
+                />
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  onClick={() => {
                     setShowCreateForm(false);
                     setNewKeyName("");
-                  }
-                }}
-                autoFocus
-              />
+                    setNewGithubToken("");
+                  }}
+                >
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">
+                  github token{" "}
+                  <span className="text-gray-400">
+                    (optional — required for github actions runners)
+                  </span>
+                </label>
+                <Input
+                  type="password"
+                  placeholder="ghp_... or github_pat_..."
+                  value={newGithubToken}
+                  onChange={(e) => setNewGithubToken(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleCreateKey();
+                    if (e.key === "Escape") {
+                      setShowCreateForm(false);
+                      setNewKeyName("");
+                      setNewGithubToken("");
+                    }
+                  }}
+                />
+              </div>
               <Button onClick={handleCreateKey} disabled={isCreating} size="sm">
-                {isCreating ? "creating..." : "create"}
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                onClick={() => {
-                  setShowCreateForm(false);
-                  setNewKeyName("");
-                }}
-              >
-                <X className="w-4 h-4" />
+                {isCreating ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    creating...
+                  </>
+                ) : (
+                  "create"
+                )}
               </Button>
             </div>
           </div>
@@ -348,6 +443,15 @@ export default function ProfilePage() {
                   </Button>
                 </div>
               </div>
+              {createdKey.githubTokenStatus && (
+                <div className="flex items-center gap-2 pt-1">
+                  <Github className="w-3.5 h-3.5 text-green-600" />
+                  <span className="text-xs text-green-600">
+                    token verified — {createdKey.githubTokenStatus.username} (
+                    {createdKey.githubTokenStatus.tokenType})
+                  </span>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -366,67 +470,150 @@ export default function ProfilePage() {
         ) : (
           <div className="divide-y divide-gray-100">
             {apiKeys.map((key) => (
-              <div
-                key={key._id}
-                className="flex items-center justify-between py-3 first:pt-0 last:pb-0"
-              >
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm text-black font-medium truncate">
-                      {key.name}
-                    </span>
-                    <span className="text-xs font-mono text-gray-400">
-                      {key.keyPrefix}****
-                    </span>
-                  </div>
-                  <div className="flex gap-3 mt-0.5">
-                    <span className="text-xs text-gray-400">
-                      created{" "}
-                      {new Date(key.createdAt).toLocaleDateString("en-US", {
-                        month: "short",
-                        day: "numeric",
-                        year: "numeric",
-                      })}
-                    </span>
-                    {key.lastUsedAt && (
+              <div key={key._id} className="py-3 first:pt-0 last:pb-0">
+                <div className="flex items-center justify-between">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-black font-medium truncate">
+                        {key.name}
+                      </span>
+                      <span className="text-xs font-mono text-gray-400">
+                        {key.keyPrefix}****
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3 mt-0.5 flex-wrap">
                       <span className="text-xs text-gray-400">
-                        last used{" "}
-                        {new Date(key.lastUsedAt).toLocaleDateString("en-US", {
+                        created{" "}
+                        {new Date(key.createdAt).toLocaleDateString("en-US", {
                           month: "short",
                           day: "numeric",
                           year: "numeric",
                         })}
                       </span>
+                      {key.lastUsedAt && (
+                        <span className="text-xs text-gray-400">
+                          last used{" "}
+                          {new Date(key.lastUsedAt).toLocaleDateString(
+                            "en-US",
+                            {
+                              month: "short",
+                              day: "numeric",
+                              year: "numeric",
+                            },
+                          )}
+                        </span>
+                      )}
+                      {key.hasGithubToken ? (
+                        <span className="flex items-center gap-1 text-xs text-green-600">
+                          <Github className="w-3 h-3" />
+                          token set
+                        </span>
+                      ) : (
+                        <button
+                          className="flex items-center gap-1 text-xs text-gray-400 hover:text-orange-accent transition-colors"
+                          onClick={() => {
+                            setEditingTokenKeyId(key._id);
+                            setEditGithubToken("");
+                          }}
+                        >
+                          <Github className="w-3 h-3" />
+                          add github token
+                        </button>
+                      )}
+                      {tokenUpdateResult?.keyId === key._id && (
+                        <span className="flex items-center gap-1 text-xs text-green-600">
+                          <Check className="w-3 h-3" />
+                          verified — {tokenUpdateResult.username}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    {key.hasGithubToken && editingTokenKeyId !== key._id && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-gray-400 hover:text-black"
+                        onClick={() => {
+                          setEditingTokenKeyId(key._id);
+                          setEditGithubToken("");
+                        }}
+                      >
+                        update token
+                      </Button>
+                    )}
+                    {confirmingRevoke === key._id ? (
+                      <>
+                        <span className="text-xs text-red-600 mr-1">
+                          revoke?
+                        </span>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => handleRevoke(key._id)}
+                        >
+                          yes
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setConfirmingRevoke(null)}
+                        >
+                          no
+                        </Button>
+                      </>
+                    ) : (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-gray-400 hover:text-red-600"
+                        onClick={() => setConfirmingRevoke(key._id)}
+                      >
+                        revoke
+                      </Button>
                     )}
                   </div>
                 </div>
-                {confirmingRevoke === key._id ? (
-                  <div className="flex items-center gap-1">
-                    <span className="text-xs text-red-600 mr-1">revoke?</span>
+                {editingTokenKeyId === key._id && (
+                  <div className="mt-2 flex gap-2 items-center">
+                    <Input
+                      type="password"
+                      placeholder="ghp_... or github_pat_..."
+                      value={editGithubToken}
+                      onChange={(e) => setEditGithubToken(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && editGithubToken.trim())
+                          handleUpdateToken(key._id);
+                        if (e.key === "Escape") {
+                          setEditingTokenKeyId(null);
+                          setEditGithubToken("");
+                        }
+                      }}
+                      autoFocus
+                      className="flex-1"
+                    />
                     <Button
-                      variant="destructive"
                       size="sm"
-                      onClick={() => handleRevoke(key._id)}
+                      disabled={!editGithubToken.trim() || isUpdatingToken}
+                      onClick={() => handleUpdateToken(key._id)}
                     >
-                      yes
+                      {isUpdatingToken ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        "save"
+                      )}
                     </Button>
                     <Button
                       variant="ghost"
-                      size="sm"
-                      onClick={() => setConfirmingRevoke(null)}
+                      size="icon-sm"
+                      onClick={() => {
+                        setEditingTokenKeyId(null);
+                        setEditGithubToken("");
+                      }}
                     >
-                      no
+                      <X className="w-4 h-4" />
                     </Button>
                   </div>
-                ) : (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-gray-400 hover:text-red-600"
-                    onClick={() => setConfirmingRevoke(key._id)}
-                  >
-                    revoke
-                  </Button>
                 )}
               </div>
             ))}
