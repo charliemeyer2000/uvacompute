@@ -419,6 +419,101 @@ export default function JobsDocsPage() {
         </div>
       </section>
 
+      <section id="vllm-inference-server">
+        <h3 className="text-lg font-semibold mb-4">vllm inference server</h3>
+        <p className="text-gray-600 mb-4">
+          run a vLLM inference server on a GPU with an HTTPS endpoint. this
+          gives you an OpenAI-compatible API for any open-source language model.
+        </p>
+
+        <div className="space-y-4">
+          <div>
+            <h4 className="font-medium mb-2">start a vllm server</h4>
+            <CodeBlock>
+              <pre className="text-sm text-black whitespace-pre">{`uva jobs run -g -c 4 -r 32 --expose 8000 -n vllm-server \\
+  vllm/vllm-openai:latest \\
+  -- vllm serve Qwen/Qwen2.5-7B-Instruct \\
+    --host 0.0.0.0 \\
+    --port 8000 \\
+    --max-model-len 4096`}</pre>
+            </CodeBlock>
+            <p className="text-sm text-gray-500 mt-2">
+              this will output an endpoint URL like{" "}
+              <code className="bg-gray-100 px-1">
+                https://abc123.uvacompute.com
+              </code>
+            </p>
+          </div>
+
+          <div>
+            <h4 className="font-medium mb-2">test the endpoint</h4>
+            <p className="text-sm text-gray-600 mb-3">
+              once the server is running (watch logs for &quot;Application
+              startup complete&quot;), test with curl:
+            </p>
+            <CodeBlock className="space-y-2">
+              <code className="text-sm text-black block">
+                curl https://YOUR_ENDPOINT.uvacompute.com/health
+              </code>
+              <code className="text-sm text-gray-500 block">
+                curl https://YOUR_ENDPOINT.uvacompute.com/v1/models
+              </code>
+            </CodeBlock>
+            <p className="text-sm text-gray-600 mt-3 mb-3">
+              send a chat completion request:
+            </p>
+            <CodeBlock>
+              <pre className="text-sm text-black whitespace-pre">{`curl https://YOUR_ENDPOINT.uvacompute.com/v1/chat/completions \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "model": "Qwen/Qwen2.5-7B-Instruct",
+    "messages": [{"role": "user", "content": "Hello!"}],
+    "max_tokens": 100
+  }'`}</pre>
+            </CodeBlock>
+          </div>
+
+          <div>
+            <h4 className="font-medium mb-2">alternative models</h4>
+            <CodeBlock className="space-y-2">
+              <pre className="text-sm text-black whitespace-pre">{`# Mistral 7B
+uva jobs run -g -c 4 -r 32 --expose 8000 -n mistral-server \\
+  vllm/vllm-openai:latest \\
+  -- vllm serve mistralai/Mistral-7B-Instruct-v0.3 \\
+    --host 0.0.0.0 --port 8000`}</pre>
+              <pre className="text-sm text-gray-500 whitespace-pre">{`# Llama 3.1 8B (requires HuggingFace token)
+uva jobs run -g -c 4 -r 32 --expose 8000 -n llama-server \\
+  -e HF_TOKEN=your_huggingface_token \\
+  vllm/vllm-openai:latest \\
+  -- vllm serve meta-llama/Llama-3.1-8B-Instruct \\
+    --host 0.0.0.0 --port 8000`}</pre>
+            </CodeBlock>
+          </div>
+
+          <div className="bg-gray-50 border border-gray-200 p-4 space-y-2">
+            <p className="text-sm text-gray-600">
+              <strong>model download:</strong> first run downloads the model
+              from HuggingFace (~15GB for 7B models). this can take 10-15
+              minutes. watch logs for progress.
+            </p>
+            <p className="text-sm text-gray-600">
+              <strong>server startup:</strong> after model loads, vLLM captures
+              CUDA graphs. look for &quot;Application startup complete&quot; in
+              logs before sending requests.
+            </p>
+            <p className="text-sm text-gray-600">
+              <strong>memory:</strong> a 7B model uses ~14GB VRAM in bfloat16.
+              the 5090&apos;s 32GB leaves plenty of room for KV cache and
+              concurrent requests.
+            </p>
+            <p className="text-sm text-gray-600">
+              <strong>multiple users:</strong> vLLM handles concurrent requests
+              automatically with continuous batching.
+            </p>
+          </div>
+        </div>
+      </section>
+
       <section id="job-options">
         <h3 className="text-lg font-semibold mb-4">job options</h3>
         <div className="overflow-x-auto">
