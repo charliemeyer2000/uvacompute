@@ -56,6 +56,50 @@ if the container command has its own flags, use `--` to separate uva flags from 
 uva jobs run --gpu pytorch/pytorch:latest -- python train.py --epochs 10 --lr 0.001
 ```
 
+### run a vllm inference server with https endpoint
+
+spin up an OpenAI-compatible API for any open-source model using `--expose` to get an HTTPS endpoint:
+
+```bash
+uva jobs run -g -c 4 -r 32 --expose 8000 -n vllm-server \
+  vllm/vllm-openai:latest \
+  -- vllm serve Qwen/Qwen2.5-7B-Instruct \
+    --host 0.0.0.0 \
+    --port 8000 \
+    --max-model-len 4096
+```
+
+this outputs an endpoint URL like `https://abc123.uvacompute.com`. once logs show "Application startup complete", query it:
+
+```bash
+curl https://YOUR_ENDPOINT.uvacompute.com/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "Qwen/Qwen2.5-7B-Instruct",
+    "messages": [{"role": "user", "content": "Hello!"}],
+    "max_tokens": 100
+  }'
+```
+
+other models that work on a single GPU:
+
+```bash
+# Mistral 7B
+uva jobs run -g -c 4 -r 32 --expose 8000 -n mistral-server \
+  vllm/vllm-openai:latest \
+  -- vllm serve mistralai/Mistral-7B-Instruct-v0.3 \
+    --host 0.0.0.0 --port 8000
+
+# Llama 3.1 8B (requires HuggingFace token)
+uva jobs run -g -c 4 -r 32 --expose 8000 -n llama-server \
+  -e HF_TOKEN=your_huggingface_token \
+  vllm/vllm-openai:latest \
+  -- vllm serve meta-llama/Llama-3.1-8B-Instruct \
+    --host 0.0.0.0 --port 8000
+```
+
+> **tip:** first run downloads ~15GB from HuggingFace (10-15 min). a 7B model uses ~14GB VRAM — the 5090's 32GB handles concurrent requests easily via continuous batching.
+
 ## managing jobs
 
 ### list your jobs
@@ -165,76 +209,6 @@ runs-on: [self-hosted, uvacompute, uvacompute-8cpu, uvacompute-16gb]
 > **note:** runners are ephemeral — each runner picks up one workflow job then exits. for workflows with multiple jobs, each job automatically gets its own runner.
 
 > **tip:** runner containers start from a bare `ubuntu:22.04` image. use `sudo apt-get install` to install system dependencies your workflow needs.
-
-## vllm inference server
-
-run a vLLM inference server on a GPU with an HTTPS endpoint. this gives you an OpenAI-compatible API for any open-source language model.
-
-### start a vllm server
-
-```bash
-uva jobs run -g -c 4 -r 32 --expose 8000 -n vllm-server \
-  vllm/vllm-openai:latest \
-  -- vllm serve Qwen/Qwen2.5-7B-Instruct \
-    --host 0.0.0.0 \
-    --port 8000 \
-    --max-model-len 4096
-```
-
-this will output an endpoint URL like:
-
-```
-Endpoint    https://abc123.uvacompute.com
-```
-
-### test the endpoint
-
-once the server is running (watch logs for "Application startup complete"), test with curl:
-
-```bash
-# health check
-curl https://YOUR_ENDPOINT.uvacompute.com/health
-
-# list models
-curl https://YOUR_ENDPOINT.uvacompute.com/v1/models
-
-# chat completion
-curl https://YOUR_ENDPOINT.uvacompute.com/v1/chat/completions \
-  -H "Content-Type: application/json" \
-  -d '{
-    "model": "Qwen/Qwen2.5-7B-Instruct",
-    "messages": [{"role": "user", "content": "Hello! What can you help me with?"}],
-    "max_tokens": 100
-  }'
-```
-
-### alternative models
-
-other models that work well on a single GPU:
-
-```bash
-# Mistral 7B
-uva jobs run -g -c 4 -r 32 --expose 8000 -n mistral-server \
-  vllm/vllm-openai:latest \
-  -- vllm serve mistralai/Mistral-7B-Instruct-v0.3 \
-    --host 0.0.0.0 \
-    --port 8000
-
-# Llama 3.1 8B (requires HuggingFace token)
-uva jobs run -g -c 4 -r 32 --expose 8000 -n llama-server \
-  -e HF_TOKEN=your_huggingface_token \
-  vllm/vllm-openai:latest \
-  -- vllm serve meta-llama/Llama-3.1-8B-Instruct \
-    --host 0.0.0.0 \
-    --port 8000
-```
-
-### tips
-
-- **model download**: first run downloads the model from HuggingFace (~15GB for 7B models). this can take 10-15 minutes. watch logs for progress.
-- **server startup**: after model loads, vLLM captures CUDA graphs. look for "Application startup complete" in logs before sending requests.
-- **memory**: a 7B model uses ~14GB VRAM in bfloat16. the 5090's 32GB leaves plenty of room for KV cache and concurrent requests.
-- **multiple users**: vLLM handles concurrent requests automatically with continuous batching.
 
 ## api keys
 
