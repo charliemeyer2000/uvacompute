@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { authClient } from "@/lib/auth-client";
-import { usePreloadedQuery, Preloaded } from "convex/react";
+import { useQuery } from "convex/react";
 import { api } from "../../../../../convex/_generated/api";
 import { Button } from "@/components/ui/button";
 import { NavLink } from "@/components/nav-link";
@@ -71,22 +71,19 @@ const docNavItems = [
   },
 ];
 
-function UserGreeting({
-  preloadedUser,
-}: {
-  preloadedUser: Preloaded<typeof api.auth.getCurrentUser>;
-}) {
-  const user = usePreloadedQuery(preloadedUser);
+function UserGreeting() {
+  const { data: session } = authClient.useSession();
+  const user = useQuery(api.auth.getCurrentUser, session?.user ? {} : "skip");
   const firstName = user?.name ? user.name.split(" ")[0].toLowerCase() : "";
   return firstName ? <span className="text-black">, {firstName}</span> : null;
 }
 
-function AdminLink({
-  preloadedDevAccess,
-}: {
-  preloadedDevAccess: Preloaded<typeof api.devAccess.hasDevAccess>;
-}) {
-  const hasDevAccess = usePreloadedQuery(preloadedDevAccess);
+function AdminLink() {
+  const { data: session } = authClient.useSession();
+  const hasDevAccess = useQuery(
+    api.devAccess.hasDevAccess,
+    session?.user ? {} : "skip",
+  );
   if (!hasDevAccess) return null;
   return (
     <NavLink href="/admin" isActive={false}>
@@ -95,23 +92,13 @@ function AdminLink({
   );
 }
 
-type DocsLayoutClientProps = {
+export default function DocsLayoutClient({
+  children,
+}: {
   children: React.ReactNode;
-} & (
-  | {
-      isLoggedIn: true;
-      preloadedUser: Preloaded<typeof api.auth.getCurrentUser>;
-      preloadedDevAccess: Preloaded<typeof api.devAccess.hasDevAccess>;
-    }
-  | {
-      isLoggedIn: false;
-      preloadedUser?: never;
-      preloadedDevAccess?: never;
-    }
-);
-
-export default function DocsLayoutClient(props: DocsLayoutClientProps) {
-  const { children, isLoggedIn } = props;
+}) {
+  const { data: session, isPending } = authClient.useSession();
+  const isLoggedIn = !isPending && !!session?.user;
   const pathname = usePathname();
   const router = useRouter();
 
@@ -148,12 +135,12 @@ export default function DocsLayoutClient(props: DocsLayoutClientProps) {
             >
               uvacompute
             </Link>
-            {isLoggedIn ? (
+            {isPending ? (
+              <div className="h-4 w-20 bg-gray-100 animate-pulse rounded" />
+            ) : isLoggedIn ? (
               <div className="text-sm text-gray-500">
                 welcome back
-                {props.preloadedUser ? (
-                  <UserGreeting preloadedUser={props.preloadedUser} />
-                ) : null}
+                <UserGreeting />
               </div>
             ) : (
               <div className="flex items-center gap-4">
@@ -211,9 +198,7 @@ export default function DocsLayoutClient(props: DocsLayoutClientProps) {
                   <NavLink href="/profile" isActive={false}>
                     profile
                   </NavLink>
-                  {props.preloadedDevAccess && (
-                    <AdminLink preloadedDevAccess={props.preloadedDevAccess} />
-                  )}
+                  <AdminLink />
                   <Button
                     variant="ghost"
                     size="sm"
