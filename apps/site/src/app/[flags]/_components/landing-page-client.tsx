@@ -2,16 +2,17 @@
 
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { usePreloadedQuery, Preloaded } from "convex/react";
+import { authClient } from "@/lib/auth-client";
+import { useQuery } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import { FooterStatus } from "@/components/footer-status";
 
-function EarlyAccessGate({
-  preloadedEarlyAccess,
-}: {
-  preloadedEarlyAccess: Preloaded<typeof api.earlyAccess.hasEarlyAccess>;
-}) {
-  const hasEarlyAccess = usePreloadedQuery(preloadedEarlyAccess);
+function EarlyAccessGate() {
+  const { data: session } = authClient.useSession();
+  const hasEarlyAccess = useQuery(
+    api.earlyAccess.hasEarlyAccess,
+    session?.user ? {} : "skip",
+  );
 
   if (hasEarlyAccess !== false) return null;
 
@@ -31,18 +32,9 @@ function EarlyAccessGate({
   );
 }
 
-type LandingPageClientProps =
-  | {
-      isLoggedIn: true;
-      preloadedEarlyAccess: Preloaded<typeof api.earlyAccess.hasEarlyAccess>;
-    }
-  | {
-      isLoggedIn: false;
-      preloadedEarlyAccess?: never;
-    };
-
-export default function LandingPageClient(props: LandingPageClientProps) {
-  const { isLoggedIn } = props;
+export default function LandingPageClient() {
+  const { data: session, isPending } = authClient.useSession();
+  const isLoggedIn = !isPending && !!session?.user;
 
   return (
     <main className="max-w-3xl mx-auto px-8 py-8 min-h-screen font-mono">
@@ -99,7 +91,9 @@ export default function LandingPageClient(props: LandingPageClientProps) {
           .
         </p>
 
-        {!isLoggedIn ? (
+        {isLoggedIn ? (
+          <EarlyAccessGate />
+        ) : (
           <>
             <h2 className="text-xl font-semibold mt-8 mb-4 text-black">
               access
@@ -114,8 +108,6 @@ export default function LandingPageClient(props: LandingPageClientProps) {
               </Button>
             </div>
           </>
-        ) : (
-          <EarlyAccessGate preloadedEarlyAccess={props.preloadedEarlyAccess} />
         )}
 
         <footer className="mt-16 pt-4 border-t border-gray-200">
