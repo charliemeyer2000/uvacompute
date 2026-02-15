@@ -700,6 +700,8 @@ generate_gpu_scripts() {
     local audio_devid="${GPU_AUDIO_DEVICE_ID:-}"
     local node_id
     node_id=$(hostname)
+    local tunnel_host="${TUNNEL_HOST}"
+    local ssh_key="${SSH_KEY_PATH}"
 
     # gpu-mode-nvidia script
     cat > /usr/local/bin/gpu-mode-nvidia <<SCRIPT
@@ -712,6 +714,8 @@ GPU_PCI="${gpu_pci}"
 AUDIO_PCI="${audio_pci}"
 NODE_ID="${node_id}"
 SITE_URL="${SITE_URL}"
+HUB_HOST="${tunnel_host}"
+SSH_KEY="${ssh_key}"
 NODE_SECRET_FILE="/etc/uvacompute/node-secret"
 LEGACY_SECRET_FILE="/etc/uvacompute/orchestration-secret"
 
@@ -830,6 +834,19 @@ report_gpu_mode() {
         }
     fi
     return 0
+}
+
+# Helper: Update Kubernetes node label (try local kubectl, fall back to SSH to hub)
+update_k8s_label() {
+    local mode="\$1"
+    kubectl label node \$(hostname) uvacompute.com/gpu-mode=\${mode} --overwrite 2>/dev/null && return 0
+    if [[ -n "\${HUB_HOST}" ]] && [[ -f "\${SSH_KEY}" ]]; then
+        ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -i "\${SSH_KEY}" \
+            "root@\${HUB_HOST}" \
+            "kubectl label node \${NODE_ID} uvacompute.com/gpu-mode=\${mode} --overwrite" 2>/dev/null && return 0
+    fi
+    echo "Warning: Could not update Kubernetes label"
+    return 1
 }
 
 echo "Checking for active GPU workloads..."
@@ -869,9 +886,7 @@ sleep 2
 if nvidia-smi > /dev/null 2>&1; then
     echo "✓ GPU is now in nvidia mode"
     nvidia-smi --query-gpu=name,driver_version --format=csv,noheader
-    # Update Kubernetes label
-    kubectl label node \$(hostname) uvacompute.com/gpu-mode=nvidia --overwrite 2>/dev/null || \
-        echo "Note: Could not update Kubernetes label (kubectl may not be configured)"
+    update_k8s_label "nvidia"
     report_gpu_mode "nvidia" "true"
 else
     echo "✗ Failed to switch to nvidia mode"
@@ -894,6 +909,8 @@ GPU_DEVID="${gpu_devid}"
 AUDIO_DEVID="${audio_devid}"
 NODE_ID="${node_id}"
 SITE_URL="${SITE_URL}"
+HUB_HOST="${tunnel_host}"
+SSH_KEY="${ssh_key}"
 NODE_SECRET_FILE="/etc/uvacompute/node-secret"
 LEGACY_SECRET_FILE="/etc/uvacompute/orchestration-secret"
 
@@ -1014,6 +1031,19 @@ report_gpu_mode() {
     return 0
 }
 
+# Helper: Update Kubernetes node label (try local kubectl, fall back to SSH to hub)
+update_k8s_label() {
+    local mode="\$1"
+    kubectl label node \$(hostname) uvacompute.com/gpu-mode=\${mode} --overwrite 2>/dev/null && return 0
+    if [[ -n "\${HUB_HOST}" ]] && [[ -f "\${SSH_KEY}" ]]; then
+        ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -i "\${SSH_KEY}" \
+            "root@\${HUB_HOST}" \
+            "kubectl label node \${NODE_ID} uvacompute.com/gpu-mode=\${mode} --overwrite" 2>/dev/null && return 0
+    fi
+    echo "Warning: Could not update Kubernetes label"
+    return 1
+}
+
 echo "Checking for active GPU workloads..."
 check_gpu_workloads || exit 1
 
@@ -1038,10 +1068,10 @@ modprobe vfio
 modprobe vfio_pci
 modprobe vfio_iommu_type1
 
-# Bind to vfio-pci
-echo "\${GPU_DEVID}" > /sys/bus/pci/drivers/vfio-pci/new_id 2>/dev/null || true
+# Bind to vfio-pci (new_id expects space-separated vendor device, e.g. "10de 2b85")
+echo "\${GPU_DEVID//:/ }" > /sys/bus/pci/drivers/vfio-pci/new_id 2>/dev/null || true
 if [ -n "\${AUDIO_DEVID}" ]; then
-    echo "\${AUDIO_DEVID}" > /sys/bus/pci/drivers/vfio-pci/new_id 2>/dev/null || true
+    echo "\${AUDIO_DEVID//:/ }" > /sys/bus/pci/drivers/vfio-pci/new_id 2>/dev/null || true
 fi
 
 echo "\${GPU_PCI}" > /sys/bus/pci/drivers/vfio-pci/bind 2>/dev/null || true
@@ -1055,9 +1085,7 @@ sleep 1
 if lspci -nnk -s \${GPU_PCI} | grep -q "vfio-pci"; then
     echo "✓ GPU is now in vfio mode (ready for VM passthrough)"
     lspci -nnk -s \${GPU_PCI} | grep -E "VGA|driver"
-    # Update Kubernetes label
-    kubectl label node \$(hostname) uvacompute.com/gpu-mode=vfio --overwrite 2>/dev/null || \
-        echo "Note: Could not update Kubernetes label (kubectl may not be configured)"
+    update_k8s_label "vfio"
     report_gpu_mode "vfio" "true"
 else
     echo "✗ Failed to switch to vfio mode"
