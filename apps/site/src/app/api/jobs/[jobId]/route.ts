@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { authClient } from "@/lib/auth-client";
 import { fetchAction, fetchMutation, fetchQuery } from "convex/nextjs";
 import { api } from "../../../../../convex/_generated/api";
-import { createAuthHeaders } from "@/lib/orchestration-auth";
+import {
+  createAuthHeaders,
+  parseOrchestrationError,
+} from "@/lib/orchestration-auth";
 import {
   JobCancellationResponseSchema,
   JobStatusResponseSchema,
@@ -66,10 +69,11 @@ export async function GET(
       console.error(
         `Orchestration service error: ${response.status} ${errorText}`,
       );
+      const errorMsg = parseOrchestrationError(errorText, response.status);
       return NextResponse.json(
         {
           status: "failed",
-          msg: `Orchestration service error: ${response.status}`,
+          msg: errorMsg,
         },
         { status: response.status },
       );
