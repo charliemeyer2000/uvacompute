@@ -64,6 +64,17 @@ export function verifyRequest(request: NextRequest, body: string): boolean {
   return signature === expectedSignature;
 }
 
+export function parseOrchestrationError(
+  errorText: string,
+  status: number,
+): string {
+  try {
+    const data = JSON.parse(errorText);
+    if (data.msg) return data.msg;
+  } catch {}
+  return `Orchestration service error: ${status}`;
+}
+
 export function isNodeAuthRequest(request: NextRequest): boolean {
   return request.headers.has("X-Node-Id");
 }
