@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { authClient } from "@/lib/auth-client";
 import { fetchMutation, fetchQuery, fetchAction } from "convex/nextjs";
 import { api } from "../../../../convex/_generated/api";
-import { createAuthHeaders } from "@/lib/orchestration-auth";
+import {
+  createAuthHeaders,
+  parseOrchestrationError,
+} from "@/lib/orchestration-auth";
 import {
   JobCreationRequestSchema,
   JobCreationResponseSchema,
@@ -112,6 +115,8 @@ export async function POST(request: NextRequest) {
         `Orchestration service error: ${response.status} ${errorText}`,
       );
 
+      const errorMsg = parseOrchestrationError(errorText, response.status);
+
       if (endpointReservation) {
         try {
           await fetchAction(api.endpoints.release, {
@@ -125,8 +130,7 @@ export async function POST(request: NextRequest) {
 
       return NextResponse.json(
         {
-          error: `Orchestration service error: ${response.status}`,
-          details: errorText,
+          error: errorMsg,
         },
         { status: response.status },
       );

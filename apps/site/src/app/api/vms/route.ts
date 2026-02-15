@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { authClient } from "@/lib/auth-client";
 import { fetchMutation, fetchQuery, fetchAction } from "convex/nextjs";
 import { api } from "../../../../convex/_generated/api";
-import { createAuthHeaders } from "@/lib/orchestration-auth";
+import {
+  createAuthHeaders,
+  parseOrchestrationError,
+} from "@/lib/orchestration-auth";
 import {
   VMCreationRequestSchema,
   VMCreationResponseSchema,
@@ -163,6 +166,8 @@ export async function POST(request: NextRequest) {
         `Orchestration service error: ${response.status} ${errorText}`,
       );
 
+      const errorMsg = parseOrchestrationError(errorText, response.status);
+
       try {
         await fetchMutation(api.vms.updateStatus, {
           vmId,
@@ -187,8 +192,7 @@ export async function POST(request: NextRequest) {
         {
           status: "internal_error",
           vmId,
-          msg: `Orchestration service error: ${response.status}`,
-          details: errorText,
+          msg: errorMsg,
         },
         { status: response.status },
       );
