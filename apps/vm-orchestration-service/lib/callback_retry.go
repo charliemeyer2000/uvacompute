@@ -8,9 +8,9 @@ import (
 )
 
 const (
-	retryQueueSize    = 100
-	retryInterval     = 60 * time.Second
-	maxRetryAttempts  = 10
+	retryQueueSize   = 100
+	retryInterval    = 60 * time.Second
+	maxRetryAttempts = 10
 )
 
 type RetryItemType string
