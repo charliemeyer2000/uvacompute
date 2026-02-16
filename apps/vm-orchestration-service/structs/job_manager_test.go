@@ -1,6 +1,7 @@
 package structs
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"strings"
@@ -12,14 +13,16 @@ import (
 )
 
 type MockJobProvider struct {
-	mu             sync.Mutex
-	LastImage      string
-	LastCommand    []string
-	LastCpus       int
-	LastRam        int
-	LastGpus       int
-	CreateJobError error
-	DeleteJobError error
+	mu                sync.Mutex
+	LastImage         string
+	LastCommand       []string
+	LastCpus          int
+	LastRam           int
+	LastGpus          int
+	CreateJobError    error
+	DeleteJobError    error
+	AllGpuNodesBusy   bool
+	GpuBusyCheckError error
 }
 
 func (m *MockJobProvider) CreateJob(jobId string, image string, command []string, env map[string]string, cpus, ram, gpus, disk int, statusCallback JobStatusCallback, expose *int, exposeSubdomain *string) error {
@@ -58,6 +61,12 @@ func (m *MockJobProvider) GetJobLogs(jobId string) (io.ReadCloser, error) {
 
 func (m *MockJobProvider) StreamJobLogs(jobId string) (io.ReadCloser, error) {
 	return io.NopCloser(strings.NewReader("streaming logs")), nil
+}
+
+func (m *MockJobProvider) AreAllGpuNodesBusy(ctx context.Context) (bool, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.AllGpuNodesBusy, m.GpuBusyCheckError
 }
 
 // MockCallbackClient for job tests
@@ -518,4 +527,66 @@ func TestStreamJobLogs_TerminalState(t *testing.T) {
 	if err == nil {
 		t.Error("StreamJobLogs should fail for terminal job")
 	}
+}
+
+func TestCreateJob_GpuBusy(t *testing.T) {
+	limits := JobResourceLimits{MaxCpus: 16, MaxRam: 64, MaxGpus: 1}
+
+	t.Run("rejects when all GPU nodes busy", func(t *testing.T) {
+		mockProvider := &MockJobProvider{AllGpuNodesBusy: true}
+		jm := NewJobManager(limits, mockProvider, nil)
+
+		gpus := 1
+		req := JobCreationRequest{
+			JobId:  uuid.New().String(),
+			UserId: "test-user",
+			Image:  "nvidia/cuda:latest",
+			Gpus:   &gpus,
+		}
+
+		_, err := jm.CreateJob(req)
+		if err == nil {
+			t.Fatal("Should reject GPU job when all nodes are busy")
+		}
+		if !strings.Contains(err.Error(), "insufficient GPU") {
+			t.Fatalf("Expected GPU error, got: %v", err)
+		}
+		if !strings.Contains(err.Error(), "in use by their owners") {
+			t.Fatalf("Expected owner-in-use message, got: %v", err)
+		}
+	})
+
+	t.Run("allows when GPU nodes available", func(t *testing.T) {
+		mockProvider := &MockJobProvider{AllGpuNodesBusy: false}
+		jm := NewJobManager(limits, mockProvider, nil)
+
+		gpus := 1
+		req := JobCreationRequest{
+			JobId:  uuid.New().String(),
+			UserId: "test-user",
+			Image:  "nvidia/cuda:latest",
+			Gpus:   &gpus,
+		}
+
+		_, err := jm.CreateJob(req)
+		if err != nil {
+			t.Fatalf("Should allow GPU job when nodes available: %v", err)
+		}
+	})
+
+	t.Run("skips check for non-GPU jobs", func(t *testing.T) {
+		mockProvider := &MockJobProvider{AllGpuNodesBusy: true}
+		jm := NewJobManager(limits, mockProvider, nil)
+
+		req := JobCreationRequest{
+			JobId:  uuid.New().String(),
+			UserId: "test-user",
+			Image:  "ubuntu:latest",
+		}
+
+		_, err := jm.CreateJob(req)
+		if err != nil {
+			t.Fatalf("Non-GPU job should succeed even when GPU nodes busy: %v", err)
+		}
+	})
 }

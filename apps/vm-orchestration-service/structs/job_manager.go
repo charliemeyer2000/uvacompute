@@ -21,6 +21,7 @@ type JobProvider interface {
 	GetJobStatus(jobId string) (JobStatus, error)
 	GetJobLogs(jobId string) (io.ReadCloser, error)
 	StreamJobLogs(jobId string) (io.ReadCloser, error)
+	AreAllGpuNodesBusy(ctx context.Context) (bool, error)
 }
 
 type JobManager struct {
@@ -514,6 +515,16 @@ func (jm *JobManager) checkResourceAvailability(req JobCreationRequest) error {
 	if totalGpus+requestGpus > jm.limits.MaxGpus {
 		return fmt.Errorf("insufficient GPU resources: requested %d GPUs, %d already allocated, limit is %d",
 			requestGpus, totalGpus, jm.limits.MaxGpus)
+	}
+
+	if requestGpus > 0 {
+		ctx := context.Background()
+		allBusy, err := jm.jobProvider.AreAllGpuNodesBusy(ctx)
+		if err != nil {
+			log.Printf("WARNING: Failed to check GPU busy state: %v", err)
+		} else if allBusy {
+			return fmt.Errorf("insufficient GPU resources: all GPU nodes are currently in use by their owners")
+		}
 	}
 
 	return nil

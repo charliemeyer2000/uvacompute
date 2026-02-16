@@ -91,7 +91,12 @@ export function NodeList({ nodes, nodeCounts }: NodeListProps) {
                     <div>
                       {node.vcpus} cpu · {node.ram} gb
                     </div>
-                    <div>{formatGPUDisplay(node.gpus, node.gpuType)}</div>
+                    <div>
+                      {formatGPUDisplay(node.gpus, node.gpuType)}
+                      {node.gpuBusy && (
+                        <span className="ml-1.5 text-yellow-500">in use</span>
+                      )}
+                    </div>
                   </div>
                 </div>
 

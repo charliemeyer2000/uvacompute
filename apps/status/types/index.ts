@@ -13,6 +13,7 @@ export const nodeStatusSchema = z.object({
   ram: z.number(),
   gpus: z.number(),
   gpuType: z.string(),
+  gpuBusy: z.boolean().optional(),
   supportsVMs: z.boolean(),
   supportsJobs: z.boolean(),
   lastHeartbeat: z.number(),

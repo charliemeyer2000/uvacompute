@@ -399,6 +399,7 @@ const NodeHealthSchema = v.object({
   nodeId: v.string(),
   k8sNodeName: v.string(),
   ready: v.boolean(),
+  gpuBusy: v.optional(v.boolean()),
   lastHeartbeat: v.number(),
   reason: v.optional(v.string()),
 });
@@ -432,6 +433,7 @@ export const syncHealth = mutation({
       await ctx.db.patch(node._id, {
         status: newStatus,
         lastHeartbeat: nodeHealth.lastHeartbeat,
+        gpuBusy: nodeHealth.gpuBusy ?? false,
       });
       nodesUpdated++;
 
