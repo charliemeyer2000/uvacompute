@@ -149,6 +149,27 @@ uva node gpu-mode vfio     # switch to vm passthrough mode
 
 switch gpu between container mode (nvidia driver, for jobs) and vm passthrough mode (vfio-pci driver, for gpu vms). must be run on the node.
 
+## gpu sharing & protection
+
+when your node is in nvidia mode, you can still use your own gpu for local work. uvacompute automatically detects when the gpu is in use and prevents scheduling conflicts.
+
+### how it works
+
+the `gpu-guardian` daemon is installed automatically during node setup. it monitors your gpu device files using linux fanotify and periodic scans:
+
+- when you start a gpu process (e.g. pytorch, llama.cpp), the guardian detects it within seconds and marks your gpu as busy
+- while the gpu is marked busy, no new gpu jobs will be scheduled on your node
+- when your process finishes, the guardian removes the busy marker and gpu jobs can be scheduled again
+
+### gpu mode behavior
+
+- **nvidia mode:** gpu-guardian runs automatically. your local gpu usage is detected and protected.
+- **vfio mode:** gpu-guardian is stopped. the gpu is fully passed through to vms and cannot be accessed by the host.
+
+switching gpu modes with `uva node gpu-mode` automatically starts or stops the guardian.
+
+> **note:** gpu-guardian only distinguishes between host processes and kubernetes (job) processes. if you are running a local gpu workload, all gpus on the node are marked as busy — even on multi-gpu systems.
+
 ### list your tokens
 
 ```bash

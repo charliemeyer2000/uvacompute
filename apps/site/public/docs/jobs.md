@@ -42,6 +42,8 @@ uva jobs run python:3.11 python -c "import torch; print(torch.cuda.is_available(
 uva jobs run --gpu pytorch/pytorch:latest python train.py
 ```
 
+gpu jobs are only scheduled on nodes where the gpu is idle. if a node owner is using their gpu locally, jobs will wait until a gpu becomes available. check [status.uvacompute.com](https://status.uvacompute.com) for current gpu availability.
+
 ### run a bash script
 
 ```bash

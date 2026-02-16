@@ -981,6 +981,23 @@ async function nodeUninstall(): Promise<void> {
       await runCommand("/usr/local/bin/k3s-uninstall.sh", [], { sudo: true });
     }
 
+    spinner.text = "Removing GPU guardian...";
+    await runCommand("systemctl", ["stop", "uvacompute-gpu-guardian"], {
+      sudo: true,
+    });
+    await runCommand("systemctl", ["disable", "uvacompute-gpu-guardian"], {
+      sudo: true,
+    });
+    const gpuGuardianFiles = [
+      "/usr/local/bin/gpu-guardian",
+      "/etc/systemd/system/uvacompute-gpu-guardian.service",
+    ];
+    for (const f of gpuGuardianFiles) {
+      if (existsSync(f)) {
+        await runCommand("rm", ["-f", f], { sudo: true });
+      }
+    }
+
     spinner.text = "Removing GPU scripts...";
     const gpuScripts = [
       "/usr/local/bin/gpu-mode-nvidia",
