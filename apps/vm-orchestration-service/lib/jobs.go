@@ -574,4 +574,3 @@ func (j *JobAdapter) EnsureNamespace() error {
 	log.Printf("Created namespace %s", j.namespace)
 	return nil
 }
-
