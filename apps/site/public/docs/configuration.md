@@ -45,22 +45,22 @@ ssh keys used for secure communication between nodes and the hub.
 | `id_ed25519_uvacompute`     | node tunnel communication key (private) |
 | `id_ed25519_uvacompute.pub` | node tunnel communication key (public)  |
 
-## gpu mode scripts (/usr/local/bin/)
+## gpu mode management
 
-scripts for switching gpu modes are installed on nodes with nvidia gpus.
+switch between nvidia (container) and vfio (vm passthrough) gpu modes on nodes with nvidia gpus.
 
-| command           | description                                     |
-| ----------------- | ----------------------------------------------- |
-| `gpu-mode-nvidia` | switch to nvidia mode (for container workloads) |
-| `gpu-mode-vfio`   | switch to vfio mode (for vm gpu passthrough)    |
-| `gpu-mode-status` | show current gpu mode                           |
+| command                    | description                                     |
+| -------------------------- | ----------------------------------------------- |
+| `uva node gpu-mode status` | show current gpu mode                           |
+| `uva node gpu-mode nvidia` | switch to nvidia mode (for container workloads) |
+| `uva node gpu-mode vfio`   | switch to vfio mode (for vm gpu passthrough)    |
 
 ### example usage
 
 ```bash
-sudo gpu-mode-status
-sudo gpu-mode-nvidia
-sudo gpu-mode-vfio
+uva node gpu-mode status
+uva node gpu-mode nvidia
+uva node gpu-mode vfio
 ```
 
 ## directory summary
