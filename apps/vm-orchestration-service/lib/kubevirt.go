@@ -134,6 +134,7 @@ func (k *KubeVirtAdapter) CreateVM(vmId string, cpus, ram, disk, gpus int, sshPu
 	_, err = k.client.Resource(vmGVR).Namespace(k.namespace).Create(ctx, vm, metav1.CreateOptions{})
 	if err != nil {
 		_ = k.deleteCloudInitSecret(ctx, secretName)
+		_ = k.typedClient.CoreV1().PersistentVolumeClaims(k.namespace).Delete(ctx, rootDiskName, metav1.DeleteOptions{})
 		return fmt.Errorf("failed to create VM: %w", err)
 	}
 
@@ -704,6 +705,9 @@ func (k *KubeVirtAdapter) DestroyVM(vmId string) error {
 
 	secretName := fmt.Sprintf("cloudinit-%s", vmId)
 	_ = k.deleteCloudInitSecret(ctx, secretName)
+
+	rootDiskName := fmt.Sprintf("%s-rootdisk", vmId)
+	_ = k.typedClient.CoreV1().PersistentVolumeClaims(k.namespace).Delete(ctx, rootDiskName, metav1.DeleteOptions{})
 
 	return nil
 }
