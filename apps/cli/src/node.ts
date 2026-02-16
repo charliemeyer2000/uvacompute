@@ -1,7 +1,7 @@
 import type { Command } from "commander";
 import ora from "ora";
 import { existsSync, readFileSync, mkdirSync, writeFileSync, rmSync } from "fs";
-import { confirm, input, select } from "@inquirer/prompts";
+import { confirm } from "@inquirer/prompts";
 import { spawn } from "child_process";
 import {
   NODE_CONFIG_DIR,
@@ -45,19 +45,11 @@ interface RemoteJob {
   status: string;
 }
 
-interface SharingConfig {
-  cpus: number;
-  ram: number;
-  gpus: number;
-  gpu_mode: "container" | "none";
-}
-
 interface NodeConfig {
   node_id?: string;
   install_date?: string;
   k3s_version?: string;
   kubevirt_version?: string;
-  sharing?: SharingConfig;
 }
 
 interface NodeState {
@@ -1159,162 +1151,53 @@ async function getWorkloads(): Promise<Workloads> {
   return result;
 }
 
-interface SystemResources {
-  cpus: number;
-  ramGb: number;
-  gpuCount: number;
-}
-
-async function getSystemResources(): Promise<SystemResources> {
-  let cpus = 1;
-  let ramGb = 4;
-  let gpuCount = 0;
-
-  try {
-    const cpuResult = await runCommand("nproc", [], { silent: true });
-    if (cpuResult.exitCode === 0) {
-      cpus = parseInt(cpuResult.stdout.trim(), 10) || 1;
-    }
-  } catch {}
-
-  try {
-    const memResult = await runCommand(
-      "bash",
-      ["-c", "grep MemTotal /proc/meminfo | awk '{print int($2/1024/1024)}'"],
-      { silent: true },
+async function nodeGpuModeStatus(): Promise<void> {
+  if (!existsSync("/usr/local/bin/gpu-mode-status")) {
+    console.log(theme.error("✗ GPU mode scripts not found"));
+    console.log(
+      theme.muted("  Install a node with GPU first: uva node install"),
     );
-    if (memResult.exitCode === 0) {
-      ramGb = parseInt(memResult.stdout.trim(), 10) || 4;
-    }
-  } catch {}
-
-  const gpu = await checkNvidiaGpu();
-  if (gpu.detected) {
-    gpuCount = 1;
-  }
-
-  return { cpus, ramGb, gpuCount };
-}
-
-function saveNodeConfig(config: NodeConfig): void {
-  mkdirSync(NODE_CONFIG_DIR, { recursive: true });
-  writeFileSync(NODE_CONFIG_FILE, yaml.dump(config), "utf8");
-}
-
-async function nodeConfig(): Promise<void> {
-  console.log(theme.emphasis("\nNode Configuration\n"));
-
-  const state = loadNodeState();
-  if (!state?.installed) {
-    console.log(theme.error("✗ Node is not installed"));
-    console.log(theme.muted("  Run 'uva node install' first"));
     process.exit(1);
   }
 
-  const spinner = ora("Detecting system resources...").start();
-  const resources = await getSystemResources();
-  spinner.succeed("System resources detected");
+  const result = await runCommand("gpu-mode-status", [], { sudo: true });
+  process.exit(result.exitCode);
+}
 
-  console.log(theme.muted(`  CPUs: ${resources.cpus}`));
-  console.log(theme.muted(`  RAM: ${resources.ramGb} GB`));
-  console.log(
-    theme.muted(
-      `  GPUs: ${resources.gpuCount > 0 ? resources.gpuCount : "None"}`,
-    ),
-  );
-  console.log();
+function nodeGpuModeSwitch(mode: "nvidia" | "vfio"): () => Promise<void> {
+  return async () => {
+    const scriptName = `gpu-mode-${mode}`;
+    if (!existsSync(`/usr/local/bin/${scriptName}`)) {
+      console.log(theme.error("✗ GPU mode scripts not found"));
+      console.log(
+        theme.muted("  Install a node with GPU first: uva node install"),
+      );
+      process.exit(1);
+    }
 
-  const currentConfig = loadNodeConfig();
-  const currentSharing = currentConfig?.sharing;
+    const label =
+      mode === "nvidia"
+        ? "nvidia (container mode)"
+        : "vfio-pci (VM passthrough mode)";
 
-  console.log(theme.info("Configure Resource Sharing"));
-  console.log(
-    theme.muted(
-      "Specify how many resources to share with the uvacompute network.\n",
-    ),
-  );
-
-  const cpuInput = await input({
-    message: `CPUs to share (1-${resources.cpus})`,
-    default: String(currentSharing?.cpus ?? Math.max(1, resources.cpus - 1)),
-    validate: (value) => {
-      const num = parseInt(value, 10);
-      if (isNaN(num) || num < 1 || num > resources.cpus) {
-        return `Please enter a number between 1 and ${resources.cpus}`;
-      }
-      return true;
-    },
-  });
-
-  const ramInput = await input({
-    message: `RAM to share in GB (1-${resources.ramGb})`,
-    default: String(currentSharing?.ram ?? Math.max(1, resources.ramGb - 4)),
-    validate: (value) => {
-      const num = parseInt(value, 10);
-      if (isNaN(num) || num < 1 || num > resources.ramGb) {
-        return `Please enter a number between 1 and ${resources.ramGb}`;
-      }
-      return true;
-    },
-  });
-
-  let gpuMode: "container" | "none" = "none";
-  let gpuCount = 0;
-
-  if (resources.gpuCount > 0) {
-    const gpuModeChoice = await select({
-      message: "GPU sharing mode",
-      choices: [
-        {
-          value: "container",
-          name: "Container mode - Share GPU with container workloads",
-        },
-        {
-          value: "none",
-          name: "None - Do not share GPU",
-        },
-      ],
-      default: currentSharing?.gpu_mode ?? "container",
+    const proceed = await confirm({
+      message: `Switch GPU to ${label}?`,
+      default: true,
     });
-    gpuMode = gpuModeChoice as "container" | "none";
-    gpuCount = gpuMode === "container" ? resources.gpuCount : 0;
-  }
 
-  const newSharing: SharingConfig = {
-    cpus: parseInt(cpuInput, 10),
-    ram: parseInt(ramInput, 10),
-    gpus: gpuCount,
-    gpu_mode: gpuMode,
+    if (!proceed) {
+      console.log(theme.muted("\nCancelled."));
+      return;
+    }
+
+    console.log();
+    const result = await runCommand(scriptName, [], { sudo: true });
+
+    if (result.exitCode !== 0) {
+      console.log(theme.error(`\n✗ Failed to switch to ${mode} mode`));
+      process.exit(1);
+    }
   };
-
-  console.log();
-  console.log(theme.info("Configuration Summary:"));
-  console.log(theme.muted(`  CPUs: ${newSharing.cpus}`));
-  console.log(theme.muted(`  RAM: ${newSharing.ram} GB`));
-  console.log(theme.muted(`  GPUs: ${newSharing.gpus}`));
-  console.log(theme.muted(`  GPU Mode: ${newSharing.gpu_mode}`));
-  console.log();
-
-  const shouldSave = await confirm({
-    message: "Save this configuration?",
-    default: true,
-  });
-
-  if (!shouldSave) {
-    console.log(theme.muted("\nConfiguration cancelled."));
-    return;
-  }
-
-  const updatedConfig: NodeConfig = {
-    ...currentConfig,
-    sharing: newSharing,
-  };
-
-  saveNodeConfig(updatedConfig);
-
-  console.log(theme.success("\n✓ Configuration saved"));
-  console.log(theme.muted(`  Config file: ${NODE_CONFIG_FILE}`));
-  console.log();
 }
 
 async function nodePause(): Promise<void> {
@@ -1506,12 +1389,16 @@ async function nodeStatus(): Promise<void> {
     }
     console.log();
     console.log(theme.muted("  GPU mode commands:"));
-    console.log(theme.muted("    sudo gpu-mode-status  - Show current mode"));
     console.log(
-      theme.muted("    sudo gpu-mode-nvidia  - Switch to container mode"),
+      theme.muted("    uva node gpu-mode status  - Show current mode"),
     );
     console.log(
-      theme.muted("    sudo gpu-mode-vfio    - Switch to VM passthrough mode"),
+      theme.muted("    uva node gpu-mode nvidia  - Switch to container mode"),
+    );
+    console.log(
+      theme.muted(
+        "    uva node gpu-mode vfio    - Switch to VM passthrough mode",
+      ),
     );
   } else {
     gpuSpinner.info(theme.muted("No NVIDIA GPU detected"));
@@ -2072,10 +1959,25 @@ export function registerNodeCommands(program: Command) {
     .description("Show active workloads on a remote node")
     .action(nodeWorkloadsRemote);
 
-  node
-    .command("config")
-    .description("Configure resource sharing settings interactively")
-    .action(nodeConfig);
+  // GPU mode subcommands (local only)
+  const gpuMode = node
+    .command("gpu-mode")
+    .description("Manage GPU driver mode (must run on node)");
+
+  gpuMode
+    .command("status")
+    .description("Show current GPU driver mode")
+    .action(nodeGpuModeStatus);
+
+  gpuMode
+    .command("nvidia")
+    .description("Switch to nvidia driver (container mode)")
+    .action(nodeGpuModeSwitch("nvidia"));
+
+  gpuMode
+    .command("vfio")
+    .description("Switch to vfio-pci driver (VM passthrough mode)")
+    .action(nodeGpuModeSwitch("vfio"));
 
   // Token subcommands for admin use
   const token = node

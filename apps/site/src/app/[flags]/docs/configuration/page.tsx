@@ -234,11 +234,10 @@ export default function ConfigurationDocsPage() {
         id="gpu-mode-scripts"
         className="border border-gray-200 p-4 sm:p-6 space-y-6"
       >
-        <h3 className="text-lg font-semibold mb-2">gpu mode scripts</h3>
+        <h3 className="text-lg font-semibold mb-2">gpu mode management</h3>
         <p className="text-sm text-gray-600 mb-4">
-          scripts for switching gpu modes are installed to{" "}
-          <code className="bg-gray-100 px-1">/usr/local/bin/</code> on nodes
-          with nvidia gpus.
+          switch between nvidia (container) and vfio (vm passthrough) gpu modes
+          on nodes with nvidia gpus.
         </p>
 
         <div className="overflow-x-auto">
@@ -256,7 +255,15 @@ export default function ConfigurationDocsPage() {
             <tbody>
               <tr>
                 <td className="p-3 border-b border-gray-200 font-mono text-xs">
-                  gpu-mode-nvidia
+                  uva node gpu-mode status
+                </td>
+                <td className="p-3 border-b border-gray-200">
+                  show current gpu mode
+                </td>
+              </tr>
+              <tr>
+                <td className="p-3 border-b border-gray-200 font-mono text-xs">
+                  uva node gpu-mode nvidia
                 </td>
                 <td className="p-3 border-b border-gray-200">
                   switch to nvidia mode (for container workloads)
@@ -264,18 +271,10 @@ export default function ConfigurationDocsPage() {
               </tr>
               <tr>
                 <td className="p-3 border-b border-gray-200 font-mono text-xs">
-                  gpu-mode-vfio
+                  uva node gpu-mode vfio
                 </td>
                 <td className="p-3 border-b border-gray-200">
                   switch to vfio mode (for vm gpu passthrough)
-                </td>
-              </tr>
-              <tr>
-                <td className="p-3 border-b border-gray-200 font-mono text-xs">
-                  gpu-mode-status
-                </td>
-                <td className="p-3 border-b border-gray-200">
-                  show current gpu mode
                 </td>
               </tr>
             </tbody>
@@ -286,12 +285,14 @@ export default function ConfigurationDocsPage() {
           <h4 className="font-medium mb-2">example usage</h4>
           <CodeBlock className="space-y-2">
             <code className="text-sm text-black block">
-              sudo gpu-mode-status
+              uva node gpu-mode status
             </code>
             <code className="text-sm text-black block">
-              sudo gpu-mode-nvidia
+              uva node gpu-mode nvidia
             </code>
-            <code className="text-sm text-black block">sudo gpu-mode-vfio</code>
+            <code className="text-sm text-black block">
+              uva node gpu-mode vfio
+            </code>
           </CodeBlock>
         </div>
       </section>
