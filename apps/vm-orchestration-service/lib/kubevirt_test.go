@@ -204,7 +204,6 @@ func TestBuildVMObjectWithCloudInit(t *testing.T) {
 		if volMap["name"] == "cloudinit" {
 			cloudInitNoCloud, found, _ := unstructured.NestedMap(volMap, "cloudInitNoCloud")
 			if found {
-				// Check for secretRef (references k8s secret with cloud-init)
 				secretRef, found, _ := unstructured.NestedMap(cloudInitNoCloud, "secretRef")
 				if found {
 					name, _, _ := unstructured.NestedString(secretRef, "name")
@@ -231,13 +230,11 @@ func TestBuildVMObjectUsesPVCVolume(t *testing.T) {
 
 	vm := adapter.buildVMObject("test-vm", 2, 8, 0, "cloudinit-test")
 
-	// Should NOT have dataVolumeTemplates (PVC is pre-created)
 	_, found, _ := unstructured.NestedSlice(vm.Object, "spec", "dataVolumeTemplates")
 	if found {
 		t.Error("Should not have dataVolumeTemplates")
 	}
 
-	// Should reference PVC directly
 	volumes, _, _ := unstructured.NestedSlice(vm.Object, "spec", "template", "spec", "volumes")
 	var rootVolume map[string]interface{}
 	for _, v := range volumes {
