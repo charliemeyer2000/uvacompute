@@ -148,6 +148,7 @@ export default defineSchema({
     gpus: v.optional(v.number()),
     gpuType: v.optional(v.string()), // e.g., "nvidia-rtx-5090", "nvidia-rtx-4090", "none"
     gpuMode: v.optional(v.union(v.literal("nvidia"), v.literal("vfio"))), // Current GPU driver mode
+    gpuBusy: v.optional(v.boolean()), // Set by gpu-guardian when host is using the GPU
     supportsVMs: v.optional(v.boolean()), // Default: true if KubeVirt available
     supportsJobs: v.optional(v.boolean()), // Default: true (container runtime)
   })

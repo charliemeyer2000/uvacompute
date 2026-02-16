@@ -213,6 +213,11 @@ export default function MyNodesPage() {
                       <p className="text-xs text-gray-400 mt-0.5">
                         {node.cpus || 0} CPUs, {node.ram || 0} GB RAM,{" "}
                         {node.gpus || 0} GPUs
+                        {node.gpuBusy && (
+                          <span className="ml-2 text-yellow-600 font-medium">
+                            GPU in use
+                          </span>
+                        )}
                       </p>
                     </div>
                   </div>
