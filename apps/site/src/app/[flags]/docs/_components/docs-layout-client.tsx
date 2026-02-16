@@ -65,7 +65,7 @@ const docNavItems = [
       { label: "node system config", id: "node-system-configuration" },
       { label: "node data storage", id: "node-data-storage" },
       { label: "ssh keys", id: "ssh-keys" },
-      { label: "gpu mode scripts", id: "gpu-mode-scripts" },
+      { label: "gpu mode management", id: "gpu-mode-scripts" },
       { label: "directory summary", id: "directory-summary" },
     ],
   },
