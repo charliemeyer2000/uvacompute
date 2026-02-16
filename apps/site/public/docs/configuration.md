@@ -63,6 +63,16 @@ uva node gpu-mode nvidia
 uva node gpu-mode vfio
 ```
 
+## node services
+
+systemd services installed on gpu nodes during setup.
+
+| service                    | description                                                         |
+| -------------------------- | ------------------------------------------------------------------- |
+| `uvacompute-tunnel`        | ssh tunnel to hub for cluster communication                         |
+| `uvacompute-gpu-guardian`  | detects host gpu usage and blocks job scheduling (nvidia mode only) |
+| `uvacompute-gpu-reconcile` | restores gpu mode after reboot                                      |
+
 ## directory summary
 
 | purpose       | location               | rationale                               |
