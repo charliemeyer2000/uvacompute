@@ -37,6 +37,10 @@ export const getClusterStatus = query({
     const usedGPUs =
       activeVms.reduce((sum, vm) => sum + vm.gpus, 0) +
       activeJobs.reduce((sum, job) => sum + job.gpus, 0);
+    const busyGPUs = onlineNodes.reduce(
+      (sum, n) => sum + (n.gpuBusy ? n.gpus || 0 : 0),
+      0,
+    );
 
     const gpuByType: Record<string, { total: number; available: number }> = {};
     for (const node of onlineNodes) {
@@ -117,7 +121,7 @@ export const getClusterStatus = query({
         },
         gpus: {
           total: totalGPUs,
-          available: Math.max(0, totalGPUs - usedGPUs),
+          available: Math.max(0, totalGPUs - usedGPUs - busyGPUs),
           byType: gpuByType,
         },
       },
