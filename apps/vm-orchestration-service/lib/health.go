@@ -127,7 +127,7 @@ func (h *HealthMonitor) checkNodeHealth(ctx context.Context) ([]NodeHealthStatus
 			NodeId:      getNodeId(&node),
 		}
 
-		if _, busy := node.Labels["uvacompute.com/gpu-busy"]; busy {
+		if node.Labels["uvacompute.com/gpu-busy"] == "true" {
 			status.GpuBusy = true
 		}
 
