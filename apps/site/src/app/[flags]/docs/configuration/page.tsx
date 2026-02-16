@@ -297,6 +297,58 @@ export default function ConfigurationDocsPage() {
         </div>
       </section>
 
+      <section
+        id="node-services"
+        className="border border-gray-200 p-4 sm:p-6 space-y-6"
+      >
+        <h3 className="text-lg font-semibold mb-2">node services</h3>
+        <p className="text-sm text-gray-600 mb-4">
+          systemd services installed on gpu nodes during setup.
+        </p>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm border border-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="text-left p-3 border-b border-gray-200">
+                  service
+                </th>
+                <th className="text-left p-3 border-b border-gray-200">
+                  description
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td className="p-3 border-b border-gray-200 font-mono text-xs">
+                  uvacompute-tunnel
+                </td>
+                <td className="p-3 border-b border-gray-200">
+                  ssh tunnel to hub for cluster communication
+                </td>
+              </tr>
+              <tr>
+                <td className="p-3 border-b border-gray-200 font-mono text-xs">
+                  uvacompute-gpu-guardian
+                </td>
+                <td className="p-3 border-b border-gray-200">
+                  detects host gpu usage and blocks job scheduling (nvidia mode
+                  only)
+                </td>
+              </tr>
+              <tr>
+                <td className="p-3 border-b border-gray-200 font-mono text-xs">
+                  uvacompute-gpu-reconcile
+                </td>
+                <td className="p-3 border-b border-gray-200">
+                  restores gpu mode after reboot
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
       <section id="directory-summary">
         <h3 className="text-lg font-semibold mb-4">directory summary</h3>
         <div className="overflow-x-auto">
