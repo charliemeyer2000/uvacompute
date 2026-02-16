@@ -280,6 +280,9 @@ func (r *Reconciler) cleanupOrphanResources() {
 		log.Printf("Reconciler: failed to list PVCs: %v", err)
 	} else {
 		for _, pvc := range pvcs.Items {
+			if pvc.Labels["uvacompute.io/golden-image"] == "true" {
+				continue
+			}
 			if len(pvc.OwnerReferences) > 0 {
 				continue
 			}

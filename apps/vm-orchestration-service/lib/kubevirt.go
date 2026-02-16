@@ -3,13 +3,15 @@ package lib
 import (
 	"context"
 	"encoding/base64"
-	"encoding/json"
 	"fmt"
 	"log"
 	"strings"
+	"sync"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -40,13 +42,26 @@ var (
 		Version:  "v1",
 		Resource: "secrets",
 	}
+
+	dvGVR = schema.GroupVersionResource{
+		Group:    "cdi.kubevirt.io",
+		Version:  "v1beta1",
+		Resource: "datavolumes",
+	}
+
+	pvcGVR = schema.GroupVersionResource{
+		Group:    "",
+		Version:  "v1",
+		Resource: "persistentvolumeclaims",
+	}
 )
 
 type KubeVirtAdapter struct {
-	client      dynamic.Interface
-	typedClient kubernetes.Interface
-	namespace   string
-	config      KubeVirtConfig
+	client        dynamic.Interface
+	typedClient   kubernetes.Interface
+	namespace     string
+	config        KubeVirtConfig
+	goldenImageMu sync.Mutex
 }
 
 func NewKubeVirtAdapter(config KubeVirtConfig) (*KubeVirtAdapter, error) {
@@ -91,12 +106,16 @@ func (k *KubeVirtAdapter) CreateVM(vmId string, cpus, ram, disk, gpus int, sshPu
 
 	statusCallback(structs.VM_STATUS_BOOTING)
 
-	image := k.config.VMImageCPU
+	sourceURL := k.config.VMImageSourceURL
 	if gpus > 0 {
-		image = k.config.VMImageGPU
+		sourceURL = k.config.VMImageGPUSourceURL
 	}
 
-	// Generate cloud-init data and store in a Secret (to bypass 2048 byte limit)
+	goldenPVCName, err := k.EnsureGoldenImage(ctx, sourceURL)
+	if err != nil {
+		return fmt.Errorf("failed to prepare golden image: %w", err)
+	}
+
 	cloudInitUserData := generateCloudInitUserData(sshPublicKeys, startupScript, cloudInitConfig, gpus > 0, expose, exposeSubdomain)
 	secretName := fmt.Sprintf("cloudinit-%s", vmId)
 
@@ -104,13 +123,18 @@ func (k *KubeVirtAdapter) CreateVM(vmId string, cpus, ram, disk, gpus int, sshPu
 		return fmt.Errorf("failed to create cloud-init secret: %w", err)
 	}
 
-	vm := k.buildVMObject(vmId, cpus, ram, disk, gpus, image, secretName)
-
-	statusCallback(structs.VM_STATUS_BOOTING)
-	_, err := k.client.Resource(vmGVR).Namespace(k.namespace).Create(ctx, vm, metav1.CreateOptions{})
-	if err != nil {
-		// Clean up secret on failure
+	rootDiskName := fmt.Sprintf("%s-rootdisk", vmId)
+	if err := k.cloneAndResizeRootDisk(ctx, rootDiskName, disk, goldenPVCName); err != nil {
 		_ = k.deleteCloudInitSecret(ctx, secretName)
+		return fmt.Errorf("failed to prepare root disk: %w", err)
+	}
+
+	vm := k.buildVMObject(vmId, cpus, ram, gpus, secretName)
+
+	_, err = k.client.Resource(vmGVR).Namespace(k.namespace).Create(ctx, vm, metav1.CreateOptions{})
+	if err != nil {
+		_ = k.deleteCloudInitSecret(ctx, secretName)
+		_ = k.typedClient.CoreV1().PersistentVolumeClaims(k.namespace).Delete(ctx, rootDiskName, metav1.DeleteOptions{})
 		return fmt.Errorf("failed to create VM: %w", err)
 	}
 
@@ -151,7 +175,258 @@ func (k *KubeVirtAdapter) deleteCloudInitSecret(ctx context.Context, secretName 
 	return k.client.Resource(secretGVR).Namespace(k.namespace).Delete(ctx, secretName, metav1.DeleteOptions{})
 }
 
-func (k *KubeVirtAdapter) buildVMObject(vmId string, cpus, ram, disk, gpus int, image, cloudInitSecretName string) *unstructured.Unstructured {
+func (k *KubeVirtAdapter) EnsureGoldenImage(ctx context.Context, sourceURL string) (string, error) {
+	goldenName := GoldenPVCName(sourceURL)
+
+	if err := k.ensureGoldenDVCreated(ctx, goldenName, sourceURL); err != nil {
+		return "", err
+	}
+
+	return goldenName, k.waitForGoldenImageReady(ctx, goldenName)
+}
+
+// Mutex protects only the check-and-create to avoid blocking concurrent callers during the long import wait.
+func (k *KubeVirtAdapter) ensureGoldenDVCreated(ctx context.Context, goldenName, sourceURL string) error {
+	k.goldenImageMu.Lock()
+	defer k.goldenImageMu.Unlock()
+
+	pvc, err := k.client.Resource(pvcGVR).Namespace(k.namespace).Get(ctx, goldenName, metav1.GetOptions{})
+	if err == nil {
+		annotations := pvc.GetAnnotations()
+		if annotations["uvacompute.io/source-url"] == sourceURL {
+			if annotations["cdi.kubevirt.io/storage.pod.phase"] == "Succeeded" {
+				log.Printf("Golden image %s already exists and is ready", goldenName)
+			}
+			return nil
+		}
+		log.Printf("Golden image %s has stale source URL, recreating", goldenName)
+		if err := k.deleteGoldenImage(ctx, goldenName); err != nil {
+			return fmt.Errorf("failed to delete stale golden image: %w", err)
+		}
+	}
+
+	log.Printf("Creating golden image %s from %s", goldenName, sourceURL)
+
+	dv := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "cdi.kubevirt.io/v1beta1",
+			"kind":       "DataVolume",
+			"metadata": map[string]interface{}{
+				"name":      goldenName,
+				"namespace": k.namespace,
+				"labels": map[string]interface{}{
+					"uvacompute.io/golden-image":   "true",
+					"app.kubernetes.io/managed-by": "vm-orchestration-service",
+				},
+				"annotations": map[string]interface{}{
+					"uvacompute.io/source-url":                         sourceURL,
+					"cdi.kubevirt.io/storage.bind.immediate.requested": "true",
+				},
+			},
+			"spec": map[string]interface{}{
+				"pvc": map[string]interface{}{
+					"accessModes": []interface{}{k.config.StorageAccessMode},
+					"resources": map[string]interface{}{
+						"requests": map[string]interface{}{
+							"storage": fmt.Sprintf("%dGi", k.config.GoldenImageSizeGB),
+						},
+					},
+					"storageClassName": k.config.DefaultStorageClass,
+				},
+				"source": goldenImageSource(sourceURL),
+			},
+		},
+	}
+
+	_, err = k.client.Resource(dvGVR).Namespace(k.namespace).Create(ctx, dv, metav1.CreateOptions{})
+	if err != nil && !errors.IsAlreadyExists(err) {
+		return fmt.Errorf("failed to create golden DataVolume: %w", err)
+	}
+
+	return nil
+}
+
+func (k *KubeVirtAdapter) waitForGoldenImageReady(ctx context.Context, goldenName string) error {
+	timeout := time.After(30 * time.Minute)
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-timeout:
+			return fmt.Errorf("timeout waiting for golden image %s to become ready", goldenName)
+		case <-ticker.C:
+			dv, err := k.client.Resource(dvGVR).Namespace(k.namespace).Get(ctx, goldenName, metav1.GetOptions{})
+			if err == nil {
+				phase, _, _ := unstructured.NestedString(dv.Object, "status", "phase")
+				switch phase {
+				case "Succeeded":
+					log.Printf("Golden image %s import complete", goldenName)
+					return nil
+				case "Failed":
+					return fmt.Errorf("golden image %s import failed", goldenName)
+				default:
+					progress, _, _ := unstructured.NestedString(dv.Object, "status", "progress")
+					log.Printf("Golden image %s: phase=%s progress=%s", goldenName, phase, progress)
+				}
+			}
+
+			// Fallback: check PVC annotation (CDI sometimes doesn't update DV phase)
+			pvc, err := k.client.Resource(pvcGVR).Namespace(k.namespace).Get(ctx, goldenName, metav1.GetOptions{})
+			if err == nil {
+				annotations := pvc.GetAnnotations()
+				if annotations["cdi.kubevirt.io/storage.pod.phase"] == "Succeeded" {
+					log.Printf("Golden image %s import complete (detected via PVC annotation)", goldenName)
+					return nil
+				}
+			}
+		}
+	}
+}
+
+func (k *KubeVirtAdapter) deleteGoldenImage(ctx context.Context, goldenName string) error {
+	_ = k.client.Resource(dvGVR).Namespace(k.namespace).Delete(ctx, goldenName, metav1.DeleteOptions{})
+	_ = k.client.Resource(pvcGVR).Namespace(k.namespace).Delete(ctx, goldenName, metav1.DeleteOptions{})
+
+	timeout := time.After(30 * time.Second)
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-timeout:
+			return fmt.Errorf("timeout waiting for golden image %s to be deleted", goldenName)
+		case <-ticker.C:
+			_, err := k.client.Resource(pvcGVR).Namespace(k.namespace).Get(ctx, goldenName, metav1.GetOptions{})
+			if errors.IsNotFound(err) {
+				return nil
+			}
+		}
+	}
+}
+
+func (k *KubeVirtAdapter) cloneAndResizeRootDisk(ctx context.Context, pvcName string, diskGB int, goldenPVCName string) error {
+	log.Printf("Creating root disk %s (%dGi) from golden image %s", pvcName, diskGB, goldenPVCName)
+
+	pvc := &corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      pvcName,
+			Namespace: k.namespace,
+			Labels: map[string]string{
+				"app.kubernetes.io/managed-by": "vm-orchestration-service",
+			},
+			Annotations: map[string]string{
+				"cdi.kubevirt.io/storage.bind.immediate.requested": "true",
+			},
+		},
+		Spec: corev1.PersistentVolumeClaimSpec{
+			AccessModes:      []corev1.PersistentVolumeAccessMode{corev1.PersistentVolumeAccessMode(k.config.StorageAccessMode)},
+			StorageClassName: &k.config.DefaultStorageClass,
+			Resources: corev1.VolumeResourceRequirements{
+				Requests: corev1.ResourceList{
+					corev1.ResourceStorage: resource.MustParse(fmt.Sprintf("%dGi", diskGB)),
+				},
+			},
+		},
+	}
+
+	_, err := k.typedClient.CoreV1().PersistentVolumeClaims(k.namespace).Create(ctx, pvc, metav1.CreateOptions{})
+	if err != nil && !errors.IsAlreadyExists(err) {
+		return fmt.Errorf("failed to create root disk PVC: %w", err)
+	}
+
+	// Pod creation triggers PVC binding with WaitForFirstConsumer
+	podName := fmt.Sprintf("clone-%s", pvcName)
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      podName,
+			Namespace: k.namespace,
+		},
+		Spec: corev1.PodSpec{
+			RestartPolicy: corev1.RestartPolicyNever,
+			Containers: []corev1.Container{
+				{
+					Name:    "clone",
+					Image:   "busybox:1.36",
+					Command: []string{"sh", "-c", fmt.Sprintf("cp /src/disk.img /dst/disk.img && truncate -s %dG /dst/disk.img", diskGB)},
+					VolumeMounts: []corev1.VolumeMount{
+						{Name: "src", MountPath: "/src", ReadOnly: true},
+						{Name: "dst", MountPath: "/dst"},
+					},
+				},
+			},
+			Volumes: []corev1.Volume{
+				{
+					Name: "src",
+					VolumeSource: corev1.VolumeSource{
+						PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+							ClaimName: goldenPVCName,
+							ReadOnly:  true,
+						},
+					},
+				},
+				{
+					Name: "dst",
+					VolumeSource: corev1.VolumeSource{
+						PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+							ClaimName: pvcName,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	_, err = k.typedClient.CoreV1().Pods(k.namespace).Create(ctx, pod, metav1.CreateOptions{})
+	if err != nil && !errors.IsAlreadyExists(err) {
+		return fmt.Errorf("failed to create clone pod: %w", err)
+	}
+
+	if err := k.waitForPodComplete(ctx, podName); err != nil {
+		return err
+	}
+	_ = k.typedClient.CoreV1().Pods(k.namespace).Delete(ctx, podName, metav1.DeleteOptions{})
+
+	log.Printf("Root disk %s ready (%dGi)", pvcName, diskGB)
+	return nil
+}
+
+func (k *KubeVirtAdapter) waitForPodComplete(ctx context.Context, podName string) error {
+	timeout := time.After(10 * time.Minute)
+	ticker := time.NewTicker(2 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-timeout:
+			return fmt.Errorf("timeout waiting for clone pod %s to complete", podName)
+		case <-ticker.C:
+			pod, err := k.typedClient.CoreV1().Pods(k.namespace).Get(ctx, podName, metav1.GetOptions{})
+			if err != nil {
+				continue
+			}
+			switch pod.Status.Phase {
+			case corev1.PodSucceeded:
+				return nil
+			case corev1.PodFailed:
+				return fmt.Errorf("clone pod %s failed", podName)
+			}
+		}
+	}
+}
+
+func goldenImageSource(sourceURL string) map[string]interface{} {
+	if strings.HasPrefix(sourceURL, "docker://") {
+		return map[string]interface{}{
+			"registry": map[string]interface{}{"url": sourceURL},
+		}
+	}
+	return map[string]interface{}{
+		"http": map[string]interface{}{"url": sourceURL},
+	}
+}
+
+func (k *KubeVirtAdapter) buildVMObject(vmId string, cpus, ram, gpus int, cloudInitSecretName string) *unstructured.Unstructured {
 	devices := map[string]interface{}{
 		"disks": []interface{}{
 			map[string]interface{}{
@@ -176,7 +451,6 @@ func (k *KubeVirtAdapter) buildVMObject(vmId string, cpus, ram, disk, gpus int, 
 	}
 
 	if gpus > 0 {
-		// Use hostDevices for VFIO GPU passthrough instead of gpus (which requires nvidia-device-plugin)
 		gpuDevices := make([]interface{}, gpus)
 		for i := 0; i < gpus; i++ {
 			gpuDevices[i] = map[string]interface{}{
@@ -187,7 +461,6 @@ func (k *KubeVirtAdapter) buildVMObject(vmId string, cpus, ram, disk, gpus int, 
 		devices["hostDevices"] = gpuDevices
 	}
 
-	// Build the template spec
 	templateSpec := map[string]interface{}{
 		"domain": map[string]interface{}{
 			"cpu": map[string]interface{}{
@@ -213,36 +486,31 @@ func (k *KubeVirtAdapter) buildVMObject(vmId string, cpus, ram, disk, gpus int, 
 		"volumes": []interface{}{
 			map[string]interface{}{
 				"name": "rootdisk",
-				"dataVolume": map[string]interface{}{
-					"name": fmt.Sprintf("%s-rootdisk", vmId),
+				"persistentVolumeClaim": map[string]interface{}{
+					"claimName": fmt.Sprintf("%s-rootdisk", vmId),
 				},
 			},
 			map[string]interface{}{
 				"name": "cloudinit",
 				"cloudInitNoCloud": map[string]interface{}{
-					// Use secretRef to bypass 2048 byte limit for inline userData
 					"secretRef": map[string]interface{}{
 						"name": cloudInitSecretName,
 					},
 				},
 			},
 		},
-		// Readiness probe: check if cloud-init is complete (port 9999)
-		// This port is only opened at the very end of cloud-init, ensuring all
-		// provisioning (including frpc for --expose VMs) is complete before READY
 		"readinessProbe": map[string]interface{}{
 			"tcpSocket": map[string]interface{}{
 				"port": int64(9999),
 			},
-			"initialDelaySeconds": int64(30),  // Wait 30s before first check (VM needs to boot)
-			"periodSeconds":       int64(10),  // Check every 10 seconds
-			"timeoutSeconds":      int64(5),   // Timeout for each check
-			"failureThreshold":    int64(180), // Allow up to 30 minutes for provisioning (180 * 10s)
-			"successThreshold":    int64(1),   // One success is enough
+			"initialDelaySeconds": int64(30),
+			"periodSeconds":       int64(10),
+			"timeoutSeconds":      int64(5),
+			"failureThreshold":    int64(180),
+			"successThreshold":    int64(1),
 		},
 	}
 
-	// Add nodeSelector for GPU VMs to ensure they land on nodes with GPU in vfio mode
 	if gpus > 0 {
 		templateSpec["nodeSelector"] = map[string]interface{}{
 			"uvacompute.com/gpu-mode": "vfio",
@@ -264,29 +532,6 @@ func (k *KubeVirtAdapter) buildVMObject(vmId string, cpus, ram, disk, gpus int, 
 			},
 			"spec": map[string]interface{}{
 				"running": true,
-				"dataVolumeTemplates": []interface{}{
-					map[string]interface{}{
-						"metadata": map[string]interface{}{
-							"name": fmt.Sprintf("%s-rootdisk", vmId),
-						},
-						"spec": map[string]interface{}{
-							"pvc": map[string]interface{}{
-								"accessModes": []interface{}{k.config.StorageAccessMode},
-								"resources": map[string]interface{}{
-									"requests": map[string]interface{}{
-										"storage": fmt.Sprintf("%dGi", disk),
-									},
-								},
-								"storageClassName": k.config.DefaultStorageClass,
-							},
-							"source": map[string]interface{}{
-								"registry": map[string]interface{}{
-									"url": k.config.VMImageSourceURL,
-								},
-							},
-						},
-					},
-				},
 				"template": map[string]interface{}{
 					"metadata": map[string]interface{}{
 						"labels": map[string]interface{}{
@@ -319,7 +564,7 @@ func (k *KubeVirtAdapter) waitForVMReady(ctx context.Context, vmId string, statu
 }
 
 func (k *KubeVirtAdapter) waitForVMBooted(ctx context.Context, vmId string, statusCallback structs.StatusCallback) error {
-	timeout := time.After(5 * time.Minute)
+	timeout := time.After(10 * time.Minute)
 	ticker := time.NewTicker(2 * time.Second)
 	defer ticker.Stop()
 
@@ -356,7 +601,6 @@ func (k *KubeVirtAdapter) waitForVMBooted(ctx context.Context, vmId string, stat
 	}
 }
 
-// checkPodSchedulingFailure checks if the virt-launcher pod for a VM has failed to schedule.
 func (k *KubeVirtAdapter) checkPodSchedulingFailure(ctx context.Context, vmId string) error {
 	pods, err := k.typedClient.CoreV1().Pods(k.namespace).List(ctx, metav1.ListOptions{
 		LabelSelector: fmt.Sprintf("kubevirt.io/domain=%s", vmId),
@@ -378,7 +622,6 @@ func (k *KubeVirtAdapter) checkPodSchedulingFailure(ctx context.Context, vmId st
 }
 
 func (k *KubeVirtAdapter) waitForCloudInitComplete(ctx context.Context, vmId string) error {
-	// Allow up to 30 minutes for cloud-init (CUDA install can take 15+ minutes)
 	timeout := time.After(30 * time.Minute)
 	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
@@ -395,13 +638,11 @@ func (k *KubeVirtAdapter) waitForCloudInitComplete(ctx context.Context, vmId str
 				continue
 			}
 
-			// Check if the VM is still running
 			phase, _, _ := unstructured.NestedString(vmi.Object, "status", "phase")
 			if phase == "Failed" {
 				return fmt.Errorf("VM failed during provisioning")
 			}
 
-			// Check the Ready condition (set by readinessProbe)
 			if k.isVMReady(vmi) {
 				log.Printf("Cloud-init complete on VM %s", vmId)
 				return nil
@@ -423,7 +664,6 @@ func (k *KubeVirtAdapter) isVMReady(vmi *unstructured.Unstructured) bool {
 		}
 		condType, _ := condMap["type"].(string)
 		condStatus, _ := condMap["status"].(string)
-		// KubeVirt sets the "Ready" condition based on readinessProbe
 		if condType == "Ready" && condStatus == "True" {
 			return true
 		}
@@ -463,9 +703,11 @@ func (k *KubeVirtAdapter) DestroyVM(vmId string) error {
 		return fmt.Errorf("failed to delete VM: %w", err)
 	}
 
-	// Clean up the associated cloud-init secret
 	secretName := fmt.Sprintf("cloudinit-%s", vmId)
-	_ = k.deleteCloudInitSecret(ctx, secretName) // Ignore error if secret doesn't exist
+	_ = k.deleteCloudInitSecret(ctx, secretName)
+
+	rootDiskName := fmt.Sprintf("%s-rootdisk", vmId)
+	_ = k.typedClient.CoreV1().PersistentVolumeClaims(k.namespace).Delete(ctx, rootDiskName, metav1.DeleteOptions{})
 
 	return nil
 }
@@ -661,7 +903,6 @@ func (k *KubeVirtAdapter) GetAvailableGPUs(ctx context.Context) (int, error) {
 
 	totalAvailable := 0
 	for _, node := range nodes.Items {
-		// Skip nodes that are not ready
 		nodeReady := false
 		for _, condition := range node.Status.Conditions {
 			if condition.Type == corev1.NodeReady && condition.Status == corev1.ConditionTrue {
@@ -678,7 +919,6 @@ func (k *KubeVirtAdapter) GetAvailableGPUs(ctx context.Context) (int, error) {
 			continue
 		}
 
-		// Count GPUs requested by running pods on this node
 		pods, err := k.typedClient.CoreV1().Pods("").List(ctx, metav1.ListOptions{
 			FieldSelector: fmt.Sprintf("spec.nodeName=%s,status.phase!=Failed,status.phase!=Succeeded", node.Name),
 		})
@@ -741,15 +981,9 @@ func (k *KubeVirtAdapter) EnsureNamespace() error {
 	return nil
 }
 
-func prettyPrint(v interface{}) string {
-	b, _ := json.MarshalIndent(v, "", "  ")
-	return string(b)
-}
-
 func generateCloudInitUserData(sshPublicKeys []string, startupScript, cloudInitConfig string, hasGPU bool, expose *int, exposeSubdomain *string) string {
 	sshConfig := generateSSHKeysConfig(sshPublicKeys)
 
-	// Always use MIME multipart to inject base templates
 	return generateMIMEMultipart(sshConfig, startupScript, cloudInitConfig, hasGPU, expose, exposeSubdomain)
 }
 
