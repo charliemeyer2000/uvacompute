@@ -284,4 +284,5 @@ func (m *MockCallbackClient) UploadJobLogs(jobId string, logs string) error {
 
 func (m *MockCallbackClient) EnqueueVMRetry(vmId, status, nodeId string) {}
 
-func (m *MockCallbackClient) EnqueueJobRetry(jobId, status string, exitCode *int, errorMsg, nodeId string) {}
+func (m *MockCallbackClient) EnqueueJobRetry(jobId, status string, exitCode *int, errorMsg, nodeId string) {
+}
