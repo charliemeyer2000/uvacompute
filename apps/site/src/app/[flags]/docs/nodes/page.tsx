@@ -270,6 +270,41 @@ export default function NodesDocsPage() {
         </div>
       </section>
 
+      <section
+        id="gpu-mode"
+        className="border border-gray-200 p-4 sm:p-6 space-y-6"
+      >
+        <h3 className="text-lg font-semibold mb-2">gpu mode management</h3>
+        <p className="text-sm text-gray-600 mb-4">
+          nodes with nvidia gpus can switch between container mode (nvidia
+          driver, for jobs) and vm passthrough mode (vfio-pci driver, for gpu
+          vms). must be run on the node.
+        </p>
+
+        <div className="space-y-4">
+          <div>
+            <h4 className="font-medium mb-2">check current mode</h4>
+            <CodeBlock>
+              <code className="text-sm text-black">
+                uva node gpu-mode status
+              </code>
+            </CodeBlock>
+          </div>
+
+          <div>
+            <h4 className="font-medium mb-2">switch modes</h4>
+            <CodeBlock className="space-y-2">
+              <code className="text-sm text-black block">
+                uva node gpu-mode nvidia
+              </code>
+              <code className="text-sm text-black block">
+                uva node gpu-mode vfio
+              </code>
+            </CodeBlock>
+          </div>
+        </div>
+      </section>
+
       <section id="additional-commands">
         <h3 className="text-lg font-semibold mb-4">additional commands</h3>
 
