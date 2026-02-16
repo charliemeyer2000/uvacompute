@@ -8,6 +8,7 @@ const NodeHealthSchema = z.object({
   nodeId: z.string(),
   k8sNodeName: z.string(),
   ready: z.boolean(),
+  gpuBusy: z.boolean().optional(),
   lastHeartbeat: z.number(),
   reason: z.string().optional(),
 });
