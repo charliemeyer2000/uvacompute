@@ -305,6 +305,71 @@ export default function NodesDocsPage() {
         </div>
       </section>
 
+      <section
+        id="gpu-sharing"
+        className="border border-gray-200 p-4 sm:p-6 space-y-6"
+      >
+        <h3 className="text-lg font-semibold mb-2">
+          gpu sharing &amp; protection
+        </h3>
+        <p className="text-sm text-gray-600 mb-4">
+          when your node is in nvidia mode, you can still use your own gpu for
+          local work. uvacompute automatically detects when the gpu is in use
+          and prevents scheduling conflicts.
+        </p>
+
+        <div>
+          <h4 className="font-medium mb-2">how it works</h4>
+          <p className="text-sm text-gray-600 mb-3">
+            the <code className="bg-gray-100 px-1">gpu-guardian</code> daemon is
+            installed automatically during node setup. it monitors your gpu
+            device files using linux fanotify and periodic scans:
+          </p>
+          <ul className="list-disc ml-6 space-y-1 text-sm text-gray-600">
+            <li>
+              when you start a gpu process (e.g. pytorch, llama.cpp), the
+              guardian detects it within seconds and marks your gpu as busy
+            </li>
+            <li>
+              while the gpu is marked busy, no new gpu jobs will be scheduled on
+              your node
+            </li>
+            <li>
+              when your process finishes, the guardian removes the busy marker
+              and gpu jobs can be scheduled again
+            </li>
+          </ul>
+        </div>
+
+        <div>
+          <h4 className="font-medium mb-2">gpu mode behavior</h4>
+          <ul className="list-disc ml-6 space-y-1 text-sm text-gray-600">
+            <li>
+              <strong>nvidia mode:</strong> gpu-guardian runs automatically.
+              your local gpu usage is detected and protected.
+            </li>
+            <li>
+              <strong>vfio mode:</strong> gpu-guardian is stopped. the gpu is
+              fully passed through to vms and cannot be accessed by the host.
+            </li>
+          </ul>
+          <p className="text-xs text-gray-500 mt-2">
+            switching gpu modes with{" "}
+            <code className="bg-gray-100 px-1">uva node gpu-mode</code>{" "}
+            automatically starts or stops the guardian.
+          </p>
+        </div>
+
+        <div className="p-4 bg-gray-50 border border-gray-200">
+          <p className="text-sm text-gray-600">
+            <strong>note:</strong> gpu-guardian only distinguishes between host
+            processes and kubernetes (job) processes. if you are running a local
+            gpu workload, all gpus on the node are marked as busy — even on
+            multi-gpu systems.
+          </p>
+        </div>
+      </section>
+
       <section id="additional-commands">
         <h3 className="text-lg font-semibold mb-4">additional commands</h3>
 

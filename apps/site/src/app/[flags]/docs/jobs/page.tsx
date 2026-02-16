@@ -99,6 +99,18 @@ export default function JobsDocsPage() {
                 uva jobs run --gpu pytorch/pytorch:latest python train.py
               </code>
             </CodeBlock>
+            <p className="text-xs text-gray-500 mt-2">
+              gpu jobs are only scheduled on nodes where the gpu is idle. if a
+              node owner is using their gpu locally, jobs will wait until a gpu
+              becomes available. check{" "}
+              <a
+                href="https://status.uvacompute.com"
+                className="text-orange-accent underline"
+              >
+                status.uvacompute.com
+              </a>{" "}
+              for current gpu availability.
+            </p>
           </div>
 
           <div>
