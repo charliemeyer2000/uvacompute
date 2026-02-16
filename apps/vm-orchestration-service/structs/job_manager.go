@@ -47,6 +47,16 @@ func NewJobManager(limits JobResourceLimits, jobProvider JobProvider, callbackCl
 }
 
 func (jm *JobManager) CreateJob(req JobCreationRequest) (string, error) {
+	// Check GPU busy state before acquiring the lock — this makes a K8s API call
+	if requestGpus := IntOrDefault(req.Gpus, DefaultJobGpus); requestGpus > 0 {
+		allBusy, err := jm.jobProvider.AreAllGpuNodesBusy(context.Background())
+		if err != nil {
+			log.Printf("WARNING: Failed to check GPU busy state: %v", err)
+		} else if allBusy {
+			return "", fmt.Errorf("insufficient GPU resources: all GPU nodes are currently in use by their owners")
+		}
+	}
+
 	jm.mu.Lock()
 	defer jm.mu.Unlock()
 
@@ -515,16 +525,6 @@ func (jm *JobManager) checkResourceAvailability(req JobCreationRequest) error {
 	if totalGpus+requestGpus > jm.limits.MaxGpus {
 		return fmt.Errorf("insufficient GPU resources: requested %d GPUs, %d already allocated, limit is %d",
 			requestGpus, totalGpus, jm.limits.MaxGpus)
-	}
-
-	if requestGpus > 0 {
-		ctx := context.Background()
-		allBusy, err := jm.jobProvider.AreAllGpuNodesBusy(ctx)
-		if err != nil {
-			log.Printf("WARNING: Failed to check GPU busy state: %v", err)
-		} else if allBusy {
-			return fmt.Errorf("insufficient GPU resources: all GPU nodes are currently in use by their owners")
-		}
 	}
 
 	return nil

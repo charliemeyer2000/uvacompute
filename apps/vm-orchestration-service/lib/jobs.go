@@ -43,7 +43,7 @@ func (j *JobAdapter) AreAllGpuNodesBusy(ctx context.Context) (bool, error) {
 		return false, nil
 	}
 	for _, node := range nodes.Items {
-		if _, busy := node.Labels["uvacompute.com/gpu-busy"]; !busy {
+		if node.Labels["uvacompute.com/gpu-busy"] != "true" {
 			return false, nil
 		}
 	}
