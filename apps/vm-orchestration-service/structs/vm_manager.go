@@ -13,6 +13,7 @@ import (
 type VMResourceLimits struct {
 	MaxCpus int
 	MaxRam  int
+	MaxDisk int // 0 = read dynamically from node labels
 	MaxGpus int
 }
 
@@ -26,6 +27,7 @@ type VMProvider interface {
 	ListVMs() ([]ListVM, error)
 	HasVfioCapableNode(ctx context.Context) (bool, error)
 	GetAvailableGPUs(ctx context.Context) (int, error)
+	GetClusterStorageGB(ctx context.Context) (int, error)
 }
 
 type VMManager struct {
@@ -614,18 +616,20 @@ func (vm *VMManager) checkResourceAvailability(req VMCreationRequest) error {
 		}
 	}
 
-	var totalCpus, totalRam, totalGpus int
+	var totalCpus, totalRam, totalDisk, totalGpus int
 
 	for _, vmState := range vm.vmMap {
 		if vmState.Status == VM_STATUS_READY || vmState.Status == VM_STATUS_PENDING {
 			totalCpus += vmState.Cpus
 			totalRam += vmState.Ram
+			totalDisk += vmState.Disk
 			totalGpus += vmState.Gpus
 		}
 	}
 
 	requestCpus := IntOrDefault(req.Cpus, DefaultCpus)
 	requestRam := IntOrDefault(req.Ram, DefaultRam)
+	requestDisk := IntOrDefault(req.Disk, DefaultDisk)
 
 	if totalCpus+requestCpus > vm.limits.MaxCpus {
 		return fmt.Errorf("insufficient CPU resources: requested %d vCPUs, %d already allocated, limit is %d",
@@ -635,6 +639,22 @@ func (vm *VMManager) checkResourceAvailability(req VMCreationRequest) error {
 	if totalRam+requestRam > vm.limits.MaxRam {
 		return fmt.Errorf("insufficient RAM: requested %d GiB, %d already allocated, limit is %d GiB",
 			requestRam, totalRam, vm.limits.MaxRam)
+	}
+
+	// Check disk — use static limit if set, otherwise read from node labels
+	maxDisk := vm.limits.MaxDisk
+	if maxDisk == 0 {
+		ctx := context.Background()
+		clusterStorage, err := vm.vmProvider.GetClusterStorageGB(ctx)
+		if err != nil {
+			log.Printf("WARNING: Failed to check cluster storage: %v - skipping disk check", err)
+		} else if clusterStorage > 0 {
+			maxDisk = clusterStorage
+		}
+	}
+	if maxDisk > 0 && totalDisk+requestDisk > maxDisk {
+		return fmt.Errorf("insufficient storage: requested %d GiB, %d already allocated, limit is %d GiB",
+			requestDisk, totalDisk, maxDisk)
 	}
 
 	if totalGpus+requestGpus > vm.limits.MaxGpus {
