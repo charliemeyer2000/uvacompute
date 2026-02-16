@@ -1053,8 +1053,27 @@ check_gpu_workloads || exit 1
 
 echo "Switching \${#GPU_PCIS[@]} GPU(s) to vfio mode..."
 
-# Unload nvidia modules
-rmmod nvidia_uvm nvidia_drm nvidia_modeset nvidia 2>/dev/null || true
+# Stop nvidia device plugin on this node so modules can be unloaded
+HOSTNAME=\$(hostname)
+PLUGIN_POD=\$(kubectl get pods -n kube-system -l app=nvidia-device-plugin-daemonset \
+    --field-selector spec.nodeName=\${HOSTNAME} -o name 2>/dev/null | head -1)
+if [[ -n "\${PLUGIN_POD}" ]]; then
+    echo "Stopping nvidia device plugin..."
+    kubectl delete \${PLUGIN_POD} -n kube-system --grace-period=5 --wait=true 2>/dev/null || true
+    sleep 2
+fi
+
+# Unload nvidia modules (retry — device plugin may take a moment to release)
+for attempt in 1 2 3 4 5; do
+    rmmod nvidia_uvm nvidia_drm nvidia_modeset nvidia 2>/dev/null && break
+    echo "Modules in use, retrying... (\${attempt}/5)"
+    sleep 3
+done
+if lsmod | grep -q "^nvidia "; then
+    echo "✗ Failed to unload nvidia modules after 5 attempts"
+    echo "  Check for processes using the GPU: lsof /dev/nvidia*"
+    exit 1
+fi
 
 # Unbind from nvidia if bound
 for pci in "\${GPU_PCIS[@]}" "\${AUDIO_PCIS[@]}"; do
@@ -1151,8 +1170,8 @@ esac
 
 echo
 echo "To switch modes:"
-echo "  sudo gpu-mode-nvidia  # For container GPU access"
-echo "  sudo gpu-mode-vfio    # For VM GPU passthrough"
+echo "  uva node gpu-mode nvidia  # For container GPU access"
+echo "  uva node gpu-mode vfio    # For VM GPU passthrough"
 SCRIPT
     chmod +x /usr/local/bin/gpu-mode-status
 
