@@ -12,7 +12,7 @@ This skill configures the RTX 5090 for VFIO passthrough to KubeVirt VMs.
 
 ```bash
 # Check current GPU mode
-ssh root@100.97.247.28 "gpu-mode-status"
+ssh root@100.97.247.28 "uva node gpu-mode status"
 
 # Check driver binding (should show vfio-pci for BOTH devices)
 ssh root@100.97.247.28 "lspci -nnks c1:00"
@@ -117,7 +117,7 @@ lspci -nnks c1:00
 kubectl label node aiworkstation uvacompute.com/gpu-mode=vfio --overwrite
 
 # Final check
-gpu-mode-status
+uva node gpu-mode status
 ```
 
 ## Hardware Reference

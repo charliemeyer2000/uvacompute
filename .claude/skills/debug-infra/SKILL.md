@@ -75,7 +75,7 @@ ssh root@***REDACTED_IP*** "kubectl describe vmi VM_NAME -n uvacompute"
 **On the workstation node:**
 
 ```bash
-ssh workstation "gpu-mode-status"
+ssh workstation "uva node gpu-mode status"
 ```
 
 **Check GPU mode label:**
@@ -87,13 +87,13 @@ ssh root@***REDACTED_IP*** "kubectl get node aiworkstation -o jsonpath='{.metada
 **Switch to VFIO mode (for VM passthrough):**
 
 ```bash
-ssh workstation "sudo gpu-mode-vfio"
+ssh workstation "sudo uva node gpu-mode vfio"
 ```
 
 **Switch to NVIDIA mode (for containers):**
 
 ```bash
-ssh workstation "sudo gpu-mode-nvidia"
+ssh workstation "sudo uva node gpu-mode nvidia"
 ```
 
 ### 4. Check vm-orchestration-service
@@ -221,9 +221,9 @@ ssh root@***REDACTED_IP*** "ssh -p TUNNEL_PORT localhost hostname"
 
 ### GPU VM Won't Start
 
-1. Verify GPU mode is VFIO: `ssh workstation "gpu-mode-status"`
+1. Verify GPU mode is VFIO: `ssh workstation "uva node gpu-mode status"`
 2. Check node label: `kubectl get node -l uvacompute.com/gpu-mode=vfio`
-3. Switch to VFIO if needed: `ssh workstation "sudo gpu-mode-vfio"`
+3. Switch to VFIO if needed: `ssh workstation "sudo uva node gpu-mode vfio"`
 4. Check IOMMU is enabled: `ssh workstation "dmesg | grep -i iommu"`
 
 ### Node Not Joining
