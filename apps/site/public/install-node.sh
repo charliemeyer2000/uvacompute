@@ -312,10 +312,11 @@ install_k3s_agent() {
     
     curl -sfL https://get.k3s.io | K3S_URL="${K3S_URL}" K3S_TOKEN="${K3S_TOKEN}" sh -s - agent
 
-    # Configure kubelet to use systemd cgroup driver (fixes KubeVirt virt-handler cgroup issues)
-    if ! grep -q "K3S_KUBELET_ARG" /etc/systemd/system/k3s-agent.service.env 2>/dev/null; then
-        log_info "Configuring kubelet cgroup driver..."
-        echo 'K3S_KUBELET_ARG=--cgroup-driver=systemd' >> /etc/systemd/system/k3s-agent.service.env
+    # Configure kubelet: cgroup driver + image GC (prune unused images at 70% disk usage)
+    if ! grep -q "image-gc-high-threshold" /etc/systemd/system/k3s-agent.service.env 2>/dev/null; then
+        log_info "Configuring kubelet args..."
+        sed -i '/^K3S_KUBELET_ARG/d' /etc/systemd/system/k3s-agent.service.env 2>/dev/null || true
+        echo 'K3S_KUBELET_ARG=--cgroup-driver=systemd --image-gc-high-threshold=70 --image-gc-low-threshold=50' >> /etc/systemd/system/k3s-agent.service.env
         systemctl daemon-reload
         systemctl restart k3s-agent
     fi
