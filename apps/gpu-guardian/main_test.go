@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"runtime"
+	"strconv"
 	"testing"
 )
 
@@ -55,26 +56,12 @@ func TestDiscoverGpuDevices_Filtering(t *testing.T) {
 
 	for _, tc := range testCases {
 		trimmed := tc.name[len("nvidia"):]
-		_, err := parseInt(trimmed)
+		_, err := strconv.Atoi(trimmed)
 		isGpu := err == nil
 		if isGpu != tc.want {
 			t.Errorf("%s: got isGpu=%v, want %v", tc.name, isGpu, tc.want)
 		}
 	}
-}
-
-func parseInt(s string) (int, error) {
-	if s == "" {
-		return 0, os.ErrInvalid
-	}
-	n := 0
-	for _, c := range s {
-		if c < '0' || c > '9' {
-			return 0, os.ErrInvalid
-		}
-		n = n*10 + int(c-'0')
-	}
-	return n, nil
 }
 
 func TestTriggerScan_NonBlocking(t *testing.T) {
