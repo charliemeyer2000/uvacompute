@@ -32,6 +32,24 @@ func (j *JobAdapter) K8sClient() kubernetes.Interface {
 	return j.client
 }
 
+func (j *JobAdapter) AreAllGpuNodesBusy(ctx context.Context) (bool, error) {
+	nodes, err := j.client.CoreV1().Nodes().List(ctx, metav1.ListOptions{
+		LabelSelector: "uvacompute.com/has-gpu=true",
+	})
+	if err != nil {
+		return false, fmt.Errorf("failed to list GPU nodes: %w", err)
+	}
+	if len(nodes.Items) == 0 {
+		return false, nil
+	}
+	for _, node := range nodes.Items {
+		if _, busy := node.Labels["uvacompute.com/gpu-busy"]; !busy {
+			return false, nil
+		}
+	}
+	return true, nil
+}
+
 func NewJobAdapter(config JobAdapterConfig) (*JobAdapter, error) {
 	var restConfig *rest.Config
 	var err error
