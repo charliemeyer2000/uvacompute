@@ -121,6 +121,7 @@ func main() {
 		VMResourceLimits: structs.VMResourceLimits{
 			MaxCpus: 16,
 			MaxRam:  64,
+			MaxDisk: 0, // 0 = read dynamically from node labels
 			MaxGpus: 1,
 		},
 		JobResourceLimits: structs.JobResourceLimits{
