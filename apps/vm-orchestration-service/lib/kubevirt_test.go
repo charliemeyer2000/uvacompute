@@ -7,6 +7,38 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
+func TestGoldenPVCName(t *testing.T) {
+	t.Parallel()
+
+	name1 := GoldenPVCName("docker://quay.io/containerdisks/ubuntu:22.04")
+	name2 := GoldenPVCName("docker://quay.io/containerdisks/ubuntu:24.04")
+	name3 := GoldenPVCName("docker://quay.io/containerdisks/ubuntu:22.04")
+
+	if name1 != name3 {
+		t.Errorf("same URL should produce same name: %s vs %s", name1, name3)
+	}
+	if name1 == name2 {
+		t.Errorf("different URLs should produce different names: %s vs %s", name1, name2)
+	}
+	if !strings.HasPrefix(name1, "uvacompute-golden-") {
+		t.Errorf("expected uvacompute-golden- prefix, got %s", name1)
+	}
+}
+
+func TestGoldenImageSource(t *testing.T) {
+	t.Parallel()
+
+	registrySource := goldenImageSource("docker://quay.io/containerdisks/ubuntu:22.04")
+	if _, ok := registrySource["registry"]; !ok {
+		t.Error("docker:// URL should produce registry source")
+	}
+
+	httpSource := goldenImageSource("https://cloud-images.ubuntu.com/releases/22.04/release/ubuntu-22.04-server-cloudimg-amd64.img")
+	if _, ok := httpSource["http"]; !ok {
+		t.Error("https:// URL should produce http source")
+	}
+}
+
 func TestDefaultKubeVirtConfig(t *testing.T) {
 	config := DefaultKubeVirtConfig()
 
@@ -14,12 +46,8 @@ func TestDefaultKubeVirtConfig(t *testing.T) {
 		t.Errorf("Expected default namespace 'uvacompute', got '%s'", config.Namespace)
 	}
 
-	if config.VMImageCPU == "" {
-		t.Error("Expected VMImageCPU to have a default value")
-	}
-
-	if config.VMImageGPU == "" {
-		t.Error("Expected VMImageGPU to have a default value")
+	if config.VMImageSourceURL == "" {
+		t.Error("Expected VMImageSourceURL to have a default value")
 	}
 }
 
@@ -35,9 +63,7 @@ func TestBuildVMObject(t *testing.T) {
 		vmId           string
 		cpus           int
 		ram            int
-		disk           int
 		gpus           int
-		image          string
 		cloudInit      string
 		expectGPU      bool
 		expectedCores  int64
@@ -48,9 +74,7 @@ func TestBuildVMObject(t *testing.T) {
 			vmId:           "test-vm-1",
 			cpus:           2,
 			ram:            8,
-			disk:           64,
 			gpus:           0,
-			image:          "test-image:latest",
 			cloudInit:      "#cloud-config\n",
 			expectGPU:      false,
 			expectedCores:  2,
@@ -61,9 +85,7 @@ func TestBuildVMObject(t *testing.T) {
 			vmId:           "test-vm-2",
 			cpus:           4,
 			ram:            16,
-			disk:           128,
 			gpus:           1,
-			image:          "gpu-image:latest",
 			cloudInit:      "#cloud-config\n",
 			expectGPU:      true,
 			expectedCores:  4,
@@ -73,7 +95,7 @@ func TestBuildVMObject(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			vm := adapter.buildVMObject(tt.vmId, tt.cpus, tt.ram, tt.disk, tt.gpus, tt.image, tt.cloudInit)
+			vm := adapter.buildVMObject(tt.vmId, tt.cpus, tt.ram, tt.gpus, tt.cloudInit)
 
 			if vm.GetName() != tt.vmId {
 				t.Errorf("Expected VM name '%s', got '%s'", tt.vmId, vm.GetName())
@@ -166,7 +188,7 @@ func TestBuildVMObjectWithCloudInit(t *testing.T) {
 
 	secretName := "cloudinit-test-vm"
 
-	vm := adapter.buildVMObject("test-vm", 2, 8, 64, 0, "test-image", secretName)
+	vm := adapter.buildVMObject("test-vm", 2, 8, 0, secretName)
 
 	spec, _, _ := unstructured.NestedMap(vm.Object, "spec")
 	template, _, _ := unstructured.NestedMap(spec, "template")
@@ -199,6 +221,41 @@ func TestBuildVMObjectWithCloudInit(t *testing.T) {
 	}
 }
 
+func TestBuildVMObjectUsesPVCVolume(t *testing.T) {
+	t.Parallel()
+	config := DefaultKubeVirtConfig()
+	adapter := &KubeVirtAdapter{
+		namespace: config.Namespace,
+		config:    config,
+	}
+
+	vm := adapter.buildVMObject("test-vm", 2, 8, 0, "cloudinit-test")
+
+	// Should NOT have dataVolumeTemplates (PVC is pre-created)
+	_, found, _ := unstructured.NestedSlice(vm.Object, "spec", "dataVolumeTemplates")
+	if found {
+		t.Error("Should not have dataVolumeTemplates")
+	}
+
+	// Should reference PVC directly
+	volumes, _, _ := unstructured.NestedSlice(vm.Object, "spec", "template", "spec", "volumes")
+	var rootVolume map[string]interface{}
+	for _, v := range volumes {
+		vol := v.(map[string]interface{})
+		if vol["name"] == "rootdisk" {
+			rootVolume = vol
+			break
+		}
+	}
+	if rootVolume == nil {
+		t.Fatal("Expected rootdisk volume")
+	}
+	claimName, found, _ := unstructured.NestedString(rootVolume, "persistentVolumeClaim", "claimName")
+	if !found || claimName != "test-vm-rootdisk" {
+		t.Errorf("Expected PVC claimName=test-vm-rootdisk, got %s", claimName)
+	}
+}
+
 func TestBuildVMObjectGPUDevices(t *testing.T) {
 	config := DefaultKubeVirtConfig()
 	adapter := &KubeVirtAdapter{
@@ -206,7 +263,7 @@ func TestBuildVMObjectGPUDevices(t *testing.T) {
 		config:    config,
 	}
 
-	vm := adapter.buildVMObject("test-vm", 4, 16, 64, 2, "gpu-image", "cloudinit-test-vm")
+	vm := adapter.buildVMObject("test-vm", 4, 16, 2, "cloudinit-test-vm")
 
 	spec, _, _ := unstructured.NestedMap(vm.Object, "spec")
 	template, _, _ := unstructured.NestedMap(spec, "template")
