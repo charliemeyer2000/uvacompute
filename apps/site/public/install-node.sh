@@ -704,6 +704,57 @@ CONTAINERD_EOF
     log_info "Note: RuntimeClass and device plugin are managed by the hub"
 }
 
+# Install gpu-guardian: detects host GPU usage and sets node label
+install_gpu_guardian() {
+    local guardian_url="https://github.com/uvacompute/uvacompute/releases/download/gpu-guardian-v1/gpu-guardian-linux-amd64"
+    local guardian_bin="/usr/local/bin/gpu-guardian"
+
+    log_info "Installing gpu-guardian..."
+
+    if [[ -f "${guardian_bin}" ]]; then
+        log_info "gpu-guardian already installed"
+    else
+        if curl -fsSL -o "${guardian_bin}" "${guardian_url}" 2>/dev/null; then
+            chmod +x "${guardian_bin}"
+            log_success "gpu-guardian downloaded"
+        else
+            log_warn "Could not download gpu-guardian — GPU busy detection will not be available"
+            log_info "You can install it manually later from: ${guardian_url}"
+            return
+        fi
+    fi
+
+    cat > /etc/systemd/system/uvacompute-gpu-guardian.service <<EOF
+[Unit]
+Description=UVACompute GPU Guardian - detect host GPU usage
+After=k3s-agent.service uvacompute-tunnel.service
+Wants=k3s-agent.service
+
+[Service]
+Type=simple
+ExecStartPre=/bin/sleep 5
+ExecStart=/usr/local/bin/gpu-guardian
+ExecStopPost=/usr/bin/kubectl label node %H uvacompute.com/gpu-busy- --overwrite
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+EOF
+    systemctl daemon-reload
+    systemctl enable uvacompute-gpu-guardian.service
+
+    # Start immediately if in nvidia mode
+    local current_driver
+    current_driver=$(lspci -nnk -s "${GPU_PCI_IDS[0]:-}" 2>/dev/null | grep "driver in use" | awk '{print $NF}')
+    if [[ "${current_driver}" == "nvidia" ]]; then
+        systemctl start uvacompute-gpu-guardian || true
+        log_info "gpu-guardian started (nvidia mode detected)"
+    else
+        log_info "gpu-guardian installed but not started (not in nvidia mode)"
+    fi
+}
+
 # Generate GPU mode switching scripts
 generate_gpu_scripts() {
     if [[ "${GPU_DETECTED}" != "true" ]]; then
@@ -908,6 +959,8 @@ if nvidia-smi > /dev/null 2>&1; then
     nvidia-ctk cdi generate --output=/etc/cdi/nvidia.yaml 2>/dev/null || true
     update_k8s_label "nvidia"
     report_gpu_mode "nvidia" "true"
+    # Start GPU guardian to detect host GPU usage
+    systemctl start uvacompute-gpu-guardian 2>/dev/null || true
 else
     echo "✗ Failed to switch to nvidia mode"
     report_gpu_mode "nvidia" "false"
@@ -1066,6 +1119,10 @@ update_k8s_label() {
 
 echo "Checking for active GPU workloads..."
 check_gpu_workloads || exit 1
+
+# Stop GPU guardian before switching modes
+systemctl stop uvacompute-gpu-guardian 2>/dev/null || true
+kubectl label node \$(hostname) uvacompute.com/gpu-busy- --overwrite 2>/dev/null || true
 
 echo "Switching \${#GPU_PCIS[@]} GPU(s) to vfio mode..."
 
@@ -1250,6 +1307,9 @@ WantedBy=multi-user.target
 EOF
     systemctl daemon-reload
     systemctl enable uvacompute-gpu-reconcile.service
+
+    # Install gpu-guardian daemon
+    install_gpu_guardian
 
     log_success "GPU mode scripts created at /usr/local/bin/"
     log_info "  gpu-mode-nvidia - Switch to container mode"
@@ -1664,11 +1724,15 @@ uninstall_node() {
     rm -rf /var/lib/uvacompute
     rm -rf /var/lib/rancher/k3s/storage
 
-    # Remove GPU scripts
+    # Remove GPU scripts and guardian
     log_info "Removing GPU scripts..."
+    systemctl stop uvacompute-gpu-guardian 2>/dev/null || true
+    systemctl disable uvacompute-gpu-guardian 2>/dev/null || true
     rm -f /usr/local/bin/gpu-mode-nvidia
     rm -f /usr/local/bin/gpu-mode-vfio
     rm -f /usr/local/bin/gpu-mode-status
+    rm -f /usr/local/bin/gpu-guardian
+    rm -f /etc/systemd/system/uvacompute-gpu-guardian.service
 
     # Remove virtctl
     rm -f /usr/local/bin/virtctl

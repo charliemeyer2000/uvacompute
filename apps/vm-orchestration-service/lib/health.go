@@ -17,6 +17,7 @@ type NodeHealthStatus struct {
 	NodeId        string `json:"nodeId"`
 	K8sNodeName   string `json:"k8sNodeName"`
 	Ready         bool   `json:"ready"`
+	GpuBusy       bool   `json:"gpuBusy"`
 	LastHeartbeat int64  `json:"lastHeartbeat"`
 	Reason        string `json:"reason,omitempty"`
 }
@@ -124,6 +125,10 @@ func (h *HealthMonitor) checkNodeHealth(ctx context.Context) ([]NodeHealthStatus
 		status := NodeHealthStatus{
 			K8sNodeName: node.Name,
 			NodeId:      getNodeId(&node),
+		}
+
+		if _, busy := node.Labels["uvacompute.com/gpu-busy"]; busy {
+			status.GpuBusy = true
 		}
 
 		for _, condition := range node.Status.Conditions {

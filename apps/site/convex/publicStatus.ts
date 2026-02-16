@@ -28,9 +28,15 @@ export const getClusterStatus = query({
     const totalRAM = onlineNodes.reduce((sum, n) => sum + (n.ram || 0), 0);
     const totalGPUs = onlineNodes.reduce((sum, n) => sum + (n.gpus || 0), 0);
 
-    const usedVCPUs = activeVms.reduce((sum, vm) => sum + vm.cpus, 0);
-    const usedRAM = activeVms.reduce((sum, vm) => sum + vm.ram, 0);
-    const usedGPUs = activeVms.reduce((sum, vm) => sum + vm.gpus, 0);
+    const usedVCPUs =
+      activeVms.reduce((sum, vm) => sum + vm.cpus, 0) +
+      activeJobs.reduce((sum, job) => sum + job.cpus, 0);
+    const usedRAM =
+      activeVms.reduce((sum, vm) => sum + vm.ram, 0) +
+      activeJobs.reduce((sum, job) => sum + job.ram, 0);
+    const usedGPUs =
+      activeVms.reduce((sum, vm) => sum + vm.gpus, 0) +
+      activeJobs.reduce((sum, job) => sum + job.gpus, 0);
 
     const gpuByType: Record<string, { total: number; available: number }> = {};
     for (const node of onlineNodes) {
@@ -44,19 +50,27 @@ export const getClusterStatus = query({
       }
     }
 
-    const vmsUsingGpuByNode: Record<string, number> = {};
+    const gpuUsedByNode: Record<string, number> = {};
     for (const vm of activeVms) {
       if (vm.nodeId && vm.gpus > 0) {
-        vmsUsingGpuByNode[vm.nodeId] =
-          (vmsUsingGpuByNode[vm.nodeId] || 0) + vm.gpus;
+        gpuUsedByNode[vm.nodeId] = (gpuUsedByNode[vm.nodeId] || 0) + vm.gpus;
+      }
+    }
+    for (const job of activeJobs) {
+      if (job.nodeId && job.gpus > 0) {
+        gpuUsedByNode[job.nodeId] = (gpuUsedByNode[job.nodeId] || 0) + job.gpus;
       }
     }
 
     for (const node of onlineNodes) {
       const gpuType = node.gpuType || "unknown";
       const nodeGpus = node.gpus || 0;
-      const usedOnNode = vmsUsingGpuByNode[node.nodeId] || 0;
       if (nodeGpus > 0 && gpuByType[gpuType]) {
+        if (node.gpuBusy) {
+          // Host is using the GPU — none available for scheduling
+          continue;
+        }
+        const usedOnNode = gpuUsedByNode[node.nodeId] || 0;
         gpuByType[gpuType].available += Math.max(0, nodeGpus - usedOnNode);
       }
     }
@@ -77,6 +91,7 @@ export const getClusterStatus = query({
       ram: node.ram || 0,
       gpus: node.gpus || 0,
       gpuType: node.gpuType || "none",
+      gpuBusy: node.gpuBusy ?? false,
       supportsVMs: node.supportsVMs ?? true,
       supportsJobs: node.supportsJobs ?? true,
       lastHeartbeat: node.lastHeartbeat,
