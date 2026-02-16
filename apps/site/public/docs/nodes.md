@@ -134,13 +134,20 @@ uva node workloads <nodeId>
 
 shows active vms and jobs running on a specific contributed node.
 
-### configure resource sharing
+### manage gpu mode
 
 ```bash
-uva node config
+uva node gpu-mode status
 ```
 
-interactively configure how many cpus, ram, and gpus to share with the network.
+show current gpu driver mode (nvidia for containers, vfio for vm passthrough).
+
+```bash
+uva node gpu-mode nvidia   # switch to container mode
+uva node gpu-mode vfio     # switch to vm passthrough mode
+```
+
+switch gpu between container mode (nvidia driver, for jobs) and vm passthrough mode (vfio-pci driver, for gpu vms). must be run on the node.
 
 ### list your tokens
 
