@@ -3,7 +3,6 @@ package lib
 import (
 	"context"
 	"encoding/base64"
-	"encoding/json"
 	"fmt"
 	"log"
 	"strings"
@@ -58,11 +57,11 @@ var (
 )
 
 type KubeVirtAdapter struct {
-	client         dynamic.Interface
-	typedClient    kubernetes.Interface
-	namespace      string
-	config         KubeVirtConfig
-	goldenImageMu  sync.Mutex
+	client        dynamic.Interface
+	typedClient   kubernetes.Interface
+	namespace     string
+	config        KubeVirtConfig
+	goldenImageMu sync.Mutex
 }
 
 func NewKubeVirtAdapter(config KubeVirtConfig) (*KubeVirtAdapter, error) {
@@ -132,7 +131,6 @@ func (k *KubeVirtAdapter) CreateVM(vmId string, cpus, ram, disk, gpus int, sshPu
 
 	vm := k.buildVMObject(vmId, cpus, ram, gpus, secretName)
 
-	statusCallback(structs.VM_STATUS_BOOTING)
 	_, err = k.client.Resource(vmGVR).Namespace(k.namespace).Create(ctx, vm, metav1.CreateOptions{})
 	if err != nil {
 		_ = k.deleteCloudInitSecret(ctx, secretName)
@@ -452,7 +450,6 @@ func (k *KubeVirtAdapter) buildVMObject(vmId string, cpus, ram, gpus int, cloudI
 	}
 
 	if gpus > 0 {
-		// Use hostDevices for VFIO GPU passthrough instead of gpus (which requires nvidia-device-plugin)
 		gpuDevices := make([]interface{}, gpus)
 		for i := 0; i < gpus; i++ {
 			gpuDevices[i] = map[string]interface{}{
@@ -463,7 +460,6 @@ func (k *KubeVirtAdapter) buildVMObject(vmId string, cpus, ram, gpus int, cloudI
 		devices["hostDevices"] = gpuDevices
 	}
 
-	// Build the template spec
 	templateSpec := map[string]interface{}{
 		"domain": map[string]interface{}{
 			"cpu": map[string]interface{}{
@@ -496,29 +492,24 @@ func (k *KubeVirtAdapter) buildVMObject(vmId string, cpus, ram, gpus int, cloudI
 			map[string]interface{}{
 				"name": "cloudinit",
 				"cloudInitNoCloud": map[string]interface{}{
-					// Use secretRef to bypass 2048 byte limit for inline userData
 					"secretRef": map[string]interface{}{
 						"name": cloudInitSecretName,
 					},
 				},
 			},
 		},
-		// Readiness probe: check if cloud-init is complete (port 9999)
-		// This port is only opened at the very end of cloud-init, ensuring all
-		// provisioning (including frpc for --expose VMs) is complete before READY
 		"readinessProbe": map[string]interface{}{
 			"tcpSocket": map[string]interface{}{
 				"port": int64(9999),
 			},
-			"initialDelaySeconds": int64(30),  // Wait 30s before first check (VM needs to boot)
-			"periodSeconds":       int64(10),  // Check every 10 seconds
-			"timeoutSeconds":      int64(5),   // Timeout for each check
-			"failureThreshold":    int64(180), // Allow up to 30 minutes for provisioning (180 * 10s)
-			"successThreshold":    int64(1),   // One success is enough
+			"initialDelaySeconds": int64(30),
+			"periodSeconds":       int64(10),
+			"timeoutSeconds":      int64(5),
+			"failureThreshold":    int64(180),
+			"successThreshold":    int64(1),
 		},
 	}
 
-	// Add nodeSelector for GPU VMs to ensure they land on nodes with GPU in vfio mode
 	if gpus > 0 {
 		templateSpec["nodeSelector"] = map[string]interface{}{
 			"uvacompute.com/gpu-mode": "vfio",
@@ -609,7 +600,6 @@ func (k *KubeVirtAdapter) waitForVMBooted(ctx context.Context, vmId string, stat
 	}
 }
 
-// checkPodSchedulingFailure checks if the virt-launcher pod for a VM has failed to schedule.
 func (k *KubeVirtAdapter) checkPodSchedulingFailure(ctx context.Context, vmId string) error {
 	pods, err := k.typedClient.CoreV1().Pods(k.namespace).List(ctx, metav1.ListOptions{
 		LabelSelector: fmt.Sprintf("kubevirt.io/domain=%s", vmId),
@@ -631,7 +621,6 @@ func (k *KubeVirtAdapter) checkPodSchedulingFailure(ctx context.Context, vmId st
 }
 
 func (k *KubeVirtAdapter) waitForCloudInitComplete(ctx context.Context, vmId string) error {
-	// Allow up to 30 minutes for cloud-init (CUDA install can take 15+ minutes)
 	timeout := time.After(30 * time.Minute)
 	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
@@ -648,13 +637,11 @@ func (k *KubeVirtAdapter) waitForCloudInitComplete(ctx context.Context, vmId str
 				continue
 			}
 
-			// Check if the VM is still running
 			phase, _, _ := unstructured.NestedString(vmi.Object, "status", "phase")
 			if phase == "Failed" {
 				return fmt.Errorf("VM failed during provisioning")
 			}
 
-			// Check the Ready condition (set by readinessProbe)
 			if k.isVMReady(vmi) {
 				log.Printf("Cloud-init complete on VM %s", vmId)
 				return nil
@@ -676,7 +663,6 @@ func (k *KubeVirtAdapter) isVMReady(vmi *unstructured.Unstructured) bool {
 		}
 		condType, _ := condMap["type"].(string)
 		condStatus, _ := condMap["status"].(string)
-		// KubeVirt sets the "Ready" condition based on readinessProbe
 		if condType == "Ready" && condStatus == "True" {
 			return true
 		}
@@ -716,9 +702,8 @@ func (k *KubeVirtAdapter) DestroyVM(vmId string) error {
 		return fmt.Errorf("failed to delete VM: %w", err)
 	}
 
-	// Clean up the associated cloud-init secret
 	secretName := fmt.Sprintf("cloudinit-%s", vmId)
-	_ = k.deleteCloudInitSecret(ctx, secretName) // Ignore error if secret doesn't exist
+	_ = k.deleteCloudInitSecret(ctx, secretName)
 
 	return nil
 }
@@ -914,7 +899,6 @@ func (k *KubeVirtAdapter) GetAvailableGPUs(ctx context.Context) (int, error) {
 
 	totalAvailable := 0
 	for _, node := range nodes.Items {
-		// Skip nodes that are not ready
 		nodeReady := false
 		for _, condition := range node.Status.Conditions {
 			if condition.Type == corev1.NodeReady && condition.Status == corev1.ConditionTrue {
@@ -931,7 +915,6 @@ func (k *KubeVirtAdapter) GetAvailableGPUs(ctx context.Context) (int, error) {
 			continue
 		}
 
-		// Count GPUs requested by running pods on this node
 		pods, err := k.typedClient.CoreV1().Pods("").List(ctx, metav1.ListOptions{
 			FieldSelector: fmt.Sprintf("spec.nodeName=%s,status.phase!=Failed,status.phase!=Succeeded", node.Name),
 		})
@@ -994,15 +977,9 @@ func (k *KubeVirtAdapter) EnsureNamespace() error {
 	return nil
 }
 
-func prettyPrint(v interface{}) string {
-	b, _ := json.MarshalIndent(v, "", "  ")
-	return string(b)
-}
-
 func generateCloudInitUserData(sshPublicKeys []string, startupScript, cloudInitConfig string, hasGPU bool, expose *int, exposeSubdomain *string) string {
 	sshConfig := generateSSHKeysConfig(sshPublicKeys)
 
-	// Always use MIME multipart to inject base templates
 	return generateMIMEMultipart(sshConfig, startupScript, cloudInitConfig, hasGPU, expose, exposeSubdomain)
 }
 
