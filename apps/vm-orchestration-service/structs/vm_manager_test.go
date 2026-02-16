@@ -49,6 +49,10 @@ func (m *MockVMProvider) GetAvailableGPUs(ctx context.Context) (int, error) {
 	return 1, nil // Mock always returns 1 available GPU for tests
 }
 
+func (m *MockVMProvider) GetClusterStorageGB(ctx context.Context) (int, error) {
+	return 200, nil // Mock returns 200GB cluster storage
+}
+
 func TestCreateVM(t *testing.T) {
 	limits := VMResourceLimits{MaxCpus: 16, MaxRam: 64, MaxGpus: 1}
 	mockProvider := &MockVMProvider{}
@@ -494,6 +498,57 @@ func TestResourceLimits_GPU(t *testing.T) {
 
 	if !strings.Contains(err.Error(), "insufficient GPU resources") {
 		t.Fatalf("Expected GPU resource limit error, got: %v", err)
+	}
+}
+
+func TestResourceLimits_Disk(t *testing.T) {
+	limits := VMResourceLimits{MaxCpus: 16, MaxRam: 64, MaxGpus: 1}
+	// MaxDisk=0 means read from GetClusterStorageGB (mock returns 200GB)
+	mockProvider := &MockVMProvider{}
+	vm := NewVMManager(limits, mockProvider, nil)
+
+	disk := 100
+	req1 := VMCreationRequest{
+		VMId:   uuid.New().String(),
+		Hours:  24,
+		UserId: "test-user",
+		Disk:   &disk,
+	}
+
+	vmId1, err := vm.CreateVM(req1)
+	if err != nil {
+		t.Fatalf("First VM (100GB) should succeed: %v", err)
+	}
+
+	vm.WaitForStatus(vmId1, VM_STATUS_READY)
+
+	req2 := VMCreationRequest{
+		VMId:   uuid.New().String(),
+		Hours:  24,
+		UserId: "test-user",
+		Disk:   &disk,
+	}
+
+	vmId2, err := vm.CreateVM(req2)
+	if err != nil {
+		t.Fatalf("Second VM (100GB, total 200GB) should succeed: %v", err)
+	}
+
+	vm.WaitForStatus(vmId2, VM_STATUS_READY)
+
+	req3 := VMCreationRequest{
+		VMId:   uuid.New().String(),
+		Hours:  24,
+		UserId: "test-user",
+		Disk:   &disk,
+	}
+	_, err = vm.CreateVM(req3)
+	if err == nil {
+		t.Fatal("Third VM should fail due to disk limits (300GB > 200GB)")
+	}
+
+	if !strings.Contains(err.Error(), "insufficient storage") {
+		t.Fatalf("Expected storage limit error, got: %v", err)
 	}
 }
 

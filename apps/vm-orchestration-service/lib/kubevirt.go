@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"log"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -943,6 +944,25 @@ func (k *KubeVirtAdapter) GetAvailableGPUs(ctx context.Context) (int, error) {
 	}
 
 	return totalAvailable, nil
+}
+
+func (k *KubeVirtAdapter) GetClusterStorageGB(ctx context.Context) (int, error) {
+	nodes, err := k.typedClient.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return 0, fmt.Errorf("failed to list nodes: %w", err)
+	}
+
+	var totalStorageGB int
+	for _, node := range nodes.Items {
+		if v, ok := node.Labels["uvacompute.com/storage"]; ok {
+			gb, err := strconv.Atoi(v)
+			if err == nil {
+				totalStorageGB += gb
+			}
+		}
+	}
+
+	return totalStorageGB, nil
 }
 
 func (k *KubeVirtAdapter) EnsureNamespace() error {

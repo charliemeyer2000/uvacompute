@@ -420,6 +420,22 @@ EOF
     fi
 }
 
+# Configure local-path provisioner to use our storage directory
+configure_storage_provisioner() {
+    log_step "Configuring storage provisioner path"
+
+    local config_json="{\\\"nodePathMap\\\":[{\\\"node\\\":\\\"DEFAULT_PATH_FOR_NON_LISTED_NODES\\\",\\\"paths\\\":[\\\"${STORAGE_PATH}\\\"]}]}"
+
+    # k3s built-in local-path-provisioner uses kube-system namespace
+    if ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -i "${SSH_KEY_PATH}" \
+        "root@${TUNNEL_HOST}" \
+        "kubectl patch configmap local-path-config -n kube-system --type=merge -p '{\"data\":{\"config.json\":\"${config_json}\"}}'" 2>/dev/null; then
+        log_success "Storage provisioner configured to use ${STORAGE_PATH}"
+    else
+        log_warn "Could not configure storage provisioner. PVCs may use default k3s path."
+    fi
+}
+
 # Detect NVIDIA GPUs
 detect_gpu() {
     log_step "Detecting GPU"
@@ -1643,9 +1659,10 @@ uninstall_node() {
         /usr/local/bin/k3s-agent-uninstall.sh
     fi
 
-    # Force remove entire storage directory
-    log_info "Removing storage directory..."
+    # Force remove storage directories
+    log_info "Removing storage directories..."
     rm -rf /var/lib/uvacompute
+    rm -rf /var/lib/rancher/k3s/storage
 
     # Remove GPU scripts
     log_info "Removing GPU scripts..."
@@ -1795,6 +1812,7 @@ main() {
     setup_kubeconfig
     annotate_node
     label_node
+    configure_storage_provisioner
     save_state
     print_summary
 }
