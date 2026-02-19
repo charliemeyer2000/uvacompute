@@ -200,6 +200,8 @@ func main() {
 	app.Router.Use(middleware.Recoverer)
 	app.Router.Use(middleware.Timeout(60 * time.Second))
 
+	app.Router.Get("/health", handlers.HealthHandler)
+
 	app.SetupAllRoutes(
 		handlers.RootHandler,
 		structs.VMHandlers{
