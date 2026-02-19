@@ -1,37 +1,53 @@
 import { subDays } from "date-fns";
 import { StatusContent } from "./_components/status-content";
 import {
-  getStatus,
-  getStatusHistory,
+  getAllStatuses,
+  getAllHistories,
   getClusterStatus,
 } from "./actions/status-actions";
-import type { DayAggregate, ClusterStatus } from "@/types";
+import { SERVICE_IDS } from "@/types";
+import type {
+  DayAggregate,
+  ClusterStatus,
+  ServiceId,
+  StatusData,
+} from "@/types";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 export default async function StatusPage() {
-  let initialData;
-  let historyData: DayAggregate[] = [];
+  let initialStatuses: Record<ServiceId, StatusData> | null = null;
+  let historyDataMap: Record<ServiceId, DayAggregate[]> = {} as Record<
+    ServiceId,
+    DayAggregate[]
+  >;
   let clusterStatus: ClusterStatus | null = null;
   let loadError = null;
 
   try {
-    initialData = await getStatus();
+    initialStatuses = await getAllStatuses();
   } catch (error) {
     console.error("Failed to load initial status:", error);
     loadError =
       error instanceof Error ? error.message : "failed to load status data";
-    initialData = {
+  }
+
+  // Build fallback if status fetch failed
+  if (!initialStatuses) {
+    const fallback: StatusData = {
       current: {
         status: "down" as const,
         responseTime: 0,
         timestamp: Date.now(),
-        error: loadError,
+        error: loadError || "failed to load status data",
       },
       history: [],
       uptime: 0,
     };
+    initialStatuses = Object.fromEntries(
+      SERVICE_IDS.map((id) => [id, fallback]),
+    ) as Record<ServiceId, StatusData>;
   }
 
   try {
@@ -42,33 +58,45 @@ export default async function StatusPage() {
 
   try {
     const days = 30;
-    const result = await getStatusHistory(days);
+    const allHistories = await getAllHistories(days);
     const today = new Date();
-    const dataMap = new Map<string, DayAggregate>(
-      result.aggregated.map((d) => [d.date, d]),
-    );
 
-    for (let i = days - 1; i >= 0; i--) {
-      const date = subDays(today, i).toISOString().split("T")[0];
-      const dayData = dataMap.get(date);
+    for (const serviceId of SERVICE_IDS) {
+      const result = allHistories[serviceId];
+      const dataMap = new Map<string, DayAggregate>(
+        result.aggregated.map((d) => [d.date, d]),
+      );
 
-      if (dayData) {
-        historyData.push(dayData);
-      } else {
-        historyData.push({
-          date,
-          operational: 0,
-          degraded: 0,
-          down: 0,
-          total: 0,
-          uptimePercentage: 0,
-          avgResponseTime: 0,
-          expectedChecks: 0,
-        });
+      const filled: DayAggregate[] = [];
+      for (let i = days - 1; i >= 0; i--) {
+        const date = subDays(today, i).toISOString().split("T")[0];
+        const dayData = dataMap.get(date);
+
+        if (dayData) {
+          filled.push(dayData);
+        } else {
+          filled.push({
+            date,
+            operational: 0,
+            degraded: 0,
+            down: 0,
+            total: 0,
+            uptimePercentage: 0,
+            avgResponseTime: 0,
+            expectedChecks: 0,
+          });
+        }
       }
+      historyDataMap[serviceId] = filled;
     }
   } catch (error) {
     console.error("Failed to load history data:", error);
+    // Ensure all services have empty arrays
+    for (const serviceId of SERVICE_IDS) {
+      if (!historyDataMap[serviceId]) {
+        historyDataMap[serviceId] = [];
+      }
+    }
   }
 
   return (
@@ -108,8 +136,8 @@ export default async function StatusPage() {
         )}
 
         <StatusContent
-          initialData={initialData}
-          historyData={historyData}
+          initialStatuses={initialStatuses}
+          historyDataMap={historyDataMap}
           initialClusterStatus={clusterStatus}
         />
 
