@@ -1,9 +1,21 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getStatus } from "@/app/actions/status-actions";
+import { SERVICE_IDS } from "@/types";
+import type { ServiceId } from "@/types";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const serviceParam =
+    request.nextUrl.searchParams.get("service") || "orchestrator";
+
+  if (!SERVICE_IDS.includes(serviceParam as ServiceId)) {
+    return NextResponse.json(
+      { error: `Invalid service. Must be one of: ${SERVICE_IDS.join(", ")}` },
+      { status: 400 },
+    );
+  }
+
   try {
-    const data = await getStatus();
+    const data = await getStatus(serviceParam as ServiceId);
 
     return NextResponse.json(data, {
       headers: {

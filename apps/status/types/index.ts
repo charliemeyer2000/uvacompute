@@ -1,5 +1,13 @@
 import { z } from "zod";
 
+export const SERVICE_IDS = ["orchestrator", "platform", "frp"] as const;
+export type ServiceId = (typeof SERVICE_IDS)[number];
+export const SERVICE_NAMES: Record<ServiceId, string> = {
+  orchestrator: "vm orchestration",
+  platform: "platform api",
+  frp: "ssh tunnels",
+};
+
 export const serviceStatusSchema = z.enum(["operational", "degraded", "down"]);
 export type ServiceStatus = z.infer<typeof serviceStatusSchema>;
 

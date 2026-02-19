@@ -1,25 +1,47 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { StatusData, DayAggregate, ClusterStatus } from "@/types";
-import { getStatus, getClusterStatus } from "../actions/status-actions";
+import { SERVICE_IDS, SERVICE_NAMES } from "@/types";
+import type {
+  StatusData,
+  DayAggregate,
+  ClusterStatus,
+  ServiceId,
+  ServiceStatus as ServiceStatusType,
+} from "@/types";
+import { getAllStatuses, getClusterStatus } from "../actions/status-actions";
 import { StatusBadge } from "./status-badge";
 import { ServiceStatus } from "./service-status";
 import { ClusterResources } from "./cluster-resources";
 import { NodeList } from "./node-list";
 
 interface StatusContentProps {
-  initialData: StatusData;
-  historyData?: DayAggregate[];
+  initialStatuses: Record<ServiceId, StatusData>;
+  historyDataMap: Record<ServiceId, DayAggregate[]>;
   initialClusterStatus?: ClusterStatus | null;
 }
 
+function deriveOverallStatus(
+  statuses: Record<ServiceId, StatusData>,
+  clusterStatus: ClusterStatus | null,
+): ServiceStatusType {
+  const all: ServiceStatusType[] = SERVICE_IDS.map(
+    (id) => statuses[id].current.status,
+  );
+  if (clusterStatus) all.push(clusterStatus.overall);
+
+  if (all.includes("down")) return "down";
+  if (all.includes("degraded")) return "degraded";
+  return "operational";
+}
+
 export function StatusContent({
-  initialData,
-  historyData = [],
+  initialStatuses,
+  historyDataMap,
   initialClusterStatus = null,
 }: StatusContentProps) {
-  const [statusData, setStatusData] = useState<StatusData>(initialData);
+  const [statuses, setStatuses] =
+    useState<Record<ServiceId, StatusData>>(initialStatuses);
   const [clusterStatus, setClusterStatus] = useState<ClusterStatus | null>(
     initialClusterStatus,
   );
@@ -29,10 +51,10 @@ export function StatusContent({
   async function fetchAllStatus() {
     try {
       const [serviceData, cluster] = await Promise.all([
-        getStatus(),
+        getAllStatuses(),
         getClusterStatus(),
       ]);
-      setStatusData(serviceData);
+      setStatuses(serviceData);
       setClusterStatus(cluster);
       setLastUpdate(new Date());
       setFetchError(null);
@@ -49,7 +71,7 @@ export function StatusContent({
     return () => clearInterval(interval);
   }, []);
 
-  const overallStatus = clusterStatus?.overall || statusData.current.status;
+  const overallStatus = deriveOverallStatus(statuses, clusterStatus);
 
   return (
     <div className="space-y-8">
@@ -79,12 +101,17 @@ export function StatusContent({
           </h2>
           <div className="flex-1 h-px bg-gray-200" />
         </div>
-        <ServiceStatus
-          name="vm orchestration"
-          status={statusData.current.status}
-          responseTime={statusData.current.responseTime}
-          historyData={historyData}
-        />
+        <div className="space-y-4">
+          {SERVICE_IDS.map((serviceId) => (
+            <ServiceStatus
+              key={serviceId}
+              name={SERVICE_NAMES[serviceId]}
+              status={statuses[serviceId].current.status}
+              responseTime={statuses[serviceId].current.responseTime}
+              historyData={historyDataMap[serviceId]}
+            />
+          ))}
+        </div>
       </section>
     </div>
   );

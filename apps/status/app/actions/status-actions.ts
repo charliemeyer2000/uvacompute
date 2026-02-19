@@ -6,7 +6,9 @@ import {
   getHistoricalData,
 } from "@/lib/redis";
 import { fetchClusterStatus } from "@/lib/cluster";
+import { SERVICE_IDS } from "@/types";
 import type {
+  ServiceId,
   StatusData,
   DayAggregate,
   HistoricalData,
@@ -14,9 +16,9 @@ import type {
   ClusterStatus,
 } from "@/types";
 
-export async function getStatus(): Promise<StatusData> {
-  const current = await getCurrentStatus();
-  const history = await getRecentChecks(24);
+export async function getStatus(serviceId: ServiceId): Promise<StatusData> {
+  const current = await getCurrentStatus(serviceId);
+  const history = await getRecentChecks(serviceId, 24);
 
   if (!current) {
     return {
@@ -45,10 +47,11 @@ export async function getStatus(): Promise<StatusData> {
 }
 
 export async function getStatusHistory(
+  serviceId: ServiceId,
   days: number = 7,
 ): Promise<HistoricalData> {
   const maxDays = Math.min(Math.max(days, 1), 30);
-  const checks = await getHistoricalData(maxDays);
+  const checks = await getHistoricalData(serviceId, maxDays);
 
   const dayMap = new Map<string, StatusCheck[]>();
 
@@ -91,7 +94,9 @@ export async function getStatusHistory(
     }
 
     const uptimePercentage =
-      expectedChecks > 0 ? (operational / expectedChecks) * 100 : 0;
+      expectedChecks > 0
+        ? (Math.min(operational, expectedChecks) / expectedChecks) * 100
+        : 0;
     const avgResponseTime =
       total > 0
         ? dayChecks.reduce((sum, c) => sum + c.responseTime, 0) / total
@@ -114,6 +119,24 @@ export async function getStatusHistory(
     aggregated: aggregated.sort((a, b) => a.date.localeCompare(b.date)),
     totalChecks: checks.length,
   };
+}
+
+export async function getAllStatuses(): Promise<Record<ServiceId, StatusData>> {
+  const entries = await Promise.all(
+    SERVICE_IDS.map(async (id) => [id, await getStatus(id)] as const),
+  );
+  return Object.fromEntries(entries) as Record<ServiceId, StatusData>;
+}
+
+export async function getAllHistories(
+  days: number = 30,
+): Promise<Record<ServiceId, HistoricalData>> {
+  const entries = await Promise.all(
+    SERVICE_IDS.map(
+      async (id) => [id, await getStatusHistory(id, days)] as const,
+    ),
+  );
+  return Object.fromEntries(entries) as Record<ServiceId, HistoricalData>;
 }
 
 export async function getClusterStatus(): Promise<ClusterStatus | null> {

@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"net/http"
+	"os/exec"
 	"strings"
 
 	"vm-orchestration-service/lib"
@@ -15,6 +16,21 @@ func RootHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]string{"status": "alive"})
+}
+
+func HealthHandler(w http.ResponseWriter, r *http.Request) {
+	frpsRunning := exec.Command("pgrep", "-x", "frps").Run() == nil
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]any{
+		"status": "alive",
+		"services": map[string]any{
+			"frps": map[string]any{
+				"running": frpsRunning,
+			},
+		},
+	})
 }
 
 func GetVMStatusHandler(app *structs.App, w http.ResponseWriter, r *http.Request, vmId string) {
