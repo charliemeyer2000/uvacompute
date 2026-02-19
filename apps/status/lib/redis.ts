@@ -1,5 +1,5 @@
 import Redis from "ioredis";
-import type { ServiceStatus, StatusCheck } from "@/types";
+import type { ServiceId, ServiceStatus, StatusCheck } from "@/types";
 
 let redis: Redis | null = null;
 
@@ -21,6 +21,7 @@ function getRedisClient(): Redis {
 const THIRTY_DAYS_SECONDS = 30 * 24 * 60 * 60;
 
 export async function recordStatusCheck(
+  serviceId: ServiceId,
   status: ServiceStatus,
   responseTime: number,
   timestamp: number,
@@ -34,24 +35,27 @@ export async function recordStatusCheck(
     ...(error && { error }),
   };
 
-  const key = `status:check:${timestamp}`;
+  const key = `status:${serviceId}:check:${timestamp}`;
+  const timelineKey = `status:${serviceId}:timeline`;
   await client.setex(key, THIRTY_DAYS_SECONDS, JSON.stringify(check));
-  await client.zadd("status:checks:timeline", timestamp, key);
+  await client.zadd(timelineKey, timestamp, key);
   await client.zremrangebyscore(
-    "status:checks:timeline",
+    timelineKey,
     0,
     Date.now() - THIRTY_DAYS_SECONDS * 1000,
   );
 }
 
 export async function getRecentChecks(
+  serviceId: ServiceId,
   hours: number = 24,
 ): Promise<StatusCheck[]> {
   const client = getRedisClient();
   const now = Date.now();
   const since = now - hours * 60 * 60 * 1000;
 
-  const keys = await client.zrangebyscore("status:checks:timeline", since, now);
+  const timelineKey = `status:${serviceId}:timeline`;
+  const keys = await client.zrangebyscore(timelineKey, since, now);
 
   if (keys.length === 0) {
     return [];
@@ -63,9 +67,12 @@ export async function getRecentChecks(
     .map((val) => JSON.parse(val));
 }
 
-export async function getCurrentStatus(): Promise<StatusCheck | null> {
+export async function getCurrentStatus(
+  serviceId: ServiceId,
+): Promise<StatusCheck | null> {
   const client = getRedisClient();
-  const keys = await client.zrevrange("status:checks:timeline", 0, 0);
+  const timelineKey = `status:${serviceId}:timeline`;
+  const keys = await client.zrevrange(timelineKey, 0, 0);
 
   if (keys.length === 0) {
     return null;
@@ -76,8 +83,9 @@ export async function getCurrentStatus(): Promise<StatusCheck | null> {
 }
 
 export async function getHistoricalData(
+  serviceId: ServiceId,
   days: number = 7,
 ): Promise<StatusCheck[]> {
   const maxDays = Math.min(days, 30);
-  return getRecentChecks(maxDays * 24);
+  return getRecentChecks(serviceId, maxDays * 24);
 }
