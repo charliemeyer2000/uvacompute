@@ -22,8 +22,9 @@ export async function GET(
   }
 
   try {
-    const releaseResponse = await fetch(
-      `https://api.github.com/repos/${GITHUB_REPO}/releases/latest`,
+    // List releases and find the latest CLI release (tagged cli-v*)
+    const releasesResponse = await fetch(
+      `https://api.github.com/repos/${GITHUB_REPO}/releases?per_page=20`,
       {
         headers: {
           Authorization: `Bearer ${GITHUB_TOKEN}`,
@@ -32,11 +33,19 @@ export async function GET(
       },
     );
 
-    if (!releaseResponse.ok) {
-      throw new Error("Failed to fetch release info");
+    if (!releasesResponse.ok) {
+      throw new Error("Failed to fetch releases");
     }
 
-    const release = await releaseResponse.json();
+    const releases = await releasesResponse.json();
+    const release = releases.find((r: any) => r.tag_name.startsWith("cli-v"));
+
+    if (!release) {
+      return NextResponse.json(
+        { error: "No CLI release found" },
+        { status: 404 },
+      );
+    }
 
     const asset = release.assets.find((a: any) => a.name === fileName);
     if (!asset) {
