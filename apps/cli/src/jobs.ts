@@ -618,8 +618,40 @@ async function streamLogs(jobId: string, token: string): Promise<void> {
   });
 }
 
+async function resolveJobId(
+  identifier: string,
+  token: string,
+): Promise<string> {
+  const response = await fetch(`${BASE_URL}/api/jobs`, {
+    method: "GET",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) throw new Error("Failed to fetch jobs");
+
+  const { jobs } = JobListResponseSchema.parse(await response.json());
+
+  const exact = jobs.find((j) => j.jobId === identifier);
+  if (exact) return exact.jobId;
+
+  const byPrefix = jobs.filter((j) => j.jobId.startsWith(identifier));
+  if (byPrefix.length === 1) return byPrefix[0]!.jobId;
+  if (byPrefix.length > 1)
+    throw new Error(
+      `Ambiguous ID prefix "${identifier}" — matches ${byPrefix.length} jobs`,
+    );
+
+  const byName = jobs.filter((j) => j.name === identifier);
+  if (byName.length === 1) return byName[0]!.jobId;
+  if (byName.length > 1)
+    throw new Error(
+      `Ambiguous name "${identifier}" — matches ${byName.length} jobs`,
+    );
+
+  throw new Error(`Job not found: ${identifier}`);
+}
+
 async function getJobLogs(
-  jobId: string,
+  identifier: string,
   options: { tail?: string; follow?: boolean },
 ): Promise<void> {
   const spinner = ora("Fetching logs...").start();
@@ -628,6 +660,15 @@ async function getJobLogs(
     const token = loadToken();
     if (!token) {
       spinner.fail("Not authenticated. Please run 'uva login' first.");
+      process.exit(1);
+    }
+
+    let jobId: string;
+    try {
+      jobId = await resolveJobId(identifier, token);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Job not found";
+      spinner.fail(msg);
       process.exit(1);
     }
 
@@ -706,9 +747,28 @@ async function getJobLogs(
 }
 
 async function cancelJob(
-  jobId: string,
+  identifier: string,
   options: { force?: boolean },
 ): Promise<void> {
+  const token = loadToken();
+  if (!token) {
+    console.log(
+      theme.warning("Not authenticated. Please run 'uva login' first."),
+    );
+    process.exit(1);
+  }
+
+  let jobId: string;
+  const resolveSpinner = ora("Resolving job...").start();
+  try {
+    jobId = await resolveJobId(identifier, token);
+    resolveSpinner.stop();
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "Job not found";
+    resolveSpinner.fail(msg);
+    process.exit(1);
+  }
+
   if (!options.force && process.stdout.isTTY) {
     const confirmed = await confirm({
       message: `Cancel job ${jobId}?`,
@@ -723,12 +783,6 @@ async function cancelJob(
   const spinner = ora(`Cancelling job ${jobId}...`).start();
 
   try {
-    const token = loadToken();
-    if (!token) {
-      spinner.fail("Not authenticated. Please run 'uva login' first.");
-      process.exit(1);
-    }
-
     let response: Response;
     try {
       response = await fetch(`${BASE_URL}/api/jobs/${jobId}`, {
