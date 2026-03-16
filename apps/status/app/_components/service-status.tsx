@@ -143,7 +143,7 @@ export function ServiceStatus({
                 <div className="flex justify-between gap-6">
                   <span className="text-gray-400">checks</span>
                   <span>
-                    {hoveredDay.operational} / {hoveredDay.expectedChecks}
+                    {hoveredDay.operational} / {hoveredDay.total}
                   </span>
                 </div>
                 <div className="flex justify-between gap-6">
