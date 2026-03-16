@@ -34,8 +34,9 @@ yarn-error.log*
 incus/
 better-auth/
 
-# env files anywhere
+# env files anywhere (except .env.example)
 **/.env*
+!**/.env.example
 
 # nix
 result

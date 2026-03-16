@@ -7,6 +7,8 @@ import (
 
 func TestGenerateFrpcCloudInit_Basic(t *testing.T) {
 	t.Setenv("FRP_AUTH_TOKEN", "test-token")
+	t.Setenv("FRP_SERVER_ADDR", "10.0.0.1")
+	t.Setenv("FRP_SERVER_PORT", "7000")
 
 	result := GenerateFrpcCloudInit(8080, "my-app", false)
 
@@ -14,8 +16,8 @@ func TestGenerateFrpcCloudInit_Basic(t *testing.T) {
 		t.Error("should start with #cloud-config")
 	}
 
-	if !strings.Contains(result, `serverAddr = "***REDACTED_IP***"`) {
-		t.Error("should contain server address")
+	if !strings.Contains(result, `serverAddr = "10.0.0.1"`) {
+		t.Error("should contain server address from env")
 	}
 	if !strings.Contains(result, "serverPort = 7000") {
 		t.Error("should contain server port")
@@ -41,6 +43,7 @@ func TestGenerateFrpcCloudInit_Basic(t *testing.T) {
 
 func TestGenerateFrpcCloudInit_WithCompletionMarker(t *testing.T) {
 	t.Setenv("FRP_AUTH_TOKEN", "test-token")
+	t.Setenv("FRP_SERVER_ADDR", "10.0.0.1")
 
 	result := GenerateFrpcCloudInit(3000, "test-sub", true)
 
@@ -54,6 +57,7 @@ func TestGenerateFrpcCloudInit_WithCompletionMarker(t *testing.T) {
 
 func TestGenerateFrpcCloudInit_FrpcInstallScripts(t *testing.T) {
 	t.Setenv("FRP_AUTH_TOKEN", "test-token")
+	t.Setenv("FRP_SERVER_ADDR", "10.0.0.1")
 
 	result := GenerateFrpcCloudInit(8080, "test", false)
 
@@ -71,23 +75,25 @@ func TestGenerateFrpcCloudInit_FrpcInstallScripts(t *testing.T) {
 	}
 }
 
-func TestGenerateFrpcCloudInit_DefaultToken(t *testing.T) {
+func TestGetFRPAuthToken_Panics(t *testing.T) {
 	t.Setenv("FRP_AUTH_TOKEN", "")
 
-	result := GenerateFrpcCloudInit(8080, "test", false)
-
-	if !strings.Contains(result, `auth.token = "default-token"`) {
-		t.Error("should use default token when FRP_AUTH_TOKEN is empty")
-	}
+	defer func() {
+		if r := recover(); r == nil {
+			t.Error("GetFRPAuthToken should panic when FRP_AUTH_TOKEN is empty")
+		}
+	}()
+	GetFRPAuthToken()
 }
 
 func TestGenerateFrpcConfig(t *testing.T) {
 	t.Setenv("FRP_AUTH_TOKEN", "my-token")
+	t.Setenv("FRP_SERVER_ADDR", "10.0.0.1")
 
 	result := GenerateFrpcConfig(9090, "my-subdomain")
 
-	if !strings.Contains(result, `serverAddr = "***REDACTED_IP***"`) {
-		t.Error("should contain server address")
+	if !strings.Contains(result, `serverAddr = "10.0.0.1"`) {
+		t.Error("should contain server address from env")
 	}
 	if !strings.Contains(result, "localPort = 9090") {
 		t.Error("should contain local port")
@@ -112,11 +118,39 @@ func TestGetFRPAuthToken(t *testing.T) {
 			t.Errorf("GetFRPAuthToken() = %q, want %q", got, "custom-token")
 		}
 	})
+}
+
+func TestGetFRPServerAddr(t *testing.T) {
+	t.Run("returns env value", func(t *testing.T) {
+		t.Setenv("FRP_SERVER_ADDR", "1.2.3.4")
+		if got := GetFRPServerAddr(); got != "1.2.3.4" {
+			t.Errorf("GetFRPServerAddr() = %q, want %q", got, "1.2.3.4")
+		}
+	})
+
+	t.Run("panics when empty", func(t *testing.T) {
+		t.Setenv("FRP_SERVER_ADDR", "")
+		defer func() {
+			if r := recover(); r == nil {
+				t.Error("GetFRPServerAddr should panic when empty")
+			}
+		}()
+		GetFRPServerAddr()
+	})
+}
+
+func TestGetFRPServerPort(t *testing.T) {
+	t.Run("returns env value", func(t *testing.T) {
+		t.Setenv("FRP_SERVER_PORT", "8000")
+		if got := GetFRPServerPort(); got != 8000 {
+			t.Errorf("GetFRPServerPort() = %d, want %d", got, 8000)
+		}
+	})
 
 	t.Run("returns default when empty", func(t *testing.T) {
-		t.Setenv("FRP_AUTH_TOKEN", "")
-		if got := GetFRPAuthToken(); got != "default-token" {
-			t.Errorf("GetFRPAuthToken() = %q, want %q", got, "default-token")
+		t.Setenv("FRP_SERVER_PORT", "")
+		if got := GetFRPServerPort(); got != 7000 {
+			t.Errorf("GetFRPServerPort() = %d, want %d", got, 7000)
 		}
 	})
 }

@@ -1,6 +1,6 @@
 #!/bin/bash
 # Hub Setup Script for uvacompute
-# Run this on the DO VPS (***REDACTED_IP***) to set up the federated k3s control plane
+# Run this on the hub VPS to set up the federated k3s control plane
 #
 # Usage: sudo ./hub-setup.sh
 #
@@ -40,7 +40,7 @@ if [ "$EUID" -ne 0 ]; then
 fi
 
 # Configuration
-HUB_IP="${HUB_IP:-***REDACTED_IP***}"
+HUB_IP="${HUB_IP:?HUB_IP environment variable is required}"
 KUBEVIRT_VERSION="${KUBEVIRT_VERSION:-v1.3.0}"
 
 log_info "Starting hub setup on ${HUB_IP}"

@@ -5,7 +5,7 @@ import { internal } from "./_generated/api";
 const SUBDOMAIN_CHARS = "abcdefghijklmnopqrstuvwxyz0123456789";
 const SUBDOMAIN_LENGTH = 8;
 
-const HUB_IP = "***REDACTED_IP***";
+const HUB_IP = process.env.HUB_IP!;
 
 function generateRandomSubdomain(): string {
   let result = "";

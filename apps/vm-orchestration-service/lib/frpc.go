@@ -3,18 +3,36 @@ package lib
 import (
 	"fmt"
 	"os"
+	"strconv"
 )
 
-const (
-	FRPServerAddr = "***REDACTED_IP***"
-	FRPServerPort = 7000
-)
+// GetFRPServerAddr returns the FRP server address from environment
+func GetFRPServerAddr() string {
+	addr := os.Getenv("FRP_SERVER_ADDR")
+	if addr == "" {
+		panic("FRP_SERVER_ADDR environment variable is required")
+	}
+	return addr
+}
+
+// GetFRPServerPort returns the FRP server port from environment
+func GetFRPServerPort() int {
+	portStr := os.Getenv("FRP_SERVER_PORT")
+	if portStr == "" {
+		return 7000
+	}
+	port, err := strconv.Atoi(portStr)
+	if err != nil {
+		return 7000
+	}
+	return port
+}
 
 // GetFRPAuthToken returns the FRP authentication token from environment
 func GetFRPAuthToken() string {
 	token := os.Getenv("FRP_AUTH_TOKEN")
 	if token == "" {
-		return "default-token"
+		panic("FRP_AUTH_TOKEN environment variable is required")
 	}
 	return token
 }
@@ -164,7 +182,7 @@ runcmd:
   - systemctl start frpc
   - /usr/local/bin/verify-frpc.sh
   - echo "frpc started for subdomain %s on port %d" >> /var/log/uvacompute-init.log%s
-`, FRPServerAddr, FRPServerPort, authToken, subdomain, port, subdomain, subdomain, port, completionRuncmd)
+`, GetFRPServerAddr(), GetFRPServerPort(), authToken, subdomain, port, subdomain, subdomain, port, completionRuncmd)
 }
 
 // GenerateFrpcConfig generates just the frpc.toml configuration content
@@ -181,5 +199,5 @@ name = "%s"
 type = "http"
 localPort = %d
 subdomain = "%s"
-`, FRPServerAddr, FRPServerPort, authToken, subdomain, port, subdomain)
+`, GetFRPServerAddr(), GetFRPServerPort(), authToken, subdomain, port, subdomain)
 }

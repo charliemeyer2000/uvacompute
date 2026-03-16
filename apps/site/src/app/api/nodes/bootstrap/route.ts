@@ -4,7 +4,7 @@ import { api } from "../../../../../convex/_generated/api";
 import { z } from "zod";
 import crypto from "crypto";
 
-const DO_VPS_HOST = "***REDACTED_IP***";
+const DO_VPS_HOST = process.env.DO_VPS_HOST!;
 const DEFAULT_TUNNEL_USER = "root";
 const DEFAULT_KUBECONFIG_PATH = "/etc/rancher/k3s/k3s.yaml";
 const K3S_API_URL = `https://${DO_VPS_HOST}:6443`;

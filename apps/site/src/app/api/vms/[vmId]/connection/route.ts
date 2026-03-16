@@ -5,7 +5,7 @@ import { api } from "../../../../../../convex/_generated/api";
 import crypto from "crypto";
 
 // VM proxy configuration
-const VM_PROXY_HOST = process.env.VM_PROXY_HOST || "***REDACTED_IP***";
+const VM_PROXY_HOST = process.env.VM_PROXY_HOST!;
 const VM_PROXY_PORT = parseInt(process.env.VM_PROXY_PORT || "22", 10);
 const VM_PROXY_USER = process.env.VM_PROXY_USER || "vmproxy";
 const VM_PROXY_SECRET = process.env.VM_PROXY_SECRET || "";

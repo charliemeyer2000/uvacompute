@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const GITHUB_REPO = "charliemeyer2000/uvacompute";
+const GITHUB_REPO = process.env.GITHUB_REPO || "charliemeyer2000/uvacompute";
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
 
 export async function GET(

@@ -4,7 +4,7 @@
 # Usage: ./scripts/deploy-hub.sh
 #
 # Prerequisites:
-# - SSH access to root@***REDACTED_IP***
+# - SSH access to your hub VPS (set HUB_IP env var)
 # - Hub setup completed (k3s + KubeVirt running)
 # - .env.production configured on hub
 
@@ -29,7 +29,7 @@ log_error() {
 }
 
 # Configuration
-HUB_IP="${HUB_IP:-***REDACTED_IP***}"
+HUB_IP="${HUB_IP:?HUB_IP environment variable is required}"
 HUB_USER="${HUB_USER:-root}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WORKSPACE_ROOT="$(dirname "$SCRIPT_DIR")"
