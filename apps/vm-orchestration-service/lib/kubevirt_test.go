@@ -490,6 +490,7 @@ func TestGenerateMIMEMultipart_WithCloudInitConfig(t *testing.T) {
 
 func TestGenerateMIMEMultipart_WithExpose(t *testing.T) {
 	t.Setenv("FRP_AUTH_TOKEN", "test-token")
+	t.Setenv("FRP_SERVER_ADDR", "10.0.0.1")
 
 	sshConfig := generateSSHKeysConfig(nil)
 	port := 8080
@@ -506,6 +507,7 @@ func TestGenerateMIMEMultipart_WithExpose(t *testing.T) {
 
 func TestGenerateMIMEMultipart_AllFields(t *testing.T) {
 	t.Setenv("FRP_AUTH_TOKEN", "test-token")
+	t.Setenv("FRP_SERVER_ADDR", "10.0.0.1")
 
 	sshKeys := []string{"ssh-rsa AAAA... user@example.com"}
 	sshConfig := generateSSHKeysConfig(sshKeys)
@@ -590,6 +592,7 @@ func TestGenerateSSHKeysConfig(t *testing.T) {
 
 func TestGenerateCloudInitUserData(t *testing.T) {
 	t.Setenv("FRP_AUTH_TOKEN", "test-token")
+	t.Setenv("FRP_SERVER_ADDR", "10.0.0.1")
 
 	result := generateCloudInitUserData([]string{"ssh-rsa AAAA..."}, "", "", false, nil, nil)
 

@@ -25,7 +25,7 @@ export async function submitEarlyAccess({
 
     await resend.emails.send({
       from: "uvacompute <noreply@notifications.uvacompute.com>",
-      to: "***REDACTED_EMAIL***",
+      to: process.env.ADMIN_EMAIL!,
       replyTo: email,
       subject: "new early access request - uvacompute",
       html: `

@@ -12,13 +12,13 @@ Environment="ENV=production"
 Environment="KUBECONFIG=/etc/rancher/k3s/k3s.yaml"
 Environment="KUBEVIRT_NAMESPACE=uvacompute"
 ExecStart=/usr/local/bin/vm-orchestration
-# Establish reverse SSH tunnel to DO VPS for SSH routing
+# Establish reverse SSH tunnel to hub VPS for SSH routing
 # Tunnel config should be in /opt/vm-orchestration-service/tunnel.env:
 #   TUNNEL_PORT=2222
-#   TUNNEL_HOST=***REDACTED_IP***
+#   TUNNEL_HOST=<your-hub-ip>
 #   SSH_KEY_PATH=/root/.ssh/id_ed25519_uvacompute
-ExecStartPost=-/bin/bash -c 'if [ -n "$TUNNEL_PORT" ]; then /usr/bin/autossh -M 0 -f -N -o "ServerAliveInterval 30" -o "ServerAliveCountMax 3" -o "ExitOnForwardFailure yes" -i "${SSH_KEY_PATH:-/root/.ssh/id_ed25519_uvacompute}" -R ${TUNNEL_PORT}:localhost:22 root@${TUNNEL_HOST:-***REDACTED_IP***}; fi'
-ExecStopPost=-/usr/bin/pkill -f "autossh.****REDACTED_IP***"
+ExecStartPost=-/bin/bash -c 'if [ -n "$TUNNEL_PORT" ] && [ -n "$TUNNEL_HOST" ]; then /usr/bin/autossh -M 0 -f -N -o "ServerAliveInterval 30" -o "ServerAliveCountMax 3" -o "ExitOnForwardFailure yes" -i "${SSH_KEY_PATH:-/root/.ssh/id_ed25519_uvacompute}" -R ${TUNNEL_PORT}:localhost:22 root@${TUNNEL_HOST}; fi'
+ExecStopPost=-/bin/bash -c 'if [ -n "$TUNNEL_HOST" ]; then /usr/bin/pkill -f "autossh.*${TUNNEL_HOST}"; fi'
 Restart=always
 RestartSec=10s
 StandardOutput=journal

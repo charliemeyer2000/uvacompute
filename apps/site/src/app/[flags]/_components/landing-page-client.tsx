@@ -117,7 +117,7 @@ export default function LandingPageClient() {
           <ul className="list-none mb-2 space-y-1 italic">
             <li>
               <a
-                href="mailto:***REDACTED_EMAIL***"
+                href="mailto:charlie@uvacompute.com"
                 className="text-orange-accent underline"
               >
                 contact us

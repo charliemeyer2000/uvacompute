@@ -144,14 +144,15 @@ vm-status:
 		echo "" && \
 		kubectl get vmi -n uvacompute
 
-# Deploy to hub (DO VPS)
+# Deploy to hub (DO VPS) - set HUB_HOST env var to your hub IP
+HUB_HOST ?= $(error HUB_HOST is required - set to your hub VPS IP)
 deploy-hub: build-linux
-	@echo "Deploying vm-orchestration to hub (***REDACTED_IP***)..."
-	scp dist/vm-orchestration-linux root@***REDACTED_IP***:/usr/local/bin/vm-orchestration
-	scp hub.service root@***REDACTED_IP***:/etc/systemd/system/vm-orchestration.service
-	ssh root@***REDACTED_IP*** "systemctl daemon-reload && systemctl enable vm-orchestration && systemctl restart vm-orchestration"
+	@echo "Deploying vm-orchestration to hub ($(HUB_HOST))..."
+	scp dist/vm-orchestration-linux root@$(HUB_HOST):/usr/local/bin/vm-orchestration
+	scp hub.service root@$(HUB_HOST):/etc/systemd/system/vm-orchestration.service
+	ssh root@$(HUB_HOST) "systemctl daemon-reload && systemctl enable vm-orchestration && systemctl restart vm-orchestration"
 	@echo "✅ Deployed to hub"
-	@echo "Check status: ssh root@***REDACTED_IP*** 'systemctl status vm-orchestration'"
+	@echo "Check status: ssh root@$(HUB_HOST) 'systemctl status vm-orchestration'"
 
 # CDI and Storage Provisioner
 CDI_VERSION ?= v1.59.0
