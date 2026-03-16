@@ -16,6 +16,16 @@ chmod +x install.sh
 ./install.sh
 ```
 
+### Nix
+
+```bash
+# run directly
+nix run 'https://uvacompute.com/nix/flake.tar.gz'
+
+# install to your profile
+nix profile install 'https://uvacompute.com/nix/flake.tar.gz'
+```
+
 ## Documentation
 
 A comprehensive man page is available. To view it:

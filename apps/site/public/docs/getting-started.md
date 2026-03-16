@@ -10,6 +10,32 @@ run this command in your terminal to install the uva cli:
 curl -fsSL https://uvacompute.com/install.sh | bash
 ```
 
+### alternative: install with nix
+
+if you use [nix](https://nixos.org), you can install the cli from the flake:
+
+```bash
+# run directly
+nix run 'https://uvacompute.com/nix/flake.tar.gz'
+
+# install to your profile
+nix profile install 'https://uvacompute.com/nix/flake.tar.gz'
+```
+
+or add it to your flake inputs:
+
+```nix
+{
+  inputs.uvacompute.url = "https://uvacompute.com/nix/flake.tar.gz";
+
+  # use the package
+  # inputs.uvacompute.packages.${system}.default
+
+  # or use the overlay
+  # inputs.uvacompute.overlays.default
+}
+```
+
 ## 2. create an account
 
 sign up for uvacompute if you haven't already:

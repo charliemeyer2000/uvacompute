@@ -36,3 +36,6 @@ better-auth/
 
 # env files anywhere
 **/.env*
+
+# nix
+result
