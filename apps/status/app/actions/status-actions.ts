@@ -93,10 +93,7 @@ export async function getStatusHistory(
       expectedChecks = EXPECTED_CHECKS_PER_DAY;
     }
 
-    const uptimePercentage =
-      expectedChecks > 0
-        ? (Math.min(operational, expectedChecks) / expectedChecks) * 100
-        : 0;
+    const uptimePercentage = total > 0 ? (operational / total) * 100 : 0;
     const avgResponseTime =
       total > 0
         ? dayChecks.reduce((sum, c) => sum + c.responseTime, 0) / total
