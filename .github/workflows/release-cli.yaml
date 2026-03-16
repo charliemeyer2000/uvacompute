@@ -166,3 +166,62 @@ jobs:
             ./dist/uvacompute-windows.exe/uvacompute-windows.exe
             ./dist/uva.1/uva.1
           generate_release_notes: true
+
+  update-flake:
+    needs: [release, create-release]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+          fetch-depth: 0
+
+      - uses: cachix/install-nix-action@v30
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Update flake.nix hashes
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="${{ needs.release.outputs.version }}"
+          TAG="cli-v${VERSION}"
+
+          # Download release assets
+          gh release download "$TAG" -p 'uvacompute-linux' -p 'uvacompute-macos' -p 'uva.1' -D /tmp/assets
+
+          # Compute SRI hashes
+          LINUX_HASH=$(nix-hash --type sha256 --flat --sri /tmp/assets/uvacompute-linux)
+          MACOS_HASH=$(nix-hash --type sha256 --flat --sri /tmp/assets/uvacompute-macos)
+          MAN_HASH=$(nix-hash --type sha256 --flat --sri /tmp/assets/uva.1)
+
+          echo "Linux hash: $LINUX_HASH"
+          echo "macOS hash: $MACOS_HASH"
+          echo "Man page hash: $MAN_HASH"
+
+          # Update flake.nix
+          sed -i "s|version = \".*\";|version = \"${VERSION}\";|" flake.nix
+
+          # Update Linux hash
+          sed -i "/x86_64-linux/,/};/{s|hash = \"sha256-.*\";|hash = \"${LINUX_HASH}\";|}" flake.nix
+
+          # Update macOS hash
+          sed -i "/aarch64-darwin/,/};/{s|hash = \"sha256-.*\";|hash = \"${MACOS_HASH}\";|}" flake.nix
+
+          # Update man page hash
+          sed -i "s|manPageHash = \"sha256-.*\";|manPageHash = \"${MAN_HASH}\";|" flake.nix
+
+          cat flake.nix
+
+      - name: Update flake.lock
+        run: nix flake update
+
+      - name: Commit flake updates
+        run: |
+          git add flake.nix flake.lock
+          git diff --cached --quiet && echo "No changes" && exit 0
+          git commit -m "chore(nix): update flake to CLI v${{ needs.release.outputs.version }}"
+          git push origin HEAD:${{ github.ref_name }}

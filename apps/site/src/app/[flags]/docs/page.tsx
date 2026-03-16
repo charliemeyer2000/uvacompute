@@ -34,6 +34,29 @@ export default function DocsPage() {
                 curl -fsSL https://uvacompute.com/install.sh | bash
               </code>
             </CodeBlock>
+            <div className="mt-4">
+              <p className="text-sm font-medium text-gray-700 mb-2">
+                alternative: install with nix
+              </p>
+              <p className="text-xs text-gray-500 mb-2">
+                if you use{" "}
+                <a
+                  href="https://nixos.org"
+                  className="text-orange-accent underline"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  nix
+                </a>
+                , you can install the cli from the flake:
+              </p>
+              <CodeBlock>
+                <code className="text-sm text-black">
+                  nix profile install
+                  &apos;https://uvacompute.com/nix/flake.tar.gz&apos;
+                </code>
+              </CodeBlock>
+            </div>
           </div>
         </div>
 
