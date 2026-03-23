@@ -967,12 +967,41 @@ async function nodeUninstall(): Promise<void> {
     process.exit(1);
   }
 
-  const state = loadNodeState();
+  // Resolve the real user's home dir — under sudo, homedir() returns /root
+  // but the CLI state lives under the original user's home
+  const { join } = await import("path");
+  const { homedir } = await import("os");
+  const sudoUser = process.env.SUDO_USER;
+  let realHome = homedir();
+  if (sudoUser) {
+    try {
+      const { execSync } = await import("child_process");
+      realHome =
+        execSync(`getent passwd ${sudoUser}`, { encoding: "utf8" }).split(
+          ":",
+        )[5] || realHome;
+    } catch {}
+  }
+  const realNodeConfigDir = join(realHome, ".uvacompute", "node");
+  const realStateFile = join(realNodeConfigDir, "install-state.yaml");
+
+  // Load state from the real user's home, not /root
+  let state: NodeState | null = null;
+  try {
+    if (existsSync(realStateFile)) {
+      const content = readFileSync(realStateFile, "utf8");
+      state = yaml.load(content) as NodeState;
+    }
+  } catch {}
+
+  // Also check /etc/uvacompute as a fallback indicator
+  const hasEtcConfig = existsSync("/etc/uvacompute");
+
   const isAgentMode =
     (state as any)?.install_mode === "agent" ||
     existsSync("/usr/local/bin/k3s-agent-uninstall.sh");
 
-  if (!state?.installed) {
+  if (!state?.installed && !hasEtcConfig) {
     console.log(theme.warning("Node does not appear to be installed."));
     const proceed = await confirm({
       message: "Do you want to attempt uninstallation anyway?",
@@ -1194,7 +1223,11 @@ async function nodeUninstall(): Promise<void> {
         () => {},
       );
     }
-    if (existsSync(NODE_CONFIG_DIR)) {
+    if (existsSync(realNodeConfigDir)) {
+      rmSync(realNodeConfigDir, { recursive: true, force: true });
+    }
+    // Also clean up /root/.uvacompute/node/ in case anything was written there
+    if (existsSync(NODE_CONFIG_DIR) && NODE_CONFIG_DIR !== realNodeConfigDir) {
       rmSync(NODE_CONFIG_DIR, { recursive: true, force: true });
     }
 
