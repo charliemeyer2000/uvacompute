@@ -205,11 +205,11 @@ jobs:
           # Update flake.nix
           sed -i "s|version = \".*\";|version = \"${VERSION}\";|" flake.nix
 
-          # Update Linux hash
-          sed -i "/x86_64-linux/,/};/{s|hash = \"sha256-.*\";|hash = \"${LINUX_HASH}\";|}" flake.nix
+          # Update Linux hash (match the asset line to avoid hitting supportedSystems)
+          sed -i "/uvacompute-linux/,/};/{s|hash = \"sha256-.*\";|hash = \"${LINUX_HASH}\";|}" flake.nix
 
           # Update macOS hash
-          sed -i "/aarch64-darwin/,/};/{s|hash = \"sha256-.*\";|hash = \"${MACOS_HASH}\";|}" flake.nix
+          sed -i "/uvacompute-macos/,/};/{s|hash = \"sha256-.*\";|hash = \"${MACOS_HASH}\";|}" flake.nix
 
           # Update man page hash
           sed -i "s|manPageHash = \"sha256-.*\";|manPageHash = \"${MAN_HASH}\";|" flake.nix
