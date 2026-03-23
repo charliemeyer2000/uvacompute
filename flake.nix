@@ -7,7 +7,7 @@
 
   outputs = { self, nixpkgs }:
     let
-      version = "0.0.46";
+      version = "0.0.47";
 
       supportedSystems = [ "x86_64-linux" "aarch64-darwin" ];
 
@@ -16,15 +16,15 @@
       assets = {
         x86_64-linux = {
           asset = "uvacompute-linux";
-          hash = "sha256-a6VgzCIgBGwZ92oEEaJymkH79zyRMQsTgQP7Y64sv2E=";
+          hash = "sha256-nkpy9P9Cpqlc5zHkpyRbhdM/ckbEjPTzkhYWRl2w+Jo=";
         };
         aarch64-darwin = {
           asset = "uvacompute-macos";
-          hash = "sha256-SG6XbJCW2YJu2AJtMiIZfoAbgJ1PgcdcvQU7+DlDq5I=";
+          hash = "sha256-4nygIL7zPlscKFisdTpjz0d1VlIcarYm5phEloVrZqU=";
         };
       };
 
-      manPageHash = "sha256-6qfi/9L7rHBCmG6l6ydGLmTF7d77d1LCUHj6HgDZlDo=";
+      manPageHash = "sha256-iCZ9k3SQqG5q+JbSi/rqCgpOxzyG1/3funttEOLQC70=";
     in
     {
       packages = forAllSystems (system:
