@@ -3,6 +3,8 @@ import ora from "ora";
 import { existsSync, readFileSync, mkdirSync, writeFileSync, rmSync } from "fs";
 import { confirm } from "@inquirer/prompts";
 import { spawn } from "child_process";
+import { createHmac } from "crypto";
+import { hostname } from "os";
 import {
   NODE_CONFIG_DIR,
   NODE_CONFIG_FILE,
@@ -859,6 +861,103 @@ async function nodeInstall(): Promise<void> {
   }
 }
 
+async function callUnregisterApi(): Promise<{
+  success: boolean;
+  vmsDeleted: number;
+  jobsCancelled: number;
+  message: string;
+}> {
+  let nodeId: string | null = null;
+  try {
+    if (existsSync("/etc/uvacompute/node-config.yaml")) {
+      const content = readFileSync("/etc/uvacompute/node-config.yaml", "utf8");
+      const config = yaml.load(content) as Record<string, any>;
+      nodeId = config?.nodeId || null;
+    }
+  } catch {}
+
+  if (!nodeId) {
+    nodeId = hostname();
+  }
+
+  const nodeSecretFile = "/etc/uvacompute/node-secret";
+  const legacySecretFile = "/etc/uvacompute/orchestration-secret";
+  let secret = "";
+  let useNodeAuth = false;
+
+  try {
+    if (existsSync(nodeSecretFile)) {
+      secret = readFileSync(nodeSecretFile, "utf8").trim();
+      useNodeAuth = true;
+    } else if (existsSync(legacySecretFile)) {
+      secret = readFileSync(legacySecretFile, "utf8").trim();
+    }
+  } catch {}
+
+  if (!secret) {
+    return {
+      success: false,
+      vmsDeleted: 0,
+      jobsCancelled: 0,
+      message: "No authentication secret found, skipping API notification",
+    };
+  }
+
+  const body = "";
+  const timestamp = Math.floor(Date.now() / 1000).toString();
+  const payload = useNodeAuth
+    ? `${nodeId}:${timestamp}:${body}`
+    : `${timestamp}:${body}`;
+  const signature = createHmac("sha256", secret).update(payload).digest("hex");
+
+  const headers: Record<string, string> = {
+    "X-Timestamp": timestamp,
+    "X-Signature": signature,
+  };
+  if (useNodeAuth) {
+    headers["X-Node-Id"] = nodeId;
+  }
+
+  const baseUrl = getBaseUrl();
+  try {
+    const response = await fetch(`${baseUrl}/api/nodes/${nodeId}`, {
+      method: "DELETE",
+      headers,
+    });
+
+    if (response.ok) {
+      const data = (await response.json()) as any;
+      return {
+        success: true,
+        vmsDeleted: data.vmsDeleted ?? 0,
+        jobsCancelled: data.jobsCancelled ?? 0,
+        message: `Node unregistered (${data.vmsDeleted ?? 0} VMs stopped, ${data.jobsCancelled ?? 0} jobs cancelled)`,
+      };
+    } else if (response.status === 404) {
+      return {
+        success: true,
+        vmsDeleted: 0,
+        jobsCancelled: 0,
+        message: "Node not found in hub (already removed or never registered)",
+      };
+    } else {
+      return {
+        success: false,
+        vmsDeleted: 0,
+        jobsCancelled: 0,
+        message: `API returned status ${response.status}`,
+      };
+    }
+  } catch (err: any) {
+    return {
+      success: false,
+      vmsDeleted: 0,
+      jobsCancelled: 0,
+      message: `Could not reach hub API: ${err.message}`,
+    };
+  }
+}
+
 async function nodeUninstall(): Promise<void> {
   console.log(theme.emphasis("\nNode Uninstallation\n"));
 
@@ -879,17 +978,29 @@ async function nodeUninstall(): Promise<void> {
     }
   }
 
-  console.log(theme.warning("This will remove:"));
+  console.log(theme.warning("This will:"));
+  console.log(
+    theme.warning("  • Deregister node from hub (stop VMs, cancel jobs)"),
+  );
   if (isAgentMode) {
-    console.log(theme.warning("  • k3s agent"));
-    console.log(theme.warning("  • SSH tunnel service"));
+    console.log(theme.warning("  • Remove k3s agent"));
+    console.log(theme.warning("  • Remove SSH tunnel service"));
   } else {
-    console.log(theme.warning("  • k3s server and all Kubernetes resources"));
-    console.log(theme.warning("  • KubeVirt"));
+    console.log(
+      theme.warning("  • Remove k3s server and all Kubernetes resources"),
+    );
+    console.log(theme.warning("  • Remove KubeVirt"));
   }
-  console.log(theme.warning("  • All container images"));
-  console.log(theme.warning("  • NVIDIA container toolkit configuration"));
-  console.log(theme.warning("  • GPU mode switching scripts"));
+  console.log(theme.warning("  • Clean up all container images"));
+  console.log(theme.warning("  • Delete VM storage (/var/lib/uvacompute)"));
+  console.log(
+    theme.warning("  • Remove GPU scripts, guardian, and reconcile service"),
+  );
+  console.log(theme.warning("  • Remove SSH keys and vmproxy access"));
+  console.log(theme.warning("  • Remove kubeconfig, virtctl, and CDI config"));
+  console.log(
+    theme.warning("  • Remove all uvacompute configuration and secrets"),
+  );
   console.log();
 
   const proceed = await confirm({
@@ -906,7 +1017,16 @@ async function nodeUninstall(): Promise<void> {
   const spinner = ora("Uninstalling node components...").start();
 
   try {
-    // For standalone server mode, remove KubeVirt first
+    // Step 1: API deregistration (must happen first — needs secrets from /etc/uvacompute/)
+    spinner.text = "Deregistering node from hub...";
+    const apiResult = await callUnregisterApi();
+    if (apiResult.success) {
+      console.log(`\n  ${theme.success("✓")} ${apiResult.message}`);
+    } else {
+      console.log(`\n  ${theme.warning("⚠")} ${apiResult.message}`);
+    }
+
+    // Step 2: KubeVirt removal (standalone server mode only, needs k3s running)
     if (!isAgentMode) {
       spinner.text = "Removing KubeVirt...";
       await runCommand(
@@ -918,7 +1038,7 @@ async function nodeUninstall(): Promise<void> {
           "--ignore-not-found",
         ],
         { sudo: true },
-      );
+      ).catch(() => {});
       await runCommand(
         "kubectl",
         [
@@ -928,32 +1048,27 @@ async function nodeUninstall(): Promise<void> {
           "--ignore-not-found",
         ],
         { sudo: true },
+      ).catch(() => {});
+    }
+
+    // Step 3: Stop all uvacompute services
+    spinner.text = "Stopping uvacompute services...";
+    for (const service of [
+      "uvacompute-tunnel",
+      "uvacompute-gpu-reconcile",
+      "uvacompute-gpu-guardian",
+    ]) {
+      await runCommand("systemctl", ["stop", service], { sudo: true }).catch(
+        () => {},
+      );
+      await runCommand("systemctl", ["disable", service], { sudo: true }).catch(
+        () => {},
       );
     }
 
-    // Stop and remove SSH tunnel service (agent mode)
-    spinner.text = "Stopping SSH tunnel service...";
-    await runCommand("systemctl", ["stop", "uvacompute-tunnel"], {
-      sudo: true,
-    }).catch(() => {});
-    await runCommand("systemctl", ["disable", "uvacompute-tunnel"], {
-      sudo: true,
-    }).catch(() => {});
-    if (existsSync("/etc/systemd/system/uvacompute-tunnel.service")) {
-      await runCommand(
-        "rm",
-        ["-f", "/etc/systemd/system/uvacompute-tunnel.service"],
-        { sudo: true },
-      );
-    }
-    await runCommand("systemctl", ["daemon-reload"], { sudo: true }).catch(
-      () => {},
-    );
-
-    // Clean up container images before removing k3s (crictl needs containerd running)
+    // Step 4: Container image cleanup (needs containerd from k3s still running)
     spinner.text = "Cleaning up container images...";
     try {
-      // Get list of all images
       const imagesResult = await runCommand("crictl", ["images", "-q"], {
         sudo: true,
         silent: true,
@@ -967,67 +1082,114 @@ async function nodeUninstall(): Promise<void> {
           }).catch(() => {});
         }
       }
-    } catch {
-      // Image cleanup is best-effort, continue if it fails
-    }
+    } catch {}
 
-    // Remove k3s (agent or server)
+    // Step 5: Remove k3s (agent or server)
     spinner.text = "Removing k3s...";
     if (existsSync("/usr/local/bin/k3s-agent-uninstall.sh")) {
       await runCommand("/usr/local/bin/k3s-agent-uninstall.sh", [], {
         sudo: true,
-      });
+      }).catch(() => {});
     } else if (existsSync("/usr/local/bin/k3s-uninstall.sh")) {
-      await runCommand("/usr/local/bin/k3s-uninstall.sh", [], { sudo: true });
+      await runCommand("/usr/local/bin/k3s-uninstall.sh", [], {
+        sudo: true,
+      }).catch(() => {});
     }
 
-    spinner.text = "Removing GPU guardian...";
-    await runCommand("systemctl", ["stop", "uvacompute-gpu-guardian"], {
-      sudo: true,
-    });
-    await runCommand("systemctl", ["disable", "uvacompute-gpu-guardian"], {
-      sudo: true,
-    });
-    const gpuGuardianFiles = [
+    // Step 6: Remove uvacompute storage
+    spinner.text = "Removing storage directories...";
+    if (existsSync("/var/lib/uvacompute")) {
+      await runCommand("rm", ["-rf", "/var/lib/uvacompute"], {
+        sudo: true,
+      }).catch(() => {});
+    }
+
+    // Step 7: Remove GPU components (guardian, mode scripts, service files)
+    spinner.text = "Removing GPU components...";
+    const gpuFiles = [
       "/usr/local/bin/gpu-guardian",
-      "/etc/systemd/system/uvacompute-gpu-guardian.service",
-    ];
-    for (const f of gpuGuardianFiles) {
-      if (existsSync(f)) {
-        await runCommand("rm", ["-f", f], { sudo: true });
-      }
-    }
-
-    spinner.text = "Removing GPU scripts...";
-    const gpuScripts = [
       "/usr/local/bin/gpu-mode-nvidia",
       "/usr/local/bin/gpu-mode-vfio",
       "/usr/local/bin/gpu-mode-status",
+      "/usr/local/bin/gpu-mode-reconcile",
+      "/etc/systemd/system/uvacompute-gpu-guardian.service",
+      "/etc/systemd/system/uvacompute-gpu-reconcile.service",
     ];
-    for (const script of gpuScripts) {
-      if (existsSync(script)) {
-        await runCommand("rm", ["-f", script], { sudo: true });
+    for (const f of gpuFiles) {
+      if (existsSync(f)) {
+        await runCommand("rm", ["-f", f], { sudo: true }).catch(() => {});
       }
     }
 
-    spinner.text = "Removing runc symlink...";
+    // Step 8: Remove virtctl
+    if (existsSync("/usr/local/bin/virtctl")) {
+      await runCommand("rm", ["-f", "/usr/local/bin/virtctl"], {
+        sudo: true,
+      }).catch(() => {});
+    }
+
+    // Step 9: Remove runc symlink (created by install script)
     if (existsSync("/usr/local/bin/runc")) {
-      await runCommand("rm", ["-f", "/usr/local/bin/runc"], { sudo: true });
+      await runCommand("rm", ["-f", "/usr/local/bin/runc"], {
+        sudo: true,
+      }).catch(() => {});
     }
 
-    spinner.text = "Removing CDI config...";
+    // Step 10: Remove CDI config
     if (existsSync("/etc/cdi/nvidia.yaml")) {
-      await runCommand("rm", ["-f", "/etc/cdi/nvidia.yaml"], { sudo: true });
+      await runCommand("rm", ["-f", "/etc/cdi/nvidia.yaml"], {
+        sudo: true,
+      }).catch(() => {});
     }
 
-    spinner.text = "Removing node config...";
+    // Step 11: Remove tunnel service file and reload systemd
+    spinner.text = "Removing service files...";
+    if (existsSync("/etc/systemd/system/uvacompute-tunnel.service")) {
+      await runCommand(
+        "rm",
+        ["-f", "/etc/systemd/system/uvacompute-tunnel.service"],
+        { sudo: true },
+      ).catch(() => {});
+    }
+    await runCommand("systemctl", ["daemon-reload"], { sudo: true }).catch(
+      () => {},
+    );
+
+    // Step 12: Remove SSH keys and vmproxy authorized_keys entry
+    spinner.text = "Removing SSH keys...";
+    for (const keyFile of [
+      "/root/.ssh/id_ed25519_uvacompute",
+      "/root/.ssh/id_ed25519_uvacompute.pub",
+    ]) {
+      if (existsSync(keyFile)) {
+        await runCommand("rm", ["-f", keyFile], { sudo: true }).catch(() => {});
+      }
+    }
+    if (existsSync("/root/.ssh/authorized_keys")) {
+      await runCommand(
+        "sed",
+        ["-i", "/vmproxy@/d", "/root/.ssh/authorized_keys"],
+        { sudo: true },
+      ).catch(() => {});
+    }
+
+    // Step 13: Remove kubeconfig (written by install script, points at hub)
+    spinner.text = "Removing kubeconfig...";
+    if (existsSync("/root/.kube/config")) {
+      await runCommand("rm", ["-f", "/root/.kube/config"], {
+        sudo: true,
+      }).catch(() => {});
+    }
+
+    // Step 14: Remove config directories (last — step 1 reads from /etc/uvacompute/)
+    spinner.text = "Removing configuration...";
+    if (existsSync("/etc/uvacompute")) {
+      await runCommand("rm", ["-rf", "/etc/uvacompute"], { sudo: true }).catch(
+        () => {},
+      );
+    }
     if (existsSync(NODE_CONFIG_DIR)) {
       rmSync(NODE_CONFIG_DIR, { recursive: true, force: true });
-    }
-
-    spinner.text = "Removing uvacompute config...";
-    if (existsSync("/etc/uvacompute")) {
-      await runCommand("rm", ["-rf", "/etc/uvacompute"], { sudo: true });
     }
 
     spinner.succeed("Node uninstalled successfully");

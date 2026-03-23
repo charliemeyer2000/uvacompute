@@ -1724,15 +1724,19 @@ uninstall_node() {
     rm -rf /var/lib/uvacompute
     rm -rf /var/lib/rancher/k3s/storage
 
-    # Remove GPU scripts and guardian
+    # Remove GPU scripts, guardian, and reconcile service
     log_info "Removing GPU scripts..."
     systemctl stop uvacompute-gpu-guardian 2>/dev/null || true
     systemctl disable uvacompute-gpu-guardian 2>/dev/null || true
+    systemctl stop uvacompute-gpu-reconcile 2>/dev/null || true
+    systemctl disable uvacompute-gpu-reconcile 2>/dev/null || true
     rm -f /usr/local/bin/gpu-mode-nvidia
     rm -f /usr/local/bin/gpu-mode-vfio
     rm -f /usr/local/bin/gpu-mode-status
+    rm -f /usr/local/bin/gpu-mode-reconcile
     rm -f /usr/local/bin/gpu-guardian
     rm -f /etc/systemd/system/uvacompute-gpu-guardian.service
+    rm -f /etc/systemd/system/uvacompute-gpu-reconcile.service
 
     # Remove virtctl
     rm -f /usr/local/bin/virtctl
