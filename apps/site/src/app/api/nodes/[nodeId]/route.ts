@@ -4,6 +4,7 @@ import {
   verifyNodeRequest,
   isNodeAuthRequest,
 } from "@/lib/orchestration-auth";
+import { getAuthenticatedUser } from "@/lib/admin-auth";
 import { api } from "../../../../../convex/_generated/api";
 import { fetchMutation, fetchQuery } from "convex/nextjs";
 import { z } from "zod";
@@ -94,8 +95,23 @@ export async function DELETE(
 ) {
   const { nodeId } = await params;
 
-  if (!(await verifyAuth(request, "", nodeId))) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  // Try HMAC auth first (node self-auth), then fall back to user bearer token with ownership check
+  const hmacAuthed = await verifyAuth(request, "", nodeId);
+  if (!hmacAuthed) {
+    const auth = await getAuthenticatedUser(request);
+    if (!auth) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    const ownership = await fetchQuery(api.nodes.verifyOwnership, {
+      nodeId,
+      ownerId: auth.user.id,
+    });
+    if (!ownership.owned) {
+      return NextResponse.json(
+        { error: "Forbidden: you do not own this node" },
+        { status: 403 },
+      );
+    }
   }
 
   try {
