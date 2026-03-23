@@ -219,9 +219,16 @@ jobs:
       - name: Update flake.lock
         run: nix flake update
 
+      - name: Rebuild hosted flake tarball
+        run: |
+          mkdir -p /tmp/flake-tarball/source
+          cp flake.nix /tmp/flake-tarball/source/flake.nix
+          cp flake.lock /tmp/flake-tarball/source/flake.lock
+          tar czf apps/site/public/nix/flake.tar.gz -C /tmp/flake-tarball source
+
       - name: Commit flake updates
         run: |
-          git add flake.nix flake.lock
+          git add flake.nix flake.lock apps/site/public/nix/flake.tar.gz
           git diff --cached --quiet && echo "No changes" && exit 0
           git commit -m "chore(nix): update flake to CLI v${{ needs.release.outputs.version }}"
           git push origin HEAD:${{ github.ref_name }}
