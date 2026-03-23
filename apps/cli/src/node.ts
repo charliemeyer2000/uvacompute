@@ -880,6 +880,9 @@ async function callUnregisterApi(): Promise<{
     nodeId = hostname();
   }
 
+  const baseUrl = getBaseUrl();
+
+  // Try HMAC auth first (node self-auth via node-secret or orchestration-secret)
   const nodeSecretFile = "/etc/uvacompute/node-secret";
   const legacySecretFile = "/etc/uvacompute/orchestration-secret";
   let secret = "";
@@ -894,35 +897,94 @@ async function callUnregisterApi(): Promise<{
     }
   } catch {}
 
-  if (!secret) {
+  if (secret) {
+    const body = "";
+    const timestamp = Math.floor(Date.now() / 1000).toString();
+    const payload = useNodeAuth
+      ? `${nodeId}:${timestamp}:${body}`
+      : `${timestamp}:${body}`;
+    const signature = createHmac("sha256", secret)
+      .update(payload)
+      .digest("hex");
+
+    const headers: Record<string, string> = {
+      "X-Timestamp": timestamp,
+      "X-Signature": signature,
+    };
+    if (useNodeAuth) {
+      headers["X-Node-Id"] = nodeId;
+    }
+
+    try {
+      const response = await fetch(`${baseUrl}/api/nodes/${nodeId}`, {
+        method: "DELETE",
+        headers,
+      });
+      if (response.ok) {
+        const data = (await response.json()) as any;
+        return {
+          success: true,
+          vmsDeleted: data.vmsDeleted ?? 0,
+          jobsCancelled: data.jobsCancelled ?? 0,
+          message: `Node unregistered (${data.vmsDeleted ?? 0} VMs stopped, ${data.jobsCancelled ?? 0} jobs cancelled)`,
+        };
+      }
+      // If HMAC auth failed (401/403), fall through to bearer token
+      if (response.status !== 401 && response.status !== 403) {
+        return {
+          success: false,
+          vmsDeleted: 0,
+          jobsCancelled: 0,
+          message: `API returned status ${response.status}`,
+        };
+      }
+    } catch (err: any) {
+      return {
+        success: false,
+        vmsDeleted: 0,
+        jobsCancelled: 0,
+        message: `Could not reach hub API: ${err.message}`,
+      };
+    }
+  }
+
+  // Fall back to user bearer token auth (resolve real user's home under sudo)
+  let token: string | null = null;
+  try {
+    const { join } = await import("path");
+    const { homedir } = await import("os");
+    const sudoUser = process.env.SUDO_USER;
+    let home = homedir();
+    if (sudoUser) {
+      try {
+        const { execSync } = await import("child_process");
+        home =
+          execSync(`getent passwd ${sudoUser}`, { encoding: "utf8" }).split(
+            ":",
+          )[5] || home;
+      } catch {}
+    }
+    const configFile = join(home, ".uvacompute", "config");
+    if (existsSync(configFile)) {
+      const config = JSON.parse(readFileSync(configFile, "utf8"));
+      token = config.auth_token || null;
+    }
+  } catch {}
+
+  if (!token) {
     return {
       success: false,
       vmsDeleted: 0,
       jobsCancelled: 0,
-      message: "No authentication secret found, skipping API notification",
+      message:
+        "No node secret or user token found, skipping API deregistration",
     };
   }
 
-  const body = "";
-  const timestamp = Math.floor(Date.now() / 1000).toString();
-  const payload = useNodeAuth
-    ? `${nodeId}:${timestamp}:${body}`
-    : `${timestamp}:${body}`;
-  const signature = createHmac("sha256", secret).update(payload).digest("hex");
-
-  const headers: Record<string, string> = {
-    "X-Timestamp": timestamp,
-    "X-Signature": signature,
-  };
-  if (useNodeAuth) {
-    headers["X-Node-Id"] = nodeId;
-  }
-
-  const baseUrl = getBaseUrl();
   try {
     const response = await fetch(`${baseUrl}/api/nodes/${nodeId}`, {
       method: "DELETE",
-      headers,
+      headers: { Authorization: `Bearer ${token}` },
     });
 
     if (response.ok) {
@@ -931,14 +993,15 @@ async function callUnregisterApi(): Promise<{
         success: true,
         vmsDeleted: data.vmsDeleted ?? 0,
         jobsCancelled: data.jobsCancelled ?? 0,
-        message: `Node unregistered (${data.vmsDeleted ?? 0} VMs stopped, ${data.jobsCancelled ?? 0} jobs cancelled)`,
+        message: `Node unregistered via user auth (${data.vmsDeleted ?? 0} VMs stopped, ${data.jobsCancelled ?? 0} jobs cancelled)`,
       };
-    } else if (response.status === 404) {
+    } else if (response.status === 403) {
       return {
-        success: true,
+        success: false,
         vmsDeleted: 0,
         jobsCancelled: 0,
-        message: "Node not found in hub (already removed or never registered)",
+        message:
+          "You do not own this node — deregister it from the web dashboard",
       };
     } else {
       return {
