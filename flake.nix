@@ -16,7 +16,7 @@
       assets = {
         x86_64-linux = {
           asset = "uvacompute-linux";
-          hash = "sha256-LbCCRF0BaLYCaCyFu8LTlTe6jAX0omPJuBHiEB0dhMY=";
+          hash = "sha256-BkJQdiX3QWbSz90R3mRQlLhEcy2p0QOmAXE2d2uNsr0=";
         };
         aarch64-darwin = {
           asset = "uvacompute-macos";
