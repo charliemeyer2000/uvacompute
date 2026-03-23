@@ -49,12 +49,10 @@
 
             dontUnpack = true;
 
-            nativeBuildInputs = nixpkgs.lib.optionals pkgs.stdenv.hostPlatform.isLinux [
-              pkgs.autoPatchelfHook
-            ];
+            dontAutoPatchelf = true;
 
-            buildInputs = nixpkgs.lib.optionals pkgs.stdenv.hostPlatform.isLinux [
-              pkgs.stdenv.cc.cc.lib
+            nativeBuildInputs = nixpkgs.lib.optionals pkgs.stdenv.hostPlatform.isLinux [
+              pkgs.patchelf
             ];
 
             installPhase = ''
@@ -62,6 +60,10 @@
               install -Dm755 ${binary} $out/bin/uva
               install -Dm644 ${manPage} $out/share/man/man1/uva.1
               runHook postInstall
+            '';
+
+            postFixup = nixpkgs.lib.optionalString pkgs.stdenv.hostPlatform.isLinux ''
+              patchelf --set-interpreter "$(cat ${pkgs.stdenv.cc}/nix-support/dynamic-linker)" $out/bin/uva
             '';
 
             meta = with pkgs.lib; {
