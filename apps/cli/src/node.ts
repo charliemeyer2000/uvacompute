@@ -961,6 +961,12 @@ async function callUnregisterApi(): Promise<{
 async function nodeUninstall(): Promise<void> {
   console.log(theme.emphasis("\nNode Uninstallation\n"));
 
+  if (process.getuid?.() !== 0) {
+    console.log(theme.error("✗ This command must be run as root"));
+    console.log(theme.muted("  Run: sudo uva node uninstall"));
+    process.exit(1);
+  }
+
   const state = loadNodeState();
   const isAgentMode =
     (state as any)?.install_mode === "agent" ||
