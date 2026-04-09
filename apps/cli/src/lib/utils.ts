@@ -11,6 +11,16 @@ import type { z } from "zod";
 
 export type ServiceStatus = z.infer<typeof StatusApiResponseSchema>;
 
+let _nonInteractive = false;
+
+export function setNonInteractive(value: boolean): void {
+  _nonInteractive = value;
+}
+
+export function isNonInteractive(): boolean {
+  return _nonInteractive;
+}
+
 export function getBaseUrl(): string {
   if (process.env.SITE_URL) {
     return process.env.SITE_URL;

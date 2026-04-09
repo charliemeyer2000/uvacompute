@@ -1,7 +1,7 @@
 import type { Command } from "commander";
 import ora from "ora";
 import { existsSync, readFileSync, mkdirSync, writeFileSync, rmSync } from "fs";
-import { confirm } from "@inquirer/prompts";
+import { confirm } from "./lib/prompt";
 import { spawn } from "child_process";
 import { createHmac } from "crypto";
 import { hostname } from "os";

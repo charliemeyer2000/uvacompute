@@ -10,6 +10,7 @@ import { registerNodeCommands } from "./src/node";
 import { registerJobCommands } from "./src/jobs";
 import { registerApiKeyCommands } from "./src/api-keys";
 import { checkForUpdate } from "./src/lib/version-check";
+import { setNonInteractive } from "./src/lib/utils";
 import {
   handleCompletion,
   registerCompletionCommands,
@@ -22,7 +23,15 @@ async function main() {
   program
     .version(require("./package.json").version)
     .name("uva")
-    .description("uvacompute cli");
+    .description("uvacompute cli")
+    .option("-y, --yes", "Skip all confirmation prompts");
+
+  program.hook("preAction", (thisCommand) => {
+    const opts = thisCommand.optsWithGlobals();
+    if (opts.yes || !process.stdout.isTTY) {
+      setNonInteractive(true);
+    }
+  });
   registerLoginCommand(program);
   registerLogoutCommand(program);
   registerVMCommands(program);

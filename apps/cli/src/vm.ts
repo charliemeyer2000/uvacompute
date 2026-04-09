@@ -11,7 +11,7 @@ import {
 } from "fs";
 import { homedir } from "os";
 import { join } from "path";
-import { select, confirm } from "@inquirer/prompts";
+import { select, confirm } from "./lib/prompt";
 import {
   getBaseUrl,
   loadToken,
@@ -179,7 +179,7 @@ async function selectVM(
     ),
   );
 
-  const selectedVmId = await select({
+  const selectedVmId = await select<string>({
     message: "Select a VM:",
     choices,
   });
@@ -683,7 +683,7 @@ async function deleteVM(nameOrVmId: string): Promise<void> {
         ),
       );
 
-      const selection = await select({
+      const selection = await select<string>({
         message: "Select a VM to delete:",
         choices,
       });

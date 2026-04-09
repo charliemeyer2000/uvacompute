@@ -9,7 +9,7 @@ import {
 } from "fs";
 import { homedir } from "os";
 import { join } from "path";
-import { confirm, password, select } from "@inquirer/prompts";
+import { confirm, password, select } from "./prompt";
 import { SSHKeyAddResponseSchema, SSHKeyListResponseSchema } from "./schemas";
 import { theme } from "./theme";
 import { getBaseUrl } from "./utils";
@@ -203,9 +203,10 @@ export async function ensureSSHKeysConfigured(token: string): Promise<boolean> {
     value: "skip",
   });
 
-  const selection = await select({
+  const selection = await select<string>({
     message: "How would you like to set up SSH access?",
     choices,
+    nonInteractiveDefault: "generate",
   });
 
   if (selection === "skip") {

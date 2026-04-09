@@ -6,7 +6,7 @@ import {
   checkServiceStatus,
   formatElapsed,
 } from "./lib/utils";
-import { confirm } from "@inquirer/prompts";
+import { confirm } from "./lib/prompt";
 import {
   theme,
   formatSectionHeader,
@@ -769,7 +769,7 @@ async function cancelJob(
     process.exit(1);
   }
 
-  if (!options.force && process.stdout.isTTY) {
+  if (!options.force) {
     const confirmed = await confirm({
       message: `Cancel job ${jobId}?`,
       default: false,

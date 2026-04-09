@@ -1,6 +1,6 @@
 import type { Command } from "commander";
 import ora from "ora";
-import { confirm } from "@inquirer/prompts";
+import { confirm } from "./lib/prompt";
 import { theme } from "./lib/theme";
 import { getBaseUrl, compareVersions, findBinaryPath } from "./lib/utils";
 import { VersionResponseSchema } from "./lib/schemas";
