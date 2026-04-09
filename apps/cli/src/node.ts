@@ -753,7 +753,7 @@ async function installNvidiaDriver(
   }
 }
 
-async function nodeInstall(): Promise<void> {
+async function nodeInstall(options: { storage?: string } = {}): Promise<void> {
   console.log(theme.emphasis("\nNode Installation\n"));
 
   const gpu = await checkNvidiaGpu();
@@ -869,11 +869,12 @@ async function nodeInstall(): Promise<void> {
     const tmpFile = `/tmp/install-node-${Date.now()}.sh`;
     writeFileSync(tmpFile, script, { mode: 0o755 });
 
-    const result = await runCommand(
-      "bash",
-      [tmpFile, "--token", registrationToken],
-      { sudo: true },
-    );
+    const scriptArgs = [tmpFile, "--token", registrationToken, "-y"];
+    if (options.storage) {
+      scriptArgs.push("--storage", options.storage);
+    }
+
+    const result = await runCommand("bash", scriptArgs, { sudo: true });
 
     try {
       rmSync(tmpFile);
@@ -2224,7 +2225,8 @@ export function registerNodeCommands(program: Command) {
   node
     .command("install")
     .description("Install k3s, KubeVirt, and configure as a contributor node")
-    .action(nodeInstall);
+    .option("--storage <gb>", "Storage allocation in GB for VM disks")
+    .action((options) => nodeInstall(options));
 
   node
     .command("uninstall")
