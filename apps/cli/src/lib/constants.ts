@@ -1,11 +1,22 @@
-import { homedir } from "os";
+import { homedir, userInfo } from "os";
 import { join } from "path";
+import { execSync } from "child_process";
 
 export const DEV_SITE_URL = "http://localhost:3000" as const;
 export const PROD_SITE_URL = "https://uvacompute.com" as const;
 export const STATUS_URL = "https://status.uvacompute.com" as const;
 
-export const CONFIG_DIR = join(homedir(), ".uvacompute");
+function resolveHomeDir(): string {
+  const sudoUser = process.env.SUDO_USER;
+  if (sudoUser && process.getuid?.() === 0) {
+    try {
+      return execSync(`eval echo ~${sudoUser}`, { encoding: "utf-8" }).trim();
+    } catch {}
+  }
+  return homedir();
+}
+
+export const CONFIG_DIR = join(resolveHomeDir(), ".uvacompute");
 export const CONFIG_FILE = join(CONFIG_DIR, "config");
 
 export const NODE_CONFIG_DIR = join(CONFIG_DIR, "node");
