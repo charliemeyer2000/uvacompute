@@ -809,10 +809,47 @@ async function nodeInstall(): Promise<void> {
   }
 
   console.log();
+
+  const authToken = loadToken();
+  if (!authToken) {
+    console.log(theme.error("✗ Not logged in"));
+    console.log(theme.muted("  Run 'uva login' first"));
+    process.exit(1);
+  }
+
+  const baseUrl = getBaseUrl();
+  const tokenSpinner = ora("Creating registration token...").start();
+
+  let registrationToken: string;
+  try {
+    const tokenResponse = await fetch(`${baseUrl}/api/nodes/tokens`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${authToken}`,
+      },
+      body: JSON.stringify({}),
+    });
+
+    if (!tokenResponse.ok) {
+      const errorBody = (await tokenResponse
+        .json()
+        .catch(() => ({ error: "Unknown error" }))) as { error?: string };
+      throw new Error(errorBody.error || `HTTP ${tokenResponse.status}`);
+    }
+
+    const tokenData = (await tokenResponse.json()) as TokenCreateResponse;
+    registrationToken = tokenData.token;
+    tokenSpinner.succeed("Registration token created");
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    tokenSpinner.fail(`Failed to create registration token: ${message}`);
+    process.exit(1);
+  }
+
   const spinner = ora("Downloading install script...").start();
 
   try {
-    const baseUrl = getBaseUrl();
     const scriptUrl = `${baseUrl}/install-node.sh`;
 
     const response = await fetch(scriptUrl);
@@ -832,7 +869,11 @@ async function nodeInstall(): Promise<void> {
     const tmpFile = `/tmp/install-node-${Date.now()}.sh`;
     writeFileSync(tmpFile, script, { mode: 0o755 });
 
-    const result = await runCommand("bash", [tmpFile], { sudo: true });
+    const result = await runCommand(
+      "bash",
+      [tmpFile, "--token", registrationToken],
+      { sudo: true },
+    );
 
     try {
       rmSync(tmpFile);
