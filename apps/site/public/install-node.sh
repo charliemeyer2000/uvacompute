@@ -519,13 +519,17 @@ detect_storage() {
 
 prompt_storage_allocation() {
     if [[ "${NONINTERACTIVE}" == "true" ]]; then
-        # Default to 50% of available space, minimum 50GB, max 500GB
-        local default_alloc=$((STORAGE_SIZE_GB / 2))
-        [[ ${default_alloc} -lt 50 ]] && default_alloc=50
-        [[ ${default_alloc} -gt 500 ]] && default_alloc=500
-        [[ ${default_alloc} -gt ${STORAGE_SIZE_GB} ]] && default_alloc=$((STORAGE_SIZE_GB - 10))
-        STORAGE_ALLOCATION_GB=${default_alloc}
-        log_info "Non-interactive mode: allocating ${STORAGE_ALLOCATION_GB}GB for VM storage"
+        if [[ -n "${STORAGE_ALLOCATION_GB}" && "${STORAGE_ALLOCATION_GB}" -gt 0 ]] 2>/dev/null; then
+            log_info "Using specified storage allocation: ${STORAGE_ALLOCATION_GB}GB"
+        else
+            # Default to 50% of available space, minimum 50GB, max 500GB
+            local default_alloc=$((STORAGE_SIZE_GB / 2))
+            [[ ${default_alloc} -lt 50 ]] && default_alloc=50
+            [[ ${default_alloc} -gt 500 ]] && default_alloc=500
+            [[ ${default_alloc} -gt ${STORAGE_SIZE_GB} ]] && default_alloc=$((STORAGE_SIZE_GB - 10))
+            STORAGE_ALLOCATION_GB=${default_alloc}
+            log_info "Non-interactive mode: allocating ${STORAGE_ALLOCATION_GB}GB for VM storage"
+        fi
         return
     fi
 
@@ -566,6 +570,7 @@ setup_storage_directory() {
 
     mkdir -p "${STORAGE_PATH}"
     chmod 755 "${STORAGE_PATH}"
+    mkdir -p "${SERVICE_DIR}"
 
     # Store storage config
     cat > "${SERVICE_DIR}/storage-config.yaml" <<EOF
