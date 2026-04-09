@@ -293,12 +293,24 @@ async function runCommand(
   options?: { sudo?: boolean; silent?: boolean },
 ): Promise<{ exitCode: number; stdout: string; stderr: string }> {
   return new Promise((resolve) => {
-    const cmd = options?.sudo ? "sudo" : command;
-    const cmdArgs = options?.sudo ? [command, ...args] : args;
+    const isSudo = options?.sudo ?? false;
+    const cmd = isSudo ? "sudo" : command;
+    const cmdArgs = isSudo
+      ? ["--preserve-env=SUDO_USER", command, ...args]
+      : args;
     const silent = options?.silent ?? false;
+
+    // When the CLI itself is not running as root but needs sudo,
+    // pass the current user as SUDO_USER so the install script
+    // can save state to the correct home directory.
+    const env = { ...process.env };
+    if (isSudo && !process.env.SUDO_USER && process.getuid?.() !== 0) {
+      env.SUDO_USER = process.env.USER || process.env.LOGNAME || "";
+    }
 
     const proc = spawn(cmd, cmdArgs, {
       stdio: ["inherit", "pipe", "pipe"],
+      env,
     });
 
     let stdout = "";
