@@ -1,7 +1,7 @@
 import type { Command } from "commander";
 import ora from "ora";
 import { readFileSync, existsSync } from "fs";
-import { confirm } from "@inquirer/prompts";
+import { confirm } from "./lib/prompt";
 import { getBaseUrl, loadToken } from "./lib/utils";
 import { theme, formatSectionHeader, formatDetail } from "./lib/theme";
 import {
@@ -135,7 +135,7 @@ async function removeSSHKey(
   keyId: string,
   options: { force?: boolean },
 ): Promise<void> {
-  if (!options.force && process.stdout.isTTY) {
+  if (!options.force) {
     const confirmed = await confirm({
       message: `Remove SSH key ${keyId}?`,
       default: false,

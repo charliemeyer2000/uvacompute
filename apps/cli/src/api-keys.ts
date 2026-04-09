@@ -1,6 +1,6 @@
 import type { Command } from "commander";
 import ora from "ora";
-import { confirm } from "@inquirer/prompts";
+import { confirm } from "./lib/prompt";
 import { getBaseUrl, loadToken } from "./lib/utils";
 import {
   theme,
@@ -132,7 +132,7 @@ async function revokeApiKey(
   keyId: string,
   options: { force?: boolean },
 ): Promise<void> {
-  if (!options.force && process.stdout.isTTY) {
+  if (!options.force) {
     const confirmed = await confirm({
       message: `Revoke API key ${keyId}? This cannot be undone.`,
       default: false,

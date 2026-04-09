@@ -1,7 +1,7 @@
 import type { Command } from "commander";
 import ora from "ora";
 import { existsSync, rmSync } from "fs";
-import { confirm } from "@inquirer/prompts";
+import { confirm } from "./lib/prompt";
 import { CONFIG_DIR } from "./lib/constants";
 import { theme } from "./lib/theme";
 import { findBinaryPath } from "./lib/utils";
