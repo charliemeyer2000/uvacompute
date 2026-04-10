@@ -24,6 +24,8 @@ STORAGE_SIZE_GB=0
 STORAGE_TYPE="unknown"
 STORAGE_DEVICE=""
 STORAGE_ALLOCATION_GB=0
+CPU_ALLOCATION=""
+RAM_ALLOCATION=""
 
 # These are set after registration
 K3S_URL=""
@@ -369,10 +371,12 @@ label_node() {
     fi
 
     local gpu_mode="nvidia"  # Default to nvidia mode (for containers)
+    local gpu_count="${GPU_COUNT:-0}"
 
     log_info "Applying labels to node ${node_id}:"
     log_info "  uvacompute.com/cpus=${cpus}"
     log_info "  uvacompute.com/ram=${ram}"
+    log_info "  uvacompute.com/gpus=${gpu_count}"
     log_info "  uvacompute.com/gpu=${gpu_label}"
     log_info "  uvacompute.com/has-gpu=${has_gpu}"
     log_info "  uvacompute.com/storage=${STORAGE_ALLOCATION_GB}"
@@ -390,6 +394,7 @@ nodeId: ${node_id}
 labels:
   uvacompute.com/cpus: "${cpus}"
   uvacompute.com/ram: "${ram}"
+  uvacompute.com/gpus: "${gpu_count}"
   uvacompute.com/gpu: "${gpu_label}"
   uvacompute.com/has-gpu: "${has_gpu}"
   uvacompute.com/gpu-mode: "${gpu_mode}"
@@ -410,7 +415,7 @@ EOF
         # Try to SSH to hub and label the node
         if ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -i "${SSH_KEY_PATH}" \
             "root@${TUNNEL_HOST}" \
-            "kubectl get node ${node_id} &>/dev/null && kubectl label node ${node_id} uvacompute.com/cpus=${cpus} uvacompute.com/ram=${ram} uvacompute.com/gpu=${gpu_label} uvacompute.com/has-gpu=${has_gpu} uvacompute.com/gpu-mode=${gpu_mode} uvacompute.com/storage=${STORAGE_ALLOCATION_GB} uvacompute.com/storage-type=${STORAGE_TYPE} --overwrite" 2>/dev/null; then
+            "kubectl get node ${node_id} &>/dev/null && kubectl label node ${node_id} uvacompute.com/cpus=${cpus} uvacompute.com/ram=${ram} uvacompute.com/gpus=${gpu_count} uvacompute.com/gpu=${gpu_label} uvacompute.com/has-gpu=${has_gpu} uvacompute.com/gpu-mode=${gpu_mode} uvacompute.com/storage=${STORAGE_ALLOCATION_GB} uvacompute.com/storage-type=${STORAGE_TYPE} --overwrite" 2>/dev/null; then
             labeled=true
             break
         fi
@@ -422,7 +427,7 @@ EOF
         log_success "Node labels applied successfully"
     else
         log_warn "Could not apply labels automatically. Run this on the hub:"
-        log_warn "  kubectl label node ${node_id} uvacompute.com/cpus=${cpus} uvacompute.com/ram=${ram} uvacompute.com/gpu=${gpu_label} uvacompute.com/has-gpu=${has_gpu} uvacompute.com/gpu-mode=${gpu_mode} uvacompute.com/storage=${STORAGE_ALLOCATION_GB} uvacompute.com/storage-type=${STORAGE_TYPE} --overwrite"
+        log_warn "  kubectl label node ${node_id} uvacompute.com/cpus=${cpus} uvacompute.com/ram=${ram} uvacompute.com/gpus=${gpu_count} uvacompute.com/gpu=${gpu_label} uvacompute.com/has-gpu=${has_gpu} uvacompute.com/gpu-mode=${gpu_mode} uvacompute.com/storage=${STORAGE_ALLOCATION_GB} uvacompute.com/storage-type=${STORAGE_TYPE} --overwrite"
     fi
 }
 
