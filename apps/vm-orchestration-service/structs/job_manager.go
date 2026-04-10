@@ -22,19 +22,25 @@ type JobProvider interface {
 	GetJobLogs(jobId string) (io.ReadCloser, error)
 	StreamJobLogs(jobId string) (io.ReadCloser, error)
 	AreAllGpuNodesBusy(ctx context.Context) (bool, error)
+	GetClusterResources(ctx context.Context) (ClusterResources, error)
 }
 
 type JobManager struct {
-	mu             sync.RWMutex
-	jobMap         map[string]JobState
-	limits         JobResourceLimits
-	jobProvider    JobProvider
-	callbackClient CallbackClient
-	jobCleanupFunc func(jobId string)
+	mu               sync.RWMutex
+	jobMap           map[string]JobState
+	limits           JobResourceLimits
+	jobProvider      JobProvider
+	callbackClient   CallbackClient
+	jobCleanupFunc   func(jobId string)
+	queueTriggerFunc func()
 }
 
 func (jm *JobManager) SetJobCleanupFunc(f func(jobId string)) {
 	jm.jobCleanupFunc = f
+}
+
+func (jm *JobManager) SetQueueTriggerFunc(f func()) {
+	jm.queueTriggerFunc = f
 }
 
 func NewJobManager(limits JobResourceLimits, jobProvider JobProvider, callbackClient CallbackClient) *JobManager {
@@ -59,6 +65,13 @@ func (jm *JobManager) CreateJob(req JobCreationRequest) (string, error) {
 
 	jm.mu.Lock()
 	defer jm.mu.Unlock()
+
+	// Idempotent: if this jobId already exists, return success without double-creating.
+	if req.JobId != "" {
+		if _, exists := jm.jobMap[req.JobId]; exists {
+			return req.JobId, nil
+		}
+	}
 
 	if err := jm.checkResourceAvailability(req); err != nil {
 		return "", err
@@ -205,6 +218,10 @@ func (jm *JobManager) UpdateJobStatus(jobId string, status JobStatus, exitCode *
 			}
 		}()
 	}
+
+	if status.IsTerminal() && jm.queueTriggerFunc != nil {
+		go jm.queueTriggerFunc()
+	}
 }
 
 func (jm *JobManager) archiveJobLogs(jobId string) {
@@ -307,6 +324,10 @@ func (jm *JobManager) CancelJob(jobId string) error {
 		}()
 	}
 
+	if jm.queueTriggerFunc != nil {
+		go jm.queueTriggerFunc()
+	}
+
 	return nil
 }
 
@@ -371,6 +392,12 @@ func (jm *JobManager) HandleJobEvent(jobId string, status JobStatus, exitCode *i
 						}
 					}(exitCodePtr, errorMessage, nodeId)
 				}
+				if jm.jobCleanupFunc != nil {
+					go jm.jobCleanupFunc(jobId)
+				}
+				if jm.queueTriggerFunc != nil {
+					go jm.queueTriggerFunc()
+				}
 				return
 			}
 		}
@@ -424,8 +451,13 @@ func (jm *JobManager) HandleJobEvent(jobId string, status JobStatus, exitCode *i
 		}()
 	}
 
-	if status.IsTerminal() && jm.jobCleanupFunc != nil {
-		go jm.jobCleanupFunc(jobId)
+	if status.IsTerminal() {
+		if jm.jobCleanupFunc != nil {
+			go jm.jobCleanupFunc(jobId)
+		}
+		if jm.queueTriggerFunc != nil {
+			go jm.queueTriggerFunc()
+		}
 	}
 }
 
@@ -512,19 +544,48 @@ func (jm *JobManager) checkResourceAvailability(req JobCreationRequest) error {
 	requestRam := IntOrDefault(req.Ram, DefaultJobRam)
 	requestGpus := IntOrDefault(req.Gpus, DefaultJobGpus)
 
-	if totalCpus+requestCpus > jm.limits.MaxCpus {
+	// Resolve dynamic limits: 0 means read from node labels
+	maxCpus, maxRam, maxGpus := jm.limits.MaxCpus, jm.limits.MaxRam, jm.limits.MaxGpus
+	if maxCpus == 0 || maxRam == 0 || maxGpus == 0 {
+		ctx := context.Background()
+		resources, err := jm.jobProvider.GetClusterResources(ctx)
+		if err != nil {
+			log.Printf("WARNING: Failed to get cluster resources: %v - using fallback limits", err)
+			if maxCpus == 0 {
+				maxCpus = 16
+			}
+			if maxRam == 0 {
+				maxRam = 64
+			}
+			if maxGpus == 0 {
+				maxGpus = 1
+			}
+		} else {
+			if maxCpus == 0 && resources.TotalCPUs > 0 {
+				maxCpus = resources.TotalCPUs
+			}
+			if maxRam == 0 && resources.TotalRAMGB > 0 {
+				maxRam = resources.TotalRAMGB
+			}
+			if maxGpus == 0 && resources.TotalGPUs > 0 {
+				maxGpus = resources.TotalGPUs
+			}
+		}
+	}
+
+	if maxCpus > 0 && totalCpus+requestCpus > maxCpus {
 		return fmt.Errorf("insufficient CPU resources: requested %d vCPUs, %d already allocated, limit is %d",
-			requestCpus, totalCpus, jm.limits.MaxCpus)
+			requestCpus, totalCpus, maxCpus)
 	}
 
-	if totalRam+requestRam > jm.limits.MaxRam {
+	if maxRam > 0 && totalRam+requestRam > maxRam {
 		return fmt.Errorf("insufficient RAM: requested %d GiB, %d already allocated, limit is %d GiB",
-			requestRam, totalRam, jm.limits.MaxRam)
+			requestRam, totalRam, maxRam)
 	}
 
-	if totalGpus+requestGpus > jm.limits.MaxGpus {
+	if maxGpus > 0 && totalGpus+requestGpus > maxGpus {
 		return fmt.Errorf("insufficient GPU resources: requested %d GPUs, %d already allocated, limit is %d",
-			requestGpus, totalGpus, jm.limits.MaxGpus)
+			requestGpus, totalGpus, maxGpus)
 	}
 
 	return nil

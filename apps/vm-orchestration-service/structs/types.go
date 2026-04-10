@@ -240,6 +240,7 @@ func (s JobStatus) IsTerminal() bool {
 }
 
 const (
+	JOB_STATUS_QUEUED       JobStatus = "queued"
 	JOB_STATUS_PENDING      JobStatus = "pending"
 	JOB_STATUS_SCHEDULED    JobStatus = "scheduled"
 	JOB_STATUS_PULLING      JobStatus = "pulling"

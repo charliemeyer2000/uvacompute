@@ -69,6 +69,10 @@ func (m *MockJobProvider) AreAllGpuNodesBusy(ctx context.Context) (bool, error) 
 	return m.AllGpuNodesBusy, m.GpuBusyCheckError
 }
 
+func (m *MockJobProvider) GetClusterResources(ctx context.Context) (ClusterResources, error) {
+	return ClusterResources{TotalCPUs: 32, TotalRAMGB: 128, TotalGPUs: 1, TotalStorageGB: 200}, nil
+}
+
 // MockCallbackClient for job tests
 type MockJobCallbackClient struct {
 	mu               sync.Mutex
@@ -589,4 +593,55 @@ func TestCreateJob_GpuBusy(t *testing.T) {
 			t.Fatalf("Non-GPU job should succeed even when GPU nodes busy: %v", err)
 		}
 	})
+}
+
+func TestCreateJob_DynamicResourceLimits(t *testing.T) {
+	// All zeros = read limits dynamically from GetClusterResources
+	// Mock returns TotalCPUs: 32, TotalRAMGB: 128, TotalGPUs: 1
+	limits := JobResourceLimits{MaxCpus: 0, MaxRam: 0, MaxGpus: 0}
+	mockProvider := &MockJobProvider{}
+	jm := NewJobManager(limits, mockProvider, nil)
+
+	// Create jobs consuming 16 CPUs each — first two should succeed
+	cpus16 := 16
+	ram16 := 16
+	req1 := JobCreationRequest{
+		JobId:  uuid.New().String(),
+		UserId: "test-user",
+		Image:  "ubuntu:latest",
+		Cpus:   &cpus16,
+		Ram:    &ram16,
+	}
+	_, err := jm.CreateJob(req1)
+	if err != nil {
+		t.Fatalf("First job (16 CPUs) should succeed with 32 dynamic limit: %v", err)
+	}
+
+	req2 := JobCreationRequest{
+		JobId:  uuid.New().String(),
+		UserId: "test-user",
+		Image:  "ubuntu:latest",
+		Cpus:   &cpus16,
+		Ram:    &ram16,
+	}
+	_, err = jm.CreateJob(req2)
+	if err != nil {
+		t.Fatalf("Second job (16 CPUs, total 32) should succeed: %v", err)
+	}
+
+	// Third job should fail — exceeds 32 CPU dynamic limit
+	req3 := JobCreationRequest{
+		JobId:  uuid.New().String(),
+		UserId: "test-user",
+		Image:  "ubuntu:latest",
+		Cpus:   &cpus16,
+		Ram:    &ram16,
+	}
+	_, err = jm.CreateJob(req3)
+	if err == nil {
+		t.Fatal("Third job should fail (48 CPUs > 32 dynamic limit)")
+	}
+	if !strings.Contains(err.Error(), "insufficient CPU resources") {
+		t.Fatalf("Expected CPU resource limit error, got: %v", err)
+	}
 }

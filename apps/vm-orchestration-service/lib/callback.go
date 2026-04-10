@@ -306,3 +306,35 @@ func (c *CallbackClient) FetchActiveJobs() ([]ConvexJob, error) {
 	log.Printf("Fetched %d active jobs from Convex", len(response.Jobs))
 	return response.Jobs, nil
 }
+
+// FetchQueuedJobs retrieves queued GitHub runner jobs waiting for resources
+func (c *CallbackClient) FetchQueuedJobs() ([]ConvexJob, error) {
+	url := fmt.Sprintf("%s/api/jobs/queued", c.siteBaseUrl)
+	timestamp := strconv.FormatInt(time.Now().Unix(), 10)
+
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("X-Timestamp", timestamp)
+	signature := c.signRequest(timestamp, "")
+	req.Header.Set("X-Signature", signature)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch queued jobs: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to fetch queued jobs: %s", resp.Status)
+	}
+
+	var response ActiveJobsResponse
+	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return response.Jobs, nil
+}

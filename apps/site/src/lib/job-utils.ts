@@ -24,6 +24,12 @@ export interface Job {
   exposePort?: number;
   exposeSubdomain?: string;
   exposeUrl?: string;
+  source?: "cli" | "api" | "github";
+  githubMeta?: {
+    repoFullName: string;
+    workflowJobId: number;
+    workflowJobUrl?: string;
+  };
 }
 
 export function formatDate(timestamp: number): string {
@@ -66,9 +72,13 @@ export function formatDuration(
 }
 
 export function isJobActive(status: JobStatus): boolean {
-  return ["pending", "scheduled", "pulling", "running"].includes(status);
+  return ["queued", "pending", "scheduled", "pulling", "running"].includes(
+    status,
+  );
 }
 
 export function isJobCancellable(status: JobStatus): boolean {
-  return ["pending", "scheduled", "pulling", "running"].includes(status);
+  return ["queued", "pending", "scheduled", "pulling", "running"].includes(
+    status,
+  );
 }

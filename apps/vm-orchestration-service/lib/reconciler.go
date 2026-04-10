@@ -22,6 +22,7 @@ type Reconciler struct {
 	k8sClient      kubernetes.Interface
 	namespace      string
 	interval       time.Duration
+	queueProcessor *QueueProcessor
 }
 
 type ReconcilerConfig struct {
@@ -33,6 +34,7 @@ type ReconcilerConfig struct {
 	K8sClient      kubernetes.Interface
 	Namespace      string
 	Interval       time.Duration
+	QueueProcessor *QueueProcessor
 }
 
 func NewReconciler(config ReconcilerConfig) *Reconciler {
@@ -52,6 +54,7 @@ func NewReconciler(config ReconcilerConfig) *Reconciler {
 		k8sClient:      config.K8sClient,
 		namespace:      config.Namespace,
 		interval:       interval,
+		queueProcessor: config.QueueProcessor,
 	}
 }
 
@@ -140,6 +143,10 @@ func (r *Reconciler) reconcile() {
 	r.reconcileStoppingVMs()
 	r.cleanupDeadPods()
 	r.cleanupOrphanResources()
+
+	if r.queueProcessor != nil {
+		r.queueProcessor.TriggerProcessing()
+	}
 }
 
 func (r *Reconciler) reconcileStoppingVMs() {

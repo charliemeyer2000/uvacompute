@@ -29,7 +29,13 @@ import {
   isJobCancellable,
 } from "@/lib/job-utils";
 import { getStatusBorderColor, getStatusDotColor } from "@/lib/status-colors";
-import { MoreVertical, Container, ExternalLink, Globe } from "lucide-react";
+import {
+  MoreVertical,
+  Container,
+  ExternalLink,
+  Globe,
+  Github,
+} from "lucide-react";
 import { toast } from "sonner";
 
 function JobCard({ job }: { job: Job }) {
@@ -72,9 +78,16 @@ function JobCard({ job }: { job: Job }) {
       >
         <div className="flex justify-between items-start mb-3">
           <div className="flex-1 min-w-0">
-            <h3 className="text-sm font-semibold text-black truncate group-hover:text-orange-accent transition-colors">
-              {job.name || "unnamed job"}
-            </h3>
+            <div className="flex items-center gap-1.5">
+              {job.source === "github" && (
+                <span title="GitHub Actions runner">
+                  <Github className="h-3.5 w-3.5 text-gray-400 flex-shrink-0" />
+                </span>
+              )}
+              <h3 className="text-sm font-semibold text-black truncate group-hover:text-orange-accent transition-colors">
+                {job.name || "unnamed job"}
+              </h3>
+            </div>
             <p className="text-xs text-gray-400 font-mono truncate mt-0.5">
               {job.jobId}
             </p>

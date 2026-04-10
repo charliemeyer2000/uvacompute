@@ -30,6 +30,11 @@ func SyncJobsFromConvex(jobManager *structs.JobManager, jobAdapter *JobAdapter, 
 	syncedCount, orphanedCount, cancellingCount := 0, 0, 0
 
 	for _, cjob := range convexJobs {
+		// Queued jobs have no K8s counterpart yet — handled by QueueProcessor.
+		if cjob.Status == "queued" {
+			continue
+		}
+
 		existingJob, existsInMemory := currentJobs[cjob.JobId]
 		k8sStatus, err := jobAdapter.GetJobStatus(cjob.JobId)
 

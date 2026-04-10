@@ -135,10 +135,18 @@ func main() {
 	app.VMManager.StartPruner(ctx)
 	app.JobManager.StartPruner(ctx)
 
+	// Create queue processor for GitHub runner job queuing
+	queueProcessor := lib.NewQueueProcessor(app.JobManager, callbackClient)
+	queueProcessor.Start()
+
 	app.JobManager.SetJobCleanupFunc(func(jobId string) {
 		if err := jobAdapter.DeleteJob(jobId); err != nil {
 			log.Printf("Job cleanup: failed to delete K8s Job %s: %v", jobId, err)
 		}
+	})
+
+	app.JobManager.SetQueueTriggerFunc(func() {
+		queueProcessor.TriggerProcessing()
 	})
 	app.VMManager.SetVMCleanupFunc(func(vmId string) {
 		if err := vmAdapter.DestroyVM(vmId); err != nil {
@@ -159,6 +167,8 @@ func main() {
 	if err := lib.SyncJobsFromConvex(app.JobManager, jobAdapter, callbackClient); err != nil {
 		fmt.Printf("Warning: Failed to sync jobs from Convex: %v\n", err)
 	}
+
+	queueProcessor.TriggerProcessing()
 
 	// Start the event-driven informer manager
 	// This handles real-time status updates for VMIs, Jobs, and Pods
@@ -190,6 +200,7 @@ func main() {
 		K8sClient:      jobAdapter.K8sClient(),
 		Namespace:      kubeVirtConfig.Namespace,
 		Interval:       30 * time.Minute,
+		QueueProcessor: queueProcessor,
 	})
 	go reconciler.Start(ctx)
 	fmt.Println("Reconciler started (30 min backup interval)")

@@ -3,6 +3,7 @@
 
 const ACTIVE_STATUSES = ["running", "completed", "ready", "online"] as const;
 const PENDING_STATUSES = [
+  "queued",
   "pending",
   "scheduled",
   "pulling",

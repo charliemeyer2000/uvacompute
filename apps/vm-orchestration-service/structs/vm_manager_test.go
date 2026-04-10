@@ -53,6 +53,10 @@ func (m *MockVMProvider) GetClusterStorageGB(ctx context.Context) (int, error) {
 	return 200, nil // Mock returns 200GB cluster storage
 }
 
+func (m *MockVMProvider) GetClusterResources(ctx context.Context) (ClusterResources, error) {
+	return ClusterResources{TotalCPUs: 32, TotalRAMGB: 128, TotalGPUs: 1, TotalStorageGB: 200}, nil
+}
+
 func TestCreateVM(t *testing.T) {
 	limits := VMResourceLimits{MaxCpus: 16, MaxRam: 64, MaxGpus: 1}
 	mockProvider := &MockVMProvider{}
@@ -549,6 +553,60 @@ func TestResourceLimits_Disk(t *testing.T) {
 
 	if !strings.Contains(err.Error(), "insufficient storage") {
 		t.Fatalf("Expected storage limit error, got: %v", err)
+	}
+}
+
+func TestResourceLimits_DynamicFromNodeLabels(t *testing.T) {
+	// All zeros = read limits dynamically from GetClusterResources
+	// Mock returns TotalCPUs: 32, TotalRAMGB: 128, TotalGPUs: 1, TotalStorageGB: 200
+	limits := VMResourceLimits{MaxCpus: 0, MaxRam: 0, MaxGpus: 0}
+	mockProvider := &MockVMProvider{}
+	vm := NewVMManager(limits, mockProvider, nil)
+
+	// Create a VM requesting 16 CPUs — should succeed (32 available)
+	cpus16 := 16
+	ram16 := 16
+	req1 := VMCreationRequest{
+		VMId:   uuid.New().String(),
+		Hours:  24,
+		UserId: "test-user",
+		Cpus:   &cpus16,
+		Ram:    &ram16,
+	}
+	vmId1, err := vm.CreateVM(req1)
+	if err != nil {
+		t.Fatalf("First VM (16 CPUs) should succeed with 32 dynamic limit: %v", err)
+	}
+	vm.WaitForStatus(vmId1, VM_STATUS_READY)
+
+	// Create another VM requesting 16 CPUs — should succeed (16+16=32)
+	req2 := VMCreationRequest{
+		VMId:   uuid.New().String(),
+		Hours:  24,
+		UserId: "test-user",
+		Cpus:   &cpus16,
+		Ram:    &ram16,
+	}
+	vmId2, err := vm.CreateVM(req2)
+	if err != nil {
+		t.Fatalf("Second VM (16 CPUs, total 32) should succeed: %v", err)
+	}
+	vm.WaitForStatus(vmId2, VM_STATUS_READY)
+
+	// Third VM should fail — exceeds 32 CPU dynamic limit
+	req3 := VMCreationRequest{
+		VMId:   uuid.New().String(),
+		Hours:  24,
+		UserId: "test-user",
+		Cpus:   &cpus16,
+		Ram:    &ram16,
+	}
+	_, err = vm.CreateVM(req3)
+	if err == nil {
+		t.Fatal("Third VM should fail (48 CPUs > 32 dynamic limit)")
+	}
+	if !strings.Contains(err.Error(), "insufficient CPU resources") {
+		t.Fatalf("Expected CPU resource limit error, got: %v", err)
 	}
 }
 
