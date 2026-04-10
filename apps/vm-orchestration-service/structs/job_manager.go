@@ -25,16 +25,21 @@ type JobProvider interface {
 }
 
 type JobManager struct {
-	mu             sync.RWMutex
-	jobMap         map[string]JobState
-	limits         JobResourceLimits
-	jobProvider    JobProvider
-	callbackClient CallbackClient
-	jobCleanupFunc func(jobId string)
+	mu               sync.RWMutex
+	jobMap           map[string]JobState
+	limits           JobResourceLimits
+	jobProvider      JobProvider
+	callbackClient   CallbackClient
+	jobCleanupFunc   func(jobId string)
+	queueTriggerFunc func()
 }
 
 func (jm *JobManager) SetJobCleanupFunc(f func(jobId string)) {
 	jm.jobCleanupFunc = f
+}
+
+func (jm *JobManager) SetQueueTriggerFunc(f func()) {
+	jm.queueTriggerFunc = f
 }
 
 func NewJobManager(limits JobResourceLimits, jobProvider JobProvider, callbackClient CallbackClient) *JobManager {
@@ -59,6 +64,13 @@ func (jm *JobManager) CreateJob(req JobCreationRequest) (string, error) {
 
 	jm.mu.Lock()
 	defer jm.mu.Unlock()
+
+	// Idempotent: if this jobId already exists, return success without double-creating.
+	if req.JobId != "" {
+		if _, exists := jm.jobMap[req.JobId]; exists {
+			return req.JobId, nil
+		}
+	}
 
 	if err := jm.checkResourceAvailability(req); err != nil {
 		return "", err
@@ -204,6 +216,10 @@ func (jm *JobManager) UpdateJobStatus(jobId string, status JobStatus, exitCode *
 				jm.callbackClient.EnqueueJobRetry(jobId, string(status), exitCode, errorMessage, nodeId)
 			}
 		}()
+	}
+
+	if status.IsTerminal() && jm.queueTriggerFunc != nil {
+		go jm.queueTriggerFunc()
 	}
 }
 
@@ -424,8 +440,13 @@ func (jm *JobManager) HandleJobEvent(jobId string, status JobStatus, exitCode *i
 		}()
 	}
 
-	if status.IsTerminal() && jm.jobCleanupFunc != nil {
-		go jm.jobCleanupFunc(jobId)
+	if status.IsTerminal() {
+		if jm.jobCleanupFunc != nil {
+			go jm.jobCleanupFunc(jobId)
+		}
+		if jm.queueTriggerFunc != nil {
+			go jm.queueTriggerFunc()
+		}
 	}
 }
 

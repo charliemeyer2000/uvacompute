@@ -156,6 +156,33 @@ export async function DELETE(
       );
     }
 
+    // Queued jobs never reached the orchestration service — cancel directly in Convex
+    if (job.status === "queued") {
+      try {
+        await fetchMutation(api.jobs.cancel, {
+          jobId,
+          userId: session.user.id,
+        });
+        return NextResponse.json(
+          {
+            status: "cancellation_success",
+            jobId,
+            msg: "Queued job cancelled",
+          },
+          { status: 200 },
+        );
+      } catch (e: unknown) {
+        const message = e instanceof Error ? e.message : "Cannot cancel job";
+        return NextResponse.json(
+          {
+            status: "cancellation_failed_internal",
+            msg: message,
+          },
+          { status: 500 },
+        );
+      }
+    }
+
     try {
       await fetchMutation(api.jobs.markCancelling, {
         jobId,

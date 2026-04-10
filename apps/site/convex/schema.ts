@@ -15,6 +15,7 @@ export const VM_STATUSES = [
 ] as const;
 
 export const JOB_STATUSES = [
+  "queued",
   "pending",
   "scheduled",
   "pulling",
@@ -108,11 +109,23 @@ export default defineSchema({
     exposePort: v.optional(v.number()),
     exposeSubdomain: v.optional(v.string()),
     exposeUrl: v.optional(v.string()),
+
+    // Job source tracking
+    source: v.optional(
+      v.union(v.literal("cli"), v.literal("api"), v.literal("github")),
+    ),
+    githubMeta: v.optional(
+      v.object({
+        repoFullName: v.string(),
+        workflowJobId: v.number(),
+      }),
+    ),
   })
     .index("by_user", ["userId"])
     .index("by_user_and_status", ["userId", "status"])
     .index("by_jobId", ["jobId"])
-    .index("by_nodeId", ["nodeId"]),
+    .index("by_nodeId", ["nodeId"])
+    .index("by_status", ["status"]),
 
   // Ephemeral endpoints table for subdomain uniqueness
   endpoints: defineTable({

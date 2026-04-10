@@ -111,6 +111,7 @@ export default function AdminPage() {
         activeVms: activeVms.length,
         activeJobs: activeJobs.length,
       },
+      queuedJobs: allJobs.filter((job) => job.status === "queued").length,
     };
   }, [nodes, allVMs, allJobs]);
 
@@ -281,7 +282,7 @@ export default function AdminPage() {
 
       {/* Resource Summary */}
       {resources && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
           <div className="bg-white border rounded-lg p-4">
             <div className="text-sm text-gray-500">Nodes</div>
             <div className="text-2xl font-bold">
@@ -309,6 +310,13 @@ export default function AdminPage() {
               {resources.gpus.used}/{resources.gpus.total}
             </div>
             <div className="text-xs text-gray-400">used</div>
+          </div>
+          <div className="bg-white border rounded-lg p-4">
+            <div className="text-sm text-gray-500">Runner Queue</div>
+            <div className="text-2xl font-bold">{resources.queuedJobs}</div>
+            <div className="text-xs text-gray-400">
+              {resources.queuedJobs === 0 ? "empty" : "waiting"}
+            </div>
           </div>
         </div>
       )}

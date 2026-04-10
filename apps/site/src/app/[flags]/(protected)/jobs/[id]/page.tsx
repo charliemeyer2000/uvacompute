@@ -33,6 +33,7 @@ import {
   Database,
   ExternalLink,
   Globe,
+  Github,
 } from "lucide-react";
 import { toast } from "sonner";
 import { LogViewer } from "./_components/log-viewer";
@@ -132,6 +133,11 @@ export default function JobDetailPage() {
           </Link>
           <div>
             <div className="flex items-center gap-3">
+              {job.source === "github" && (
+                <span title="GitHub Actions runner">
+                  <Github className="h-5 w-5 text-gray-400 flex-shrink-0" />
+                </span>
+              )}
               <h1 className="text-2xl font-semibold text-black">
                 {job.name || "unnamed job"}
               </h1>
@@ -274,6 +280,42 @@ export default function JobDetailPage() {
             error
           </p>
           <p className="text-sm text-red-700">{job.errorMessage}</p>
+        </div>
+      )}
+
+      {/* GitHub Actions metadata */}
+      {job.githubMeta && (
+        <div className="bg-white border border-gray-200 p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <Github className="h-4 w-4 text-gray-400" />
+            <p className="text-xs text-gray-400 uppercase tracking-wide">
+              github actions
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-sm">
+            <div>
+              <span className="text-gray-500">repo: </span>
+              <a
+                href={`https://github.com/${job.githubMeta.repoFullName}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-black hover:text-orange-accent transition-colors font-mono"
+              >
+                {job.githubMeta.repoFullName}
+              </a>
+            </div>
+            <div>
+              <span className="text-gray-500">workflow job: </span>
+              <a
+                href={`https://github.com/${job.githubMeta.repoFullName}/actions/runs/${job.githubMeta.workflowJobId}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-black hover:text-orange-accent transition-colors font-mono"
+              >
+                #{job.githubMeta.workflowJobId}
+              </a>
+            </div>
+          </div>
         </div>
       )}
 

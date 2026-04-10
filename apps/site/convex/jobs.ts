@@ -44,6 +44,50 @@ export const create = mutation({
   },
 });
 
+export const createQueued = mutation({
+  args: {
+    userId: v.string(),
+    jobId: v.string(),
+    name: v.optional(v.string()),
+    image: v.string(),
+    command: v.optional(v.array(v.string())),
+    env: v.optional(v.any()),
+    cpus: v.number(),
+    ram: v.number(),
+    gpus: v.number(),
+    disk: v.optional(v.number()),
+    source: v.optional(
+      v.union(v.literal("cli"), v.literal("api"), v.literal("github")),
+    ),
+    githubMeta: v.optional(
+      v.object({
+        repoFullName: v.string(),
+        workflowJobId: v.number(),
+      }),
+    ),
+  },
+  handler: async (ctx, args) => {
+    const jobDocId = await ctx.db.insert("jobs", {
+      userId: args.userId,
+      jobId: args.jobId,
+      name: args.name,
+      image: args.image,
+      command: args.command,
+      env: args.env,
+      cpus: args.cpus,
+      ram: args.ram,
+      gpus: args.gpus,
+      disk: args.disk,
+      status: "queued",
+      createdAt: Date.now(),
+      source: args.source,
+      githubMeta: args.githubMeta,
+    });
+
+    return jobDocId;
+  },
+});
+
 export const updateStatus = mutation({
   args: {
     jobId: v.string(),
@@ -136,6 +180,7 @@ export const listActiveByUser = query({
       .collect();
 
     const activeStatuses = [
+      "queued",
       "pending",
       "scheduled",
       "pulling",
@@ -203,6 +248,7 @@ export const cancel = mutation({
     }
 
     const cancellableStatuses = [
+      "queued",
       "pending",
       "scheduled",
       "pulling",
@@ -250,6 +296,7 @@ export const markCancelling = mutation({
     }
 
     const cancellableStatuses = [
+      "queued",
       "pending",
       "scheduled",
       "pulling",
@@ -281,6 +328,7 @@ export const listActive = query({
     const allJobs = await ctx.db.query("jobs").order("desc").collect();
 
     const activeStatuses = [
+      "queued",
       "pending",
       "scheduled",
       "pulling",
@@ -341,6 +389,7 @@ export const cleanupStaleJobs = internalMutation({
   handler: async (ctx) => {
     const now = Date.now();
     const staleThreshold = 15 * 60 * 1000;
+    const queuedExpiry = 60 * 60 * 1000; // 1 hour
     let count = 0;
 
     const cancellingJobs = await ctx.db
@@ -367,6 +416,51 @@ export const cleanupStaleJobs = internalMutation({
       }
     }
 
+    // Expire queued jobs older than 1 hour
+    const queuedJobs = await ctx.db
+      .query("jobs")
+      .withIndex("by_status", (q) => q.eq("status", "queued"))
+      .collect();
+
+    for (const job of queuedJobs) {
+      if (now - job.createdAt > queuedExpiry) {
+        await ctx.db.patch(job._id, {
+          status: "failed",
+          errorMessage:
+            "Expired: queued for over 1 hour without available resources",
+          completedAt: now,
+        });
+        count++;
+        console.log(`Cron: expired queued job ${job.jobId}`);
+      }
+    }
+
     return count;
+  },
+});
+
+export const listQueued = query({
+  args: {},
+  handler: async (ctx) => {
+    const queuedJobs = await ctx.db
+      .query("jobs")
+      .withIndex("by_status", (q) => q.eq("status", "queued"))
+      .order("asc")
+      .collect();
+
+    return queuedJobs.map((job) => ({
+      jobId: job.jobId,
+      userId: job.userId,
+      name: job.name,
+      image: job.image,
+      command: job.command,
+      env: job.env,
+      cpus: job.cpus,
+      ram: job.ram,
+      gpus: job.gpus,
+      disk: job.disk ?? 0,
+      status: job.status,
+      createdAt: job.createdAt,
+    }));
   },
 });
