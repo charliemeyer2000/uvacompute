@@ -130,6 +130,7 @@ export async function POST(
 
   const repoFullName = payload.repository.full_name;
   const workflowJobId = payload.workflow_job.id;
+  const workflowJobUrl: string | undefined = payload.workflow_job.html_url;
   const resources = parseResourcesFromLabels(labels);
 
   console.log(
@@ -219,6 +220,7 @@ export async function POST(
       githubMeta: {
         repoFullName,
         workflowJobId,
+        workflowJobUrl,
       },
     });
   } catch (e) {

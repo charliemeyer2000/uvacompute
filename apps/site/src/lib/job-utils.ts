@@ -28,6 +28,7 @@ export interface Job {
   githubMeta?: {
     repoFullName: string;
     workflowJobId: number;
+    workflowJobUrl?: string;
   };
 }
 

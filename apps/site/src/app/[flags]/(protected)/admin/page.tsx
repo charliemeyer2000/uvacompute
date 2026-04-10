@@ -72,7 +72,8 @@ export default function AdminPage() {
       (job) =>
         job.status !== "completed" &&
         job.status !== "failed" &&
-        job.status !== "cancelled",
+        job.status !== "cancelled" &&
+        job.status !== "queued",
     );
 
     const usedCpus =

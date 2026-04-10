@@ -304,17 +304,19 @@ export default function JobDetailPage() {
                 {job.githubMeta.repoFullName}
               </a>
             </div>
-            <div>
-              <span className="text-gray-500">workflow job: </span>
-              <a
-                href={`https://github.com/${job.githubMeta.repoFullName}/actions/runs/${job.githubMeta.workflowJobId}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-black hover:text-orange-accent transition-colors font-mono"
-              >
-                #{job.githubMeta.workflowJobId}
-              </a>
-            </div>
+            {job.githubMeta.workflowJobUrl && (
+              <div>
+                <span className="text-gray-500">workflow job: </span>
+                <a
+                  href={job.githubMeta.workflowJobUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-black hover:text-orange-accent transition-colors font-mono"
+                >
+                  #{job.githubMeta.workflowJobId}
+                </a>
+              </div>
+            )}
           </div>
         </div>
       )}

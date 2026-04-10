@@ -55,6 +55,20 @@ export async function GET(
       );
     }
 
+    // Queued jobs haven't reached the orchestration service yet
+    if (job.status === "queued") {
+      return NextResponse.json({
+        status: "queued",
+        jobId,
+        name: job.name,
+        image: job.image,
+        cpus: job.cpus,
+        ram: job.ram,
+        gpus: job.gpus,
+        disk: job.disk,
+      });
+    }
+
     const authHeaders = createAuthHeaders("GET", `/jobs/${jobId}`, "");
     const response = await fetch(
       `${VM_ORCHESTRATION_SERVICE_URL}/jobs/${jobId}`,

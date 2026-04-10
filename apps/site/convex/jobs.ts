@@ -63,6 +63,7 @@ export const createQueued = mutation({
       v.object({
         repoFullName: v.string(),
         workflowJobId: v.number(),
+        workflowJobUrl: v.optional(v.string()),
       }),
     ),
   },

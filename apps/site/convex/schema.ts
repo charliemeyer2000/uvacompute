@@ -118,6 +118,7 @@ export default defineSchema({
       v.object({
         repoFullName: v.string(),
         workflowJobId: v.number(),
+        workflowJobUrl: v.optional(v.string()),
       }),
     ),
   })
