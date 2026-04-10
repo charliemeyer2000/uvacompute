@@ -36,6 +36,9 @@ func (p *testJobProvider) GetJobStatus(string) (structs.JobStatus, error) { retu
 func (p *testJobProvider) GetJobLogs(string) (io.ReadCloser, error)   { return io.NopCloser(strings.NewReader("")), nil }
 func (p *testJobProvider) StreamJobLogs(string) (io.ReadCloser, error) { return io.NopCloser(strings.NewReader("")), nil }
 func (p *testJobProvider) AreAllGpuNodesBusy(context.Context) (bool, error) { return false, nil }
+func (p *testJobProvider) GetClusterResources(context.Context) (structs.ClusterResources, error) {
+	return structs.ClusterResources{TotalCPUs: 32, TotalRAMGB: 128, TotalGPUs: 1, TotalStorageGB: 200}, nil
+}
 
 // mockQueueServer provides a test HTTP server that mimics the Convex API
 // endpoints used by CallbackClient (FetchQueuedJobs, NotifyJobStatusUpdate).
