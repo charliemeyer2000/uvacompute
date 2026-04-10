@@ -765,7 +765,9 @@ async function installNvidiaDriver(
   }
 }
 
-async function nodeInstall(options: { storage?: string } = {}): Promise<void> {
+async function nodeInstall(
+  options: { cpus?: string; ram?: string; storage?: string } = {},
+): Promise<void> {
   console.log(theme.emphasis("\nNode Installation\n"));
 
   const gpu = await checkNvidiaGpu();
@@ -882,6 +884,12 @@ async function nodeInstall(options: { storage?: string } = {}): Promise<void> {
     writeFileSync(tmpFile, script, { mode: 0o755 });
 
     const scriptArgs = [tmpFile, "--token", registrationToken, "-y"];
+    if (options.cpus) {
+      scriptArgs.push("--cpus", options.cpus);
+    }
+    if (options.ram) {
+      scriptArgs.push("--ram", options.ram);
+    }
     if (options.storage) {
       scriptArgs.push("--storage", options.storage);
     }
@@ -2237,6 +2245,11 @@ export function registerNodeCommands(program: Command) {
   node
     .command("install")
     .description("Install k3s, KubeVirt, and configure as a contributor node")
+    .option(
+      "--cpus <count>",
+      "Number of CPUs to contribute (default: total - 4)",
+    )
+    .option("--ram <gb>", "RAM in GB to contribute (default: total - 4)")
     .option("--storage <gb>", "Storage allocation in GB for VM disks")
     .action((options) => nodeInstall(options));
 

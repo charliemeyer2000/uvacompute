@@ -38,8 +38,8 @@ export const JobCreationRequestSchema = z.object({
   command: z.array(z.string()).optional(),
   env: z.record(z.string(), z.string()).optional(),
   name: z.string().max(255).optional(),
-  cpus: z.number().int().min(1).max(16).optional().default(1),
-  ram: z.number().int().min(1).max(64).optional().default(4),
+  cpus: z.number().int().min(1).max(128).optional().default(1),
+  ram: z.number().int().min(1).max(512).optional().default(4),
   gpus: z.number().int().min(0).max(1).optional().default(0),
   disk: z.number().int().min(0).max(100).optional().default(0),
   expose: z

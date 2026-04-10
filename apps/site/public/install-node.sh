@@ -163,11 +163,8 @@ register_node() {
     local node_id
     node_id=$(hostname)
 
-    local cpus
-    cpus=$(nproc)
-
-    local ram
-    ram=$(free -g | awk '/^Mem:/{print $2}')
+    local cpus="${CPU_ALLOCATION}"
+    local ram="${RAM_ALLOCATION}"
 
     local gpus=0
     local gpu_type="none"
@@ -312,14 +309,26 @@ install_k3s_agent() {
     
     curl -sfL https://get.k3s.io | K3S_URL="${K3S_URL}" K3S_TOKEN="${K3S_TOKEN}" sh -s - agent
 
-    # Configure kubelet: cgroup driver + image GC (prune unused images at 70% disk usage)
-    if ! grep -q "image-gc-high-threshold" /etc/systemd/system/k3s-agent.service.env 2>/dev/null; then
-        log_info "Configuring kubelet args..."
-        sed -i '/^K3S_KUBELET_ARG/d' /etc/systemd/system/k3s-agent.service.env 2>/dev/null || true
-        echo 'K3S_KUBELET_ARG=--cgroup-driver=systemd --image-gc-high-threshold=70 --image-gc-low-threshold=50' >> /etc/systemd/system/k3s-agent.service.env
-        systemctl daemon-reload
-        systemctl restart k3s-agent
+    # Configure kubelet: cgroup driver + image GC + system resource reservations
+    log_info "Configuring kubelet args..."
+    sed -i '/^K3S_KUBELET_ARG/d' /etc/systemd/system/k3s-agent.service.env 2>/dev/null || true
+
+    local total_cpus
+    total_cpus=$(nproc)
+    local total_ram
+    total_ram=$(free -g | awk '/^Mem:/{print $2}')
+    local reserved_cpus=$((total_cpus - CPU_ALLOCATION))
+    local reserved_ram=$((total_ram - RAM_ALLOCATION))
+
+    local kubelet_args="--cgroup-driver=systemd --image-gc-high-threshold=70 --image-gc-low-threshold=50"
+    if [[ ${reserved_cpus} -gt 0 || ${reserved_ram} -gt 0 ]]; then
+        kubelet_args="${kubelet_args} --system-reserved=cpu=${reserved_cpus},memory=${reserved_ram}Gi"
+        log_info "Reserving ${reserved_cpus} CPUs and ${reserved_ram}GB RAM for system (contributing ${CPU_ALLOCATION} CPUs / ${RAM_ALLOCATION}GB RAM)"
     fi
+
+    echo "K3S_KUBELET_ARG=${kubelet_args}" >> /etc/systemd/system/k3s-agent.service.env
+    systemctl daemon-reload
+    systemctl restart k3s-agent
 
     log_info "Waiting for k3s agent to be ready..."
     local retries=30
@@ -347,11 +356,8 @@ label_node() {
     local node_id
     node_id=$(hostname)
 
-    local cpus
-    cpus=$(nproc)
-
-    local ram
-    ram=$(free -g | awk '/^Mem:/{print $2}')
+    local cpus="${CPU_ALLOCATION}"
+    local ram="${RAM_ALLOCATION}"
 
     local gpu_label="none"
     local has_gpu="false"
@@ -563,6 +569,98 @@ prompt_storage_allocation() {
     fi
 
     log_success "Will allocate ${STORAGE_ALLOCATION_GB}GB for VM storage"
+}
+
+prompt_cpu_allocation() {
+    local total_cpus
+    total_cpus=$(nproc)
+
+    if [[ "${NONINTERACTIVE}" == "true" ]]; then
+        if [[ -n "${CPU_ALLOCATION}" && "${CPU_ALLOCATION}" -gt 0 ]] 2>/dev/null; then
+            log_info "Using specified CPU allocation: ${CPU_ALLOCATION} vCPUs"
+        else
+            # Default to total - 4 (reserve 4 for system), minimum 1
+            local default_alloc=$((total_cpus - 4))
+            [[ ${default_alloc} -lt 1 ]] && default_alloc=1
+            CPU_ALLOCATION=${default_alloc}
+            log_info "Non-interactive mode: contributing ${CPU_ALLOCATION} of ${total_cpus} vCPUs"
+        fi
+        return
+    fi
+
+    echo ""
+    echo "╔══════════════════════════════════════════════════════════════╗"
+    echo "║                    CPU ALLOCATION                           ║"
+    echo "╠══════════════════════════════════════════════════════════════╣"
+    echo "║ Total CPUs detected: ${total_cpus}"
+    echo "║"
+    echo "║ How many CPUs to contribute to UVACompute?"
+    echo "║ (Remaining CPUs stay reserved for system use)"
+    echo "╚══════════════════════════════════════════════════════════════╝"
+    echo ""
+
+    local default_alloc=$((total_cpus - 4))
+    [[ ${default_alloc} -lt 1 ]] && default_alloc=1
+
+    read -rp "CPUs to contribute [${default_alloc}]: " input_cpus
+    CPU_ALLOCATION=${input_cpus:-${default_alloc}}
+
+    if [[ ${CPU_ALLOCATION} -gt ${total_cpus} ]]; then
+        log_error "Cannot contribute more than total CPUs (${total_cpus})"
+        exit 1
+    fi
+    if [[ ${CPU_ALLOCATION} -lt 1 ]]; then
+        log_error "Must contribute at least 1 CPU"
+        exit 1
+    fi
+
+    log_success "Will contribute ${CPU_ALLOCATION} of ${total_cpus} vCPUs"
+}
+
+prompt_ram_allocation() {
+    local total_ram
+    total_ram=$(free -g | awk '/^Mem:/{print $2}')
+
+    if [[ "${NONINTERACTIVE}" == "true" ]]; then
+        if [[ -n "${RAM_ALLOCATION}" && "${RAM_ALLOCATION}" -gt 0 ]] 2>/dev/null; then
+            log_info "Using specified RAM allocation: ${RAM_ALLOCATION}GB"
+        else
+            # Default to total - 4 (reserve 4GB for system), minimum 2
+            local default_alloc=$((total_ram - 4))
+            [[ ${default_alloc} -lt 2 ]] && default_alloc=2
+            RAM_ALLOCATION=${default_alloc}
+            log_info "Non-interactive mode: contributing ${RAM_ALLOCATION}GB of ${total_ram}GB RAM"
+        fi
+        return
+    fi
+
+    echo ""
+    echo "╔══════════════════════════════════════════════════════════════╗"
+    echo "║                    RAM ALLOCATION                           ║"
+    echo "╠══════════════════════════════════════════════════════════════╣"
+    echo "║ Total RAM detected: ${total_ram}GB"
+    echo "║"
+    echo "║ How much RAM (GB) to contribute to UVACompute?"
+    echo "║ (Remaining RAM stays reserved for system use)"
+    echo "╚══════════════════════════════════════════════════════════════╝"
+    echo ""
+
+    local default_alloc=$((total_ram - 4))
+    [[ ${default_alloc} -lt 2 ]] && default_alloc=2
+
+    read -rp "RAM in GB to contribute [${default_alloc}]: " input_ram
+    RAM_ALLOCATION=${input_ram:-${default_alloc}}
+
+    if [[ ${RAM_ALLOCATION} -gt ${total_ram} ]]; then
+        log_error "Cannot contribute more than total RAM (${total_ram}GB)"
+        exit 1
+    fi
+    if [[ ${RAM_ALLOCATION} -lt 2 ]]; then
+        log_error "Must contribute at least 2GB RAM"
+        exit 1
+    fi
+
+    log_success "Will contribute ${RAM_ALLOCATION}GB of ${total_ram}GB RAM"
 }
 
 setup_storage_directory() {
@@ -1822,6 +1920,22 @@ parse_args() {
                 STORAGE_ALLOCATION_GB="${1#*=}"
                 shift
                 ;;
+            --cpus)
+                CPU_ALLOCATION="$2"
+                shift 2
+                ;;
+            --cpus=*)
+                CPU_ALLOCATION="${1#*=}"
+                shift
+                ;;
+            --ram)
+                RAM_ALLOCATION="$2"
+                shift 2
+                ;;
+            --ram=*)
+                RAM_ALLOCATION="${1#*=}"
+                shift
+                ;;
             --help|-h)
                 echo "Usage: $0 [COMMAND] [OPTIONS]"
                 echo ""
@@ -1832,6 +1946,8 @@ parse_args() {
                 echo "Options:"
                 echo "  --token TOKEN    Registration token for platform enrollment (required)"
                 echo "  --noninteractive, -y  Non-interactive mode (use defaults)"
+                echo "  --cpus COUNT     Number of CPUs to contribute (default: total - 4)"
+                echo "  --ram GB         RAM in GB to contribute (default: total - 4)"
                 echo "  --storage GB     Storage allocation in GB (default: auto)"
                 echo "  --force, -f      Skip confirmation prompts (for uninstall)"
                 echo "  --help, -h       Show this help message"
@@ -1872,6 +1988,8 @@ main() {
     detect_gpu
     detect_storage
     prompt_storage_allocation
+    prompt_cpu_allocation
+    prompt_ram_allocation
     setup_storage_directory
     generate_ssh_key
     register_node

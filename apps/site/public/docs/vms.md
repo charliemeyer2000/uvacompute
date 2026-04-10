@@ -1,6 +1,6 @@
 # virtual machines
 
-uvacompute vms provide instant access to gpu-powered virtual machines with up to rtx 5090s, 2tb nvme ssd, 16 vcpus, and 64gb ram. get an ssh shell in under 10 seconds.
+uvacompute vms provide instant access to gpu-powered virtual machines with up to rtx 5090s, 2tb nvme ssd, 32 vcpus, and 128gb ram. get an ssh shell in under 10 seconds.
 
 ## prerequisites
 

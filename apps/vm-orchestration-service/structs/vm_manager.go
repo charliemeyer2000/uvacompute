@@ -28,6 +28,7 @@ type VMProvider interface {
 	HasVfioCapableNode(ctx context.Context) (bool, error)
 	GetAvailableGPUs(ctx context.Context) (int, error)
 	GetClusterStorageGB(ctx context.Context) (int, error)
+	GetClusterResources(ctx context.Context) (ClusterResources, error)
 }
 
 type VMManager struct {
@@ -631,35 +632,57 @@ func (vm *VMManager) checkResourceAvailability(req VMCreationRequest) error {
 	requestRam := IntOrDefault(req.Ram, DefaultRam)
 	requestDisk := IntOrDefault(req.Disk, DefaultDisk)
 
-	if totalCpus+requestCpus > vm.limits.MaxCpus {
-		return fmt.Errorf("insufficient CPU resources: requested %d vCPUs, %d already allocated, limit is %d",
-			requestCpus, totalCpus, vm.limits.MaxCpus)
-	}
-
-	if totalRam+requestRam > vm.limits.MaxRam {
-		return fmt.Errorf("insufficient RAM: requested %d GiB, %d already allocated, limit is %d GiB",
-			requestRam, totalRam, vm.limits.MaxRam)
-	}
-
-	// Check disk — use static limit if set, otherwise read from node labels
-	maxDisk := vm.limits.MaxDisk
-	if maxDisk == 0 {
+	// Resolve dynamic limits: 0 means read from node labels
+	maxCpus, maxRam, maxDisk, maxGpus := vm.limits.MaxCpus, vm.limits.MaxRam, vm.limits.MaxDisk, vm.limits.MaxGpus
+	if maxCpus == 0 || maxRam == 0 || maxDisk == 0 || maxGpus == 0 {
 		ctx := context.Background()
-		clusterStorage, err := vm.vmProvider.GetClusterStorageGB(ctx)
+		resources, err := vm.vmProvider.GetClusterResources(ctx)
 		if err != nil {
-			log.Printf("WARNING: Failed to check cluster storage: %v - skipping disk check", err)
-		} else if clusterStorage > 0 {
-			maxDisk = clusterStorage
+			log.Printf("WARNING: Failed to get cluster resources: %v - using fallback limits", err)
+			if maxCpus == 0 {
+				maxCpus = 16
+			}
+			if maxRam == 0 {
+				maxRam = 64
+			}
+			if maxGpus == 0 {
+				maxGpus = 1
+			}
+			// maxDisk 0 with error = skip disk check (existing behavior)
+		} else {
+			if maxCpus == 0 && resources.TotalCPUs > 0 {
+				maxCpus = resources.TotalCPUs
+			}
+			if maxRam == 0 && resources.TotalRAMGB > 0 {
+				maxRam = resources.TotalRAMGB
+			}
+			if maxDisk == 0 && resources.TotalStorageGB > 0 {
+				maxDisk = resources.TotalStorageGB
+			}
+			if maxGpus == 0 && resources.TotalGPUs > 0 {
+				maxGpus = resources.TotalGPUs
+			}
 		}
 	}
+
+	if maxCpus > 0 && totalCpus+requestCpus > maxCpus {
+		return fmt.Errorf("insufficient CPU resources: requested %d vCPUs, %d already allocated, limit is %d",
+			requestCpus, totalCpus, maxCpus)
+	}
+
+	if maxRam > 0 && totalRam+requestRam > maxRam {
+		return fmt.Errorf("insufficient RAM: requested %d GiB, %d already allocated, limit is %d GiB",
+			requestRam, totalRam, maxRam)
+	}
+
 	if maxDisk > 0 && totalDisk+requestDisk > maxDisk {
 		return fmt.Errorf("insufficient storage: requested %d GiB, %d already allocated, limit is %d GiB",
 			requestDisk, totalDisk, maxDisk)
 	}
 
-	if totalGpus+requestGpus > vm.limits.MaxGpus {
+	if maxGpus > 0 && totalGpus+requestGpus > maxGpus {
 		return fmt.Errorf("insufficient GPU resources: requested %d GPUs, %d already allocated, limit is %d",
-			requestGpus, totalGpus, vm.limits.MaxGpus)
+			requestGpus, totalGpus, maxGpus)
 	}
 
 	return nil

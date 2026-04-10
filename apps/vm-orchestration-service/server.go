@@ -119,15 +119,15 @@ func main() {
 		JobProvider:    jobAdapter,
 		CallbackClient: callbackClient,
 		VMResourceLimits: structs.VMResourceLimits{
-			MaxCpus: 16,
-			MaxRam:  64,
+			MaxCpus: 0, // 0 = read dynamically from node labels
+			MaxRam:  0, // 0 = read dynamically from node labels
 			MaxDisk: 0, // 0 = read dynamically from node labels
-			MaxGpus: 1,
+			MaxGpus: 0, // 0 = read dynamically from node labels
 		},
 		JobResourceLimits: structs.JobResourceLimits{
-			MaxCpus: 16,
-			MaxRam:  64,
-			MaxGpus: 1,
+			MaxCpus: 0, // 0 = read dynamically from node labels
+			MaxRam:  0, // 0 = read dynamically from node labels
+			MaxGpus: 0, // 0 = read dynamically from node labels
 		},
 	})
 

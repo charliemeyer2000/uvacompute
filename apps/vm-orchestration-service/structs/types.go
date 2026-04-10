@@ -56,8 +56,8 @@ type VMCreationRequest struct {
 	Hours           int      `json:"hours" validate:"required,min=1"`
 	UserId          string   `json:"userId" validate:"required"`
 	Name            *string  `json:"name,omitempty" validate:"omitempty,max=255"`
-	Cpus            *int     `json:"cpus,omitempty" validate:"omitempty,min=1,max=16"`
-	Ram             *int     `json:"ram,omitempty" validate:"omitempty,min=1,max=64"`
+	Cpus            *int     `json:"cpus,omitempty" validate:"omitempty,min=1,max=128"`
+	Ram             *int     `json:"ram,omitempty" validate:"omitempty,min=1,max=512"`
 	Disk            *int     `json:"disk,omitempty" validate:"omitempty,min=10,max=500"`
 	Gpus            *int     `json:"gpus,omitempty" validate:"omitempty,min=0,max=1"`
 	GpuType         *GPUType `json:"gpu-type,omitempty" validate:"omitempty,oneof='5090'"`
@@ -271,8 +271,8 @@ type JobCreationRequest struct {
 	Command []string          `json:"command,omitempty"`
 	Env     map[string]string `json:"env,omitempty"`
 	Name    *string           `json:"name,omitempty" validate:"omitempty,max=255"`
-	Cpus    *int              `json:"cpus,omitempty" validate:"omitempty,min=1,max=16"`
-	Ram     *int              `json:"ram,omitempty" validate:"omitempty,min=1,max=64"`
+	Cpus    *int              `json:"cpus,omitempty" validate:"omitempty,min=1,max=128"`
+	Ram     *int              `json:"ram,omitempty" validate:"omitempty,min=1,max=512"`
 	Gpus    *int              `json:"gpus,omitempty" validate:"omitempty,min=0,max=1"`
 	Disk    *int              `json:"disk,omitempty" validate:"omitempty,min=0,max=100"`
 	// Ephemeral endpoint fields (--expose flag)
@@ -326,6 +326,15 @@ type JobResourceLimits struct {
 	MaxCpus int
 	MaxRam  int
 	MaxGpus int
+}
+
+// ClusterResources holds aggregated resource totals from all cluster nodes.
+// Read dynamically from Kubernetes node labels (uvacompute.com/cpus, etc).
+type ClusterResources struct {
+	TotalCPUs      int
+	TotalRAMGB     int
+	TotalGPUs      int
+	TotalStorageGB int
 }
 
 const (
