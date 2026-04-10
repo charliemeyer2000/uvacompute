@@ -638,9 +638,10 @@ prompt_ram_allocation() {
             fi
             log_info "Using specified RAM allocation: ${RAM_ALLOCATION}GB"
         else
-            # Default to total - 4 (reserve 4GB for system), minimum 2
+            # Default to total - 4 (reserve 4GB for system), minimum 2, capped at total
             local default_alloc=$((total_ram - 4))
             [[ ${default_alloc} -lt 2 ]] && default_alloc=2
+            [[ ${default_alloc} -gt ${total_ram} ]] && default_alloc=${total_ram}
             RAM_ALLOCATION=${default_alloc}
             log_info "Non-interactive mode: contributing ${RAM_ALLOCATION}GB of ${total_ram}GB RAM"
         fi
