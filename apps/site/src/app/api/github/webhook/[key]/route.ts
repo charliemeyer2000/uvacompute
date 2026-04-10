@@ -130,6 +130,7 @@ export async function POST(
 
   const repoFullName = payload.repository.full_name;
   const workflowJobId = payload.workflow_job.id;
+  const workflowJobUrl: string | undefined = payload.workflow_job.html_url;
   const resources = parseResourcesFromLabels(labels);
 
   console.log(
@@ -199,73 +200,99 @@ export async function POST(
   // Create UVA job with the runner
   const jobId = crypto.randomUUID();
   const jobName = `gh-runner-${workflowJobId}`;
+  const command = ["/bin/bash", "-c", buildBootstrapScript()];
+  const env = { JIT_CONFIG: jitConfig };
 
-  const jobRequest = {
-    jobId,
-    userId: apiKey.userId,
-    image: "ubuntu:22.04",
-    name: jobName,
-    cpus: resources.cpus,
-    ram: resources.ram,
-    disk: resources.disk,
-    gpus: resources.gpus,
-    env: { JIT_CONFIG: jitConfig },
-    command: ["/bin/bash", "-c", buildBootstrapScript()],
-  };
-
-  const requestBody = JSON.stringify(jobRequest);
-  const authHeaders = createAuthHeaders("POST", "/jobs", requestBody);
-
-  const orchResponse = await fetch(`${VM_ORCHESTRATION_SERVICE_URL}/jobs`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...authHeaders,
-    },
-    body: requestBody,
-  });
-
-  if (!orchResponse.ok) {
-    const errText = await orchResponse.text();
-    console.error(
-      `[github-webhook] Job creation failed: ${orchResponse.status}`,
-      errText,
-    );
+  // Save to Convex first as "queued" — even if orchestration is down, the webhook is durable.
+  try {
+    await fetchMutation(api.jobs.createQueued, {
+      userId: apiKey.userId,
+      jobId,
+      name: jobName,
+      image: "ubuntu:22.04",
+      command,
+      env,
+      cpus: resources.cpus,
+      ram: resources.ram,
+      gpus: resources.gpus,
+      disk: resources.disk,
+      source: "github",
+      githubMeta: {
+        repoFullName,
+        workflowJobId,
+        workflowJobUrl,
+      },
+    });
+  } catch (e) {
+    console.error("[github-webhook] Failed to save to Convex:", e);
     return NextResponse.json(
-      { error: "Failed to create runner job", details: errText },
+      { error: "Failed to queue runner job" },
       { status: 500 },
     );
   }
 
-  const orchData = await orchResponse.json();
+  // Optimistically try orchestration — if it fails, the queue processor will pick it up.
+  let submitted = false;
+  try {
+    const jobRequest = {
+      jobId,
+      userId: apiKey.userId,
+      image: "ubuntu:22.04",
+      name: jobName,
+      cpus: resources.cpus,
+      ram: resources.ram,
+      disk: resources.disk,
+      gpus: resources.gpus,
+      env,
+      command,
+    };
 
-  // Save to Convex for dashboard visibility under the real user
-  if (orchData.status === "success" && orchData.jobId) {
-    try {
-      await fetchMutation(api.jobs.create, {
-        userId: apiKey.userId,
-        jobId: orchData.jobId,
-        name: jobName,
-        image: "ubuntu:22.04",
-        cpus: resources.cpus,
-        ram: resources.ram,
-        gpus: resources.gpus,
-        disk: resources.disk,
-      });
-    } catch (e) {
-      console.error("[github-webhook] Failed to save to Convex:", e);
+    const requestBody = JSON.stringify(jobRequest);
+    const authHeaders = createAuthHeaders("POST", "/jobs", requestBody);
+
+    const orchResponse = await fetch(`${VM_ORCHESTRATION_SERVICE_URL}/jobs`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...authHeaders,
+      },
+      body: requestBody,
+    });
+
+    if (orchResponse.ok) {
+      try {
+        await fetchMutation(api.jobs.updateStatus, {
+          jobId,
+          status: "pending",
+        });
+      } catch (e) {
+        console.error(
+          "[github-webhook] Failed to update status to pending:",
+          e,
+        );
+      }
+      submitted = true;
+      console.log(
+        `[github-webhook] Runner provisioned: ${jobName} for ${repoFullName} (user: ${apiKey.userId})`,
+        { jobId, resources },
+      );
+    } else {
+      const errText = await orchResponse.text();
+      console.log(
+        `[github-webhook] Job ${jobId} queued for later (orchestration returned ${orchResponse.status}: ${errText})`,
+      );
     }
+  } catch (e) {
+    console.log(
+      `[github-webhook] Job ${jobId} queued for later (orchestration unreachable: ${e})`,
+    );
   }
-
-  console.log(
-    `[github-webhook] Runner provisioned: ${jobName} for ${repoFullName} (user: ${apiKey.userId})`,
-    { jobId: orchData.jobId, resources },
-  );
 
   return NextResponse.json({
     ok: true,
-    jobId: orchData.jobId,
+    jobId,
     runner: `uva-jit-${workflowJobId}`,
     resources,
+    queued: !submitted,
   });
 }

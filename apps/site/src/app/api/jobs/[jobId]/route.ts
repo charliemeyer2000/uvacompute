@@ -55,6 +55,20 @@ export async function GET(
       );
     }
 
+    // Queued jobs haven't reached the orchestration service yet
+    if (job.status === "queued") {
+      return NextResponse.json({
+        status: "queued",
+        jobId,
+        name: job.name,
+        image: job.image,
+        cpus: job.cpus,
+        ram: job.ram,
+        gpus: job.gpus,
+        disk: job.disk,
+      });
+    }
+
     const authHeaders = createAuthHeaders("GET", `/jobs/${jobId}`, "");
     const response = await fetch(
       `${VM_ORCHESTRATION_SERVICE_URL}/jobs/${jobId}`,
@@ -154,6 +168,33 @@ export async function DELETE(
         },
         { status: 404 },
       );
+    }
+
+    // Queued jobs never reached the orchestration service — cancel directly in Convex
+    if (job.status === "queued") {
+      try {
+        await fetchMutation(api.jobs.cancel, {
+          jobId,
+          userId: session.user.id,
+        });
+        return NextResponse.json(
+          {
+            status: "cancellation_success",
+            jobId,
+            msg: "Queued job cancelled",
+          },
+          { status: 200 },
+        );
+      } catch (e: unknown) {
+        const message = e instanceof Error ? e.message : "Cannot cancel job";
+        return NextResponse.json(
+          {
+            status: "cancellation_failed_internal",
+            msg: message,
+          },
+          { status: 500 },
+        );
+      }
     }
 
     try {
