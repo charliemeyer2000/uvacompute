@@ -111,15 +111,16 @@ func NewInformerManager(config InformerConfig, vmManager *structs.VMManager, job
 	)
 
 	return &InformerManager{
-		dynamicFactory: dynamicFactory,
-		typedFactory:   typedFactory,
-		cdiFactory:     cdiFactory,
-		vmManager:      vmManager,
-		jobManager:     jobManager,
-		callbackClient: callbackClient,
-		k8sClient:      typedClient,
-		namespace:      config.Namespace,
-		stopCh:         make(chan struct{}),
+		dynamicFactory:        dynamicFactory,
+		typedFactory:          typedFactory,
+		cdiFactory:            cdiFactory,
+		vmManager:             vmManager,
+		jobManager:            jobManager,
+		callbackClient:        callbackClient,
+		k8sClient:             typedClient,
+		namespace:             config.Namespace,
+		stopCh:                make(chan struct{}),
+		pendingScheduleChecks: make(map[string]bool),
 	}, nil
 }
 
@@ -485,9 +486,6 @@ func (im *InformerManager) onPodDelete(obj interface{}) {
 // the K8s scheduler time to retry before we declare failure.
 func (im *InformerManager) scheduleUnschedulableRecheck(podName, jobId string, delay time.Duration) {
 	im.mu.Lock()
-	if im.pendingScheduleChecks == nil {
-		im.pendingScheduleChecks = make(map[string]bool)
-	}
 	if im.pendingScheduleChecks[podName] {
 		im.mu.Unlock()
 		return
@@ -496,7 +494,14 @@ func (im *InformerManager) scheduleUnschedulableRecheck(podName, jobId string, d
 	im.mu.Unlock()
 
 	go func() {
-		time.Sleep(delay)
+		select {
+		case <-time.After(delay):
+		case <-im.stopCh:
+			im.mu.Lock()
+			delete(im.pendingScheduleChecks, podName)
+			im.mu.Unlock()
+			return
+		}
 
 		im.mu.Lock()
 		delete(im.pendingScheduleChecks, podName)

@@ -6,6 +6,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes/fake"
 
 	"vm-orchestration-service/structs"
 )
@@ -256,6 +257,8 @@ func TestHandleJobEvent_ExitCodePreserved(t *testing.T) {
 func newTestInformerManager() *InformerManager {
 	return &InformerManager{
 		namespace:             "uvacompute",
+		k8sClient:             fake.NewSimpleClientset(),
+		stopCh:                make(chan struct{}),
 		pendingScheduleChecks: make(map[string]bool),
 	}
 }
