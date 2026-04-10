@@ -23,22 +23,27 @@ import (
 	"vm-orchestration-service/structs"
 )
 
+// Grace period before treating Unschedulable as a terminal failure.
+// Allows K8s scheduler to retry as resources free up (e.g., completing pods being cleaned up).
+const unschedulableGracePeriod = 60 * time.Second
+
 type InformerManager struct {
-	dynamicFactory dynamicinformer.DynamicSharedInformerFactory
-	typedFactory   informers.SharedInformerFactory
-	cdiFactory     informers.SharedInformerFactory
-	vmiInformer    cache.SharedIndexInformer
-	jobInformer    cache.SharedIndexInformer
-	podInformer    cache.SharedIndexInformer
-	cdiPodInformer cache.SharedIndexInformer
-	vmManager      *structs.VMManager
-	jobManager     *structs.JobManager
-	callbackClient structs.CallbackClient
-	k8sClient      kubernetes.Interface
-	namespace      string
-	stopCh         chan struct{}
-	mu             sync.Mutex
-	started        bool
+	dynamicFactory          dynamicinformer.DynamicSharedInformerFactory
+	typedFactory            informers.SharedInformerFactory
+	cdiFactory              informers.SharedInformerFactory
+	vmiInformer             cache.SharedIndexInformer
+	jobInformer             cache.SharedIndexInformer
+	podInformer             cache.SharedIndexInformer
+	cdiPodInformer          cache.SharedIndexInformer
+	vmManager               *structs.VMManager
+	jobManager              *structs.JobManager
+	callbackClient          structs.CallbackClient
+	k8sClient               kubernetes.Interface
+	namespace               string
+	stopCh                  chan struct{}
+	mu                      sync.Mutex
+	started                 bool
+	pendingScheduleChecks   map[string]bool // tracks pending re-check goroutines by pod name
 }
 
 type InformerConfig struct {
@@ -474,6 +479,40 @@ func (im *InformerManager) onPodDelete(obj interface{}) {
 	log.Printf("Informers: Pod DELETE for job %s", jobId)
 }
 
+// scheduleUnschedulableRecheck schedules a goroutine to re-fetch and re-process
+// a pod's status after a delay. This handles the case where a pod is temporarily
+// unschedulable (e.g., resources being freed from a completing job) and gives
+// the K8s scheduler time to retry before we declare failure.
+func (im *InformerManager) scheduleUnschedulableRecheck(podName, jobId string, delay time.Duration) {
+	im.mu.Lock()
+	if im.pendingScheduleChecks == nil {
+		im.pendingScheduleChecks = make(map[string]bool)
+	}
+	if im.pendingScheduleChecks[podName] {
+		im.mu.Unlock()
+		return
+	}
+	im.pendingScheduleChecks[podName] = true
+	im.mu.Unlock()
+
+	go func() {
+		time.Sleep(delay)
+
+		im.mu.Lock()
+		delete(im.pendingScheduleChecks, podName)
+		im.mu.Unlock()
+
+		pod, err := im.k8sClient.CoreV1().Pods(im.namespace).Get(context.Background(), podName, metav1.GetOptions{})
+		if err != nil {
+			log.Printf("Informers: Failed to re-check unschedulable pod %s (job %s): %v", podName, jobId, err)
+			return
+		}
+
+		log.Printf("Informers: Re-checking unschedulable pod %s (job %s) after grace period", podName, jobId)
+		im.handlePodEvent(pod)
+	}()
+}
+
 func (im *InformerManager) extractPodJobId(pod *corev1.Pod) string {
 	if pod.Labels == nil {
 		return ""
@@ -550,6 +589,13 @@ func (im *InformerManager) handlePendingPod(pod *corev1.Pod, jobId, nodeId strin
 	for _, condition := range pod.Status.Conditions {
 		if condition.Type == corev1.PodScheduled && condition.Status == corev1.ConditionFalse {
 			if condition.Reason == "Unschedulable" {
+				elapsed := time.Since(condition.LastTransitionTime.Time)
+				if elapsed < unschedulableGracePeriod {
+					log.Printf("Informers: Pod %s (job %s) unschedulable for %s, waiting (grace period: %s)",
+						pod.Name, jobId, elapsed.Round(time.Second), unschedulableGracePeriod)
+					im.scheduleUnschedulableRecheck(pod.Name, jobId, unschedulableGracePeriod-elapsed)
+					return structs.JOB_STATUS_SCHEDULED, nil, "", false
+				}
 				exitCode := 1
 				return structs.JOB_STATUS_FAILED, &exitCode, "Pod unschedulable: " + condition.Message, true
 			}

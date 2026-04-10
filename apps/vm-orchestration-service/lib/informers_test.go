@@ -2,6 +2,10 @@ package lib
 
 import (
 	"testing"
+	"time"
+
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"vm-orchestration-service/structs"
 )
@@ -246,6 +250,146 @@ func TestHandleJobEvent_ExitCodePreserved(t *testing.T) {
 	status := manager.GetJobStatusForTest(jobId)
 	if status != structs.JOB_STATUS_FAILED {
 		t.Errorf("Expected status FAILED, got %v", status)
+	}
+}
+
+func newTestInformerManager() *InformerManager {
+	return &InformerManager{
+		namespace:             "uvacompute",
+		pendingScheduleChecks: make(map[string]bool),
+	}
+}
+
+func TestHandlePendingPod_UnschedulableWithinGracePeriod(t *testing.T) {
+	im := newTestInformerManager()
+
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   "test-pod-abc",
+			Labels: map[string]string{"uvacompute.io/job-id": "test-job-1"},
+		},
+		Status: corev1.PodStatus{
+			Phase: corev1.PodPending,
+			Conditions: []corev1.PodCondition{
+				{
+					Type:               corev1.PodScheduled,
+					Status:             corev1.ConditionFalse,
+					Reason:             "Unschedulable",
+					Message:            "0/2 nodes are available: 1 Insufficient cpu",
+					LastTransitionTime: metav1.Now(), // just happened
+				},
+			},
+		},
+	}
+
+	status, exitCode, _, isTerminal := im.handlePendingPod(pod, "test-job-1", "")
+
+	if isTerminal {
+		t.Error("Expected non-terminal status within grace period, got terminal")
+	}
+	if exitCode != nil {
+		t.Errorf("Expected nil exit code within grace period, got %d", *exitCode)
+	}
+	if status != structs.JOB_STATUS_SCHEDULED {
+		t.Errorf("Expected SCHEDULED status within grace period, got %s", status)
+	}
+}
+
+func TestHandlePendingPod_UnschedulablePastGracePeriod(t *testing.T) {
+	im := newTestInformerManager()
+
+	pastGrace := time.Now().Add(-(unschedulableGracePeriod + 10*time.Second))
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   "test-pod-def",
+			Labels: map[string]string{"uvacompute.io/job-id": "test-job-2"},
+		},
+		Status: corev1.PodStatus{
+			Phase: corev1.PodPending,
+			Conditions: []corev1.PodCondition{
+				{
+					Type:               corev1.PodScheduled,
+					Status:             corev1.ConditionFalse,
+					Reason:             "Unschedulable",
+					Message:            "0/2 nodes are available: 1 Insufficient cpu",
+					LastTransitionTime: metav1.NewTime(pastGrace),
+				},
+			},
+		},
+	}
+
+	status, exitCode, errorMsg, isTerminal := im.handlePendingPod(pod, "test-job-2", "")
+
+	if !isTerminal {
+		t.Error("Expected terminal status past grace period, got non-terminal")
+	}
+	if exitCode == nil || *exitCode != 1 {
+		t.Errorf("Expected exit code 1, got %v", exitCode)
+	}
+	if status != structs.JOB_STATUS_FAILED {
+		t.Errorf("Expected FAILED status past grace period, got %s", status)
+	}
+	if errorMsg == "" {
+		t.Error("Expected error message, got empty string")
+	}
+}
+
+func TestHandlePendingPod_UnschedulableRecheckDeduplication(t *testing.T) {
+	im := newTestInformerManager()
+
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   "test-pod-dedup",
+			Labels: map[string]string{"uvacompute.io/job-id": "test-job-3"},
+		},
+		Status: corev1.PodStatus{
+			Phase: corev1.PodPending,
+			Conditions: []corev1.PodCondition{
+				{
+					Type:               corev1.PodScheduled,
+					Status:             corev1.ConditionFalse,
+					Reason:             "Unschedulable",
+					Message:            "0/2 nodes are available",
+					LastTransitionTime: metav1.Now(),
+				},
+			},
+		},
+	}
+
+	// Call twice — should only schedule one re-check
+	im.handlePendingPod(pod, "test-job-3", "")
+	im.handlePendingPod(pod, "test-job-3", "")
+
+	im.mu.Lock()
+	count := len(im.pendingScheduleChecks)
+	im.mu.Unlock()
+
+	if count != 1 {
+		t.Errorf("Expected 1 pending schedule check, got %d", count)
+	}
+}
+
+func TestHandlePendingPod_NormalPending(t *testing.T) {
+	im := newTestInformerManager()
+
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   "test-pod-normal",
+			Labels: map[string]string{"uvacompute.io/job-id": "test-job-4"},
+		},
+		Status: corev1.PodStatus{
+			Phase:      corev1.PodPending,
+			Conditions: []corev1.PodCondition{},
+		},
+	}
+
+	status, _, _, isTerminal := im.handlePendingPod(pod, "test-job-4", "")
+
+	if isTerminal {
+		t.Error("Expected non-terminal for normal pending pod")
+	}
+	if status != structs.JOB_STATUS_SCHEDULED {
+		t.Errorf("Expected SCHEDULED for normal pending pod, got %s", status)
 	}
 }
 
