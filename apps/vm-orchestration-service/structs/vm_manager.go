@@ -650,17 +650,29 @@ func (vm *VMManager) checkResourceAvailability(req VMCreationRequest) error {
 			}
 			// maxDisk 0 with error = skip disk check (existing behavior)
 		} else {
-			if maxCpus == 0 && resources.TotalCPUs > 0 {
-				maxCpus = resources.TotalCPUs
+			if maxCpus == 0 {
+				if resources.TotalCPUs > 0 {
+					maxCpus = resources.TotalCPUs
+				} else {
+					maxCpus = 16
+				}
 			}
-			if maxRam == 0 && resources.TotalRAMGB > 0 {
-				maxRam = resources.TotalRAMGB
+			if maxRam == 0 {
+				if resources.TotalRAMGB > 0 {
+					maxRam = resources.TotalRAMGB
+				} else {
+					maxRam = 64
+				}
 			}
 			if maxDisk == 0 && resources.TotalStorageGB > 0 {
 				maxDisk = resources.TotalStorageGB
 			}
-			if maxGpus == 0 && resources.TotalGPUs > 0 {
-				maxGpus = resources.TotalGPUs
+			if maxGpus == 0 {
+				if resources.TotalGPUs > 0 {
+					maxGpus = resources.TotalGPUs
+				} else {
+					maxGpus = 1
+				}
 			}
 		}
 	}

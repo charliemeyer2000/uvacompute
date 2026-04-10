@@ -582,6 +582,10 @@ prompt_cpu_allocation() {
 
     if [[ "${NONINTERACTIVE}" == "true" ]]; then
         if [[ -n "${CPU_ALLOCATION}" && "${CPU_ALLOCATION}" -gt 0 ]] 2>/dev/null; then
+            if [[ ${CPU_ALLOCATION} -gt ${total_cpus} ]]; then
+                log_error "Cannot contribute more than total CPUs (${total_cpus}), got ${CPU_ALLOCATION}"
+                exit 1
+            fi
             log_info "Using specified CPU allocation: ${CPU_ALLOCATION} vCPUs"
         else
             # Default to total - 4 (reserve 4 for system), minimum 1
@@ -628,6 +632,10 @@ prompt_ram_allocation() {
 
     if [[ "${NONINTERACTIVE}" == "true" ]]; then
         if [[ -n "${RAM_ALLOCATION}" && "${RAM_ALLOCATION}" -gt 0 ]] 2>/dev/null; then
+            if [[ ${RAM_ALLOCATION} -gt ${total_ram} ]]; then
+                log_error "Cannot contribute more than total RAM (${total_ram}GB), got ${RAM_ALLOCATION}GB"
+                exit 1
+            fi
             log_info "Using specified RAM allocation: ${RAM_ALLOCATION}GB"
         else
             # Default to total - 4 (reserve 4GB for system), minimum 2
