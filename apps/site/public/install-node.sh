@@ -136,6 +136,11 @@ check_prerequisites() {
         esac
     fi
 
+    # Update PCI ID database so lspci can identify new GPUs (e.g., RTX 5090)
+    if command -v update-pciids &> /dev/null; then
+        update-pciids -q 2>/dev/null || log_warn "Could not update PCI ID database (no network?)"
+    fi
+
     log_success "All prerequisites satisfied"
 }
 
@@ -152,6 +157,36 @@ generate_ssh_key() {
     fi
 
     SSH_PUBLIC_KEY=$(cat "${SSH_KEY_PATH}.pub")
+}
+
+# Normalize a raw lspci GPU name to a label-friendly string
+# e.g., "NVIDIA Corporation GB202 [GeForce RTX 5090] (rev a1)" -> "nvidia-rtx-5090"
+#        "NVIDIA GeForce RTX 4090"                               -> "nvidia-rtx-4090"
+normalize_gpu_name() {
+    local raw="$1"
+    local clean
+
+    # Extract bracketed name if present (e.g., "[GeForce RTX 5090]")
+    if echo "${raw}" | grep -q '\['; then
+        clean=$(echo "${raw}" | grep -oP '\[\K[^]]+')
+    else
+        clean=${raw}
+    fi
+
+    local result
+    result=$(echo "${clean}" | tr '[:upper:]' '[:lower:]' \
+        | sed 's/nvidia corporation //' \
+        | sed 's/nvidia geforce /nvidia-/' \
+        | sed 's/geforce /nvidia-/' \
+        | sed 's/ /-/g' \
+        | sed 's/[^a-z0-9-]//g')
+
+    # Ensure nvidia- prefix for NVIDIA GPUs
+    if [[ "${result}" != nvidia-* ]]; then
+        result="nvidia-${result}"
+    fi
+
+    echo "${result}"
 }
 
 # Register node with the platform and get k3s credentials
@@ -172,11 +207,10 @@ register_node() {
     local gpu_type="none"
     if lspci | grep -qi nvidia; then
         gpus=$(lspci | grep -ci 'vga.*nvidia' || echo 0)
-        # Get GPU name and format as type (e.g., "nvidia-rtx-5090")
         local gpu_name
         gpu_name=$(lspci | grep -i 'vga.*nvidia' | head -1 | sed 's/.*: //')
         if [[ -n "${gpu_name}" ]]; then
-            gpu_type=$(echo "${gpu_name}" | tr '[:upper:]' '[:lower:]' | sed 's/nvidia corporation /nvidia-/g' | sed 's/nvidia geforce /nvidia-/g' | sed 's/ /-/g' | sed 's/[^a-z0-9-]//g')
+            gpu_type=$(normalize_gpu_name "${gpu_name}")
         fi
     fi
 
@@ -364,9 +398,7 @@ label_node() {
     local gpu_label="none"
     local has_gpu="false"
     if [[ "${GPU_DETECTED}" == "true" ]]; then
-        # Parse GPU name to create a label-friendly string
-        # e.g., "NVIDIA GeForce RTX 5090" -> "nvidia-rtx-5090"
-        gpu_label=$(echo "${GPU_NAME}" | tr '[:upper:]' '[:lower:]' | sed 's/nvidia geforce /nvidia-/g' | sed 's/ /-/g' | sed 's/[^a-z0-9-]//g')
+        gpu_label=$(normalize_gpu_name "${GPU_NAME}")
         has_gpu="true"
     fi
 
