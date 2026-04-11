@@ -89,18 +89,18 @@ export const VMCreationRequestSchema = z.object({
     .number()
     .int()
     .min(1)
-    .max(16)
+    .max(128)
     .refine((n) => n > 0 && (n & (n - 1)) === 0, {
-      message: "CPUs must be a power of 2 (1, 2, 4, 8, 16)",
+      message: "CPUs must be a power of 2 (1, 2, 4, 8, 16, ...)",
     })
     .optional(),
   ram: z
     .number()
     .int()
     .min(1)
-    .max(64)
+    .max(512)
     .refine((n) => n > 0 && (n & (n - 1)) === 0, {
-      message: "RAM must be a power of 2 (1, 2, 4, 8, 16, 32, 64)",
+      message: "RAM must be a power of 2 (1, 2, 4, 8, 16, 32, 64, ...)",
     })
     .optional(),
   disk: z.number().int().min(10).max(500).optional(),

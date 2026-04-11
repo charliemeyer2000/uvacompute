@@ -60,7 +60,8 @@ export default function LandingPageClient() {
         </h2>
         <p className="mb-4 text-base leading-relaxed">
           get instant access to gpu-powered vms with rtx 5090s, up to 2tb nvme
-          ssd, 16 vcpus, and 64gb ram. get an ssh shell in under 10 seconds.
+          ssd, up to 32 vcpus, and 128gb ram. get an ssh shell in under 10
+          seconds.
         </p>
 
         <h2 className="text-xl font-semibold mt-8 mb-4 text-black">

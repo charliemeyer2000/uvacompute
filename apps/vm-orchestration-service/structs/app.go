@@ -29,11 +29,8 @@ type AppConfig struct {
 }
 
 func NewApp(vmProvider VMProvider, callbackClient CallbackClient) *App {
-	limits := VMResourceLimits{
-		MaxCpus: 16,
-		MaxRam:  64,
-		MaxGpus: 1,
-	}
+	// All zeros = dynamic limits read from node labels at runtime
+	limits := VMResourceLimits{}
 
 	return &App{
 		VMManager: NewVMManager(limits, vmProvider, callbackClient),
@@ -47,19 +44,11 @@ func NewAppWithConfig(config AppConfig) *App {
 	}
 
 	if config.VMProvider != nil {
-		vmLimits := config.VMResourceLimits
-		if vmLimits.MaxCpus == 0 {
-			vmLimits = VMResourceLimits{MaxCpus: 16, MaxRam: 64, MaxGpus: 1}
-		}
-		app.VMManager = NewVMManager(vmLimits, config.VMProvider, config.CallbackClient)
+		app.VMManager = NewVMManager(config.VMResourceLimits, config.VMProvider, config.CallbackClient)
 	}
 
 	if config.JobProvider != nil {
-		jobLimits := config.JobResourceLimits
-		if jobLimits.MaxCpus == 0 {
-			jobLimits = JobResourceLimits{MaxCpus: 16, MaxRam: 64, MaxGpus: 1}
-		}
-		app.JobManager = NewJobManager(jobLimits, config.JobProvider, config.CallbackClient)
+		app.JobManager = NewJobManager(config.JobResourceLimits, config.JobProvider, config.CallbackClient)
 	}
 
 	return app
