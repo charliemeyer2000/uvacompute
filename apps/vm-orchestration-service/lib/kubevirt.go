@@ -965,6 +965,39 @@ func (k *KubeVirtAdapter) GetClusterStorageGB(ctx context.Context) (int, error) 
 	return totalStorageGB, nil
 }
 
+func (k *KubeVirtAdapter) GetClusterResources(ctx context.Context) (structs.ClusterResources, error) {
+	nodes, err := k.typedClient.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return structs.ClusterResources{}, fmt.Errorf("failed to list nodes: %w", err)
+	}
+
+	var res structs.ClusterResources
+	for _, node := range nodes.Items {
+		if v, ok := node.Labels["uvacompute.com/cpus"]; ok {
+			if n, err := strconv.Atoi(v); err == nil {
+				res.TotalCPUs += n
+			}
+		}
+		if v, ok := node.Labels["uvacompute.com/ram"]; ok {
+			if n, err := strconv.Atoi(v); err == nil {
+				res.TotalRAMGB += n
+			}
+		}
+		if v, ok := node.Labels["uvacompute.com/gpus"]; ok {
+			if n, err := strconv.Atoi(v); err == nil {
+				res.TotalGPUs += n
+			}
+		}
+		if v, ok := node.Labels["uvacompute.com/storage"]; ok {
+			if n, err := strconv.Atoi(v); err == nil {
+				res.TotalStorageGB += n
+			}
+		}
+	}
+
+	return res, nil
+}
+
 func (k *KubeVirtAdapter) EnsureNamespace() error {
 	ctx := context.Background()
 

@@ -38,10 +38,10 @@ Create a new virtual machine with specified resource allocation.
 (Required) Number of hours to run the VM. Must be a positive integer. VM will be automatically terminated after this duration.
 .TP
 .BR \-c ", " \-\-cpus " \fIcpus\fR"
-Number of virtual CPUs (default: 1). Must be a power of 2. Maximum: 16.
+Number of virtual CPUs (default: 1). Must be a power of 2. Maximum: 128.
 .TP
 .BR \-r ", " \-\-ram " \fIram\fR"
-RAM allocation in gigabytes (default: 8). Must be a power of 2. Maximum: 64.
+RAM allocation in gigabytes (default: 8). Must be a power of 2. Maximum: 512.
 .TP
 .BR \-d ", " \-\-disk " \fIdisk\fR"
 Disk size in gigabytes (default: 64). Must be a power of 2. Maximum: 1000.
@@ -134,10 +134,10 @@ Run a container job with the specified image. The optional command arguments are
 Request a GPU for the job. Allocates 1 GPU to the container.
 .TP
 .BR \-c ", " \-\-cpu " \fIcpus\fR"
-Number of CPUs to allocate (default: 1). Maximum: 16.
+Number of CPUs to allocate (default: 1). Maximum: 128.
 .TP
 .BR \-r ", " \-\-ram " \fIram\fR"
-RAM allocation in gigabytes (default: 4). Maximum: 64.
+RAM allocation in gigabytes (default: 4). Maximum: 512.
 .TP
 .BR \-e ", " \-\-env " \fIKEY=VALUE\fR"
 Set an environment variable in the container. Can be specified multiple times for multiple variables.
@@ -226,6 +226,15 @@ NVIDIA container toolkit (if GPU detected)
 GPU mode switching scripts generation
 .IP \(bu 2
 Node configuration state storage
+.TP
+.BR \-\-cpus " \fIcount\fR"
+Number of CPUs to contribute to the cluster (default: total \- 4). Remaining CPUs are reserved for system use via kubelet system\-reserved.
+.TP
+.BR \-\-ram " \fIgb\fR"
+RAM in GB to contribute to the cluster (default: total \- 4). Remaining RAM is reserved for system use via kubelet system\-reserved.
+.TP
+.BR \-\-storage " \fIgb\fR"
+Storage allocation in GB for VM disks (default: auto).
 .RE
 .IP
 Requires root privileges (sudo). Only Ubuntu and Debian are currently supported.
