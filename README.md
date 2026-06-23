@@ -2,6 +2,23 @@
 
 Instant GPU-powered virtual machines and container jobs, managed through a CLI and web dashboard. Built on Kubernetes (KubeVirt) with real-time status via Convex.
 
+## Table of Contents
+
+- [Architecture](#architecture)
+- [Self-Hosting](#self-hosting)
+  - [Prerequisites](#prerequisites)
+  - [Setup](#setup)
+- [Apps](#apps)
+  - [`apps/site`](#appssite)
+  - [`apps/status`](#appsstatus)
+  - [`apps/cli`](#appscli)
+  - [`apps/vm-orchestration-service`](#appsvm-orchestration-service)
+- [Deployment](#deployment)
+- [Examples](#examples)
+- [Roadmap](#roadmap)
+- [Contributing](#contributing)
+- [License](#license)
+
 ## Architecture
 
 ![Infrastructure Diagram](apps/site/public/infra.png)
