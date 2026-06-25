@@ -77,7 +77,7 @@
       );
 
       overlays.default = final: prev: {
-        uvacompute = self.packages.${prev.system}.default;
+        uvacompute = self.packages.${prev.stdenv.hostPlatform.system}.default;
       };
     };
 }
