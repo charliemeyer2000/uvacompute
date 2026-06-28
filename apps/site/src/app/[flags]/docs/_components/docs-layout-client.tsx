@@ -224,7 +224,7 @@ export default function DocsLayoutClient({
         {/* Docs Content with Sidebar */}
         <div className="flex flex-col md:flex-row gap-4 md:gap-8">
           {/* Sidebar Navigation (desktop) */}
-          <nav className="hidden md:block w-48 flex-shrink-0">
+          <nav className="hidden md:block w-48 shrink-0">
             <ul className="space-y-1">
               {docNavItems.map((item) => {
                 const isActive = isActiveDocSection(item.href);

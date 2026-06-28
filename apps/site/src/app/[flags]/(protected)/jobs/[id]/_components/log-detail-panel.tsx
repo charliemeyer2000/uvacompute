@@ -46,7 +46,7 @@ export function LogDetailPanel({
         className="fixed inset-0 bg-black/20 z-40 sm:hidden"
         onClick={onClose}
       />
-      <div className="fixed inset-0 z-50 sm:static sm:z-auto sm:w-[420px] flex-shrink-0 sm:border-l border-gray-200 bg-white overflow-y-auto animate-in slide-in-from-bottom-4 sm:slide-in-from-right-4 duration-200">
+      <div className="fixed inset-0 z-50 sm:static sm:z-auto sm:w-[420px] shrink-0 sm:border-l border-gray-200 bg-white overflow-y-auto animate-in slide-in-from-bottom-4 sm:slide-in-from-right-4 duration-200">
         {/* Panel Header */}
         <div className="sticky top-0 bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between z-10">
           <div className="flex items-center gap-2 min-w-0">
@@ -65,20 +65,20 @@ export function LogDetailPanel({
               disabled={!hasPrev}
               className="p-1 text-gray-400 hover:text-black disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
             >
-              <ChevronUp className="h-4 w-4" />
+              <ChevronUp className="size-4" />
             </button>
             <button
               onClick={() => onNavigate("next")}
               disabled={!hasNext}
               className="p-1 text-gray-400 hover:text-black disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
             >
-              <ChevronDown className="h-4 w-4" />
+              <ChevronDown className="size-4" />
             </button>
             <button
               onClick={onClose}
               className="p-1 text-gray-400 hover:text-black transition-colors ml-1"
             >
-              <X className="h-4 w-4" />
+              <X className="size-4" />
             </button>
           </div>
         </div>
@@ -129,9 +129,9 @@ export function LogDetailPanel({
               className="flex items-center gap-1 text-xs text-gray-400 hover:text-black transition-colors"
             >
               {copied ? (
-                <Check className="h-3 w-3 text-green-600" />
+                <Check className="size-3 text-green-600" />
               ) : (
-                <Copy className="h-3 w-3" />
+                <Copy className="size-3" />
               )}
               {copied ? "copied" : "copy"}
             </button>

@@ -2,6 +2,7 @@ import type { NextConfig } from "next";
 import createWithVercelToolbar from "@vercel/toolbar/plugins/next";
 const nextConfig: NextConfig = {
   experimental: {
+    optimizePackageImports: ["lucide-react"],
     viewTransition: true,
   },
   images: {

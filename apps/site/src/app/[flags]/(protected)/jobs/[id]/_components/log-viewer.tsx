@@ -413,7 +413,7 @@ export function LogViewer({ job }: LogViewerProps) {
       <div className="border-b border-gray-200 px-2 sm:px-4 py-2.5 flex flex-wrap items-center gap-2 sm:gap-3">
         {/* Search */}
         <div className="relative w-full sm:w-auto sm:flex-1 order-first">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-gray-400" />
           <input
             type="text"
             placeholder="search logs..."
@@ -426,7 +426,7 @@ export function LogViewer({ job }: LogViewerProps) {
               onClick={() => setSearchQuery("")}
               className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-black"
             >
-              <X className="h-3.5 w-3.5" />
+              <X className="size-3.5" />
             </button>
           )}
         </div>
@@ -442,9 +442,9 @@ export function LogViewer({ job }: LogViewerProps) {
             }`}
           >
             {isLive && isStreaming && (
-              <span className="relative flex h-2 w-2">
+              <span className="relative flex size-2">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-500 opacity-75" />
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
+                <span className="relative inline-flex rounded-full size-2 bg-green-500" />
               </span>
             )}
             {isLive ? "live" : "paused"}
@@ -460,9 +460,9 @@ export function LogViewer({ job }: LogViewerProps) {
             className="h-9"
           >
             {isPaused ? (
-              <Play className="h-3.5 w-3.5" />
+              <Play className="size-3.5" />
             ) : (
-              <Pause className="h-3.5 w-3.5" />
+              <Pause className="size-3.5" />
             )}
           </Button>
         )}
@@ -476,9 +476,9 @@ export function LogViewer({ job }: LogViewerProps) {
           className="h-9"
         >
           {isLoading ? (
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            <Loader2 className="size-3.5 animate-spin" />
           ) : (
-            <RefreshCw className="h-3.5 w-3.5" />
+            <RefreshCw className="size-3.5" />
           )}
         </Button>
 
@@ -491,9 +491,9 @@ export function LogViewer({ job }: LogViewerProps) {
           className="h-9"
         >
           {copied ? (
-            <Check className="h-3.5 w-3.5 text-green-600" />
+            <Check className="size-3.5 text-green-600" />
           ) : (
-            <Copy className="h-3.5 w-3.5" />
+            <Copy className="size-3.5" />
           )}
         </Button>
 
@@ -506,7 +506,7 @@ export function LogViewer({ job }: LogViewerProps) {
             disabled={!hasLogs}
             className="h-9"
           >
-            <Download className="h-3.5 w-3.5" />
+            <Download className="size-3.5" />
           </Button>
           {showExportMenu && (
             <div className="absolute right-0 top-full mt-1 w-36 bg-white border border-gray-200 shadow-lg z-50">
@@ -543,7 +543,7 @@ export function LogViewer({ job }: LogViewerProps) {
               : "bg-white border-gray-200 text-gray-400 hover:text-black hover:border-gray-300"
           }`}
         >
-          <ChevronDownIcon className="h-3.5 w-3.5" />
+          <ChevronDownIcon className="size-3.5" />
         </button>
       </div>
 
@@ -566,7 +566,7 @@ export function LogViewer({ job }: LogViewerProps) {
         >
           {isLoading && !logs ? (
             <div className="flex items-center justify-center h-full gap-3">
-              <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
+              <Loader2 className="size-5 animate-spin text-gray-400" />
               <span className="text-gray-500 text-sm">loading logs...</span>
             </div>
           ) : error ? (
@@ -587,10 +587,10 @@ export function LogViewer({ job }: LogViewerProps) {
                     LEVEL_ROW_STYLES[line.level]
                   } ${selectedLineIndex === index ? "!bg-orange-accent/8 border-l-orange-accent" : ""}`}
                 >
-                  <span className="w-10 sm:w-16 text-right text-gray-300 select-none flex-shrink-0 tabular-nums">
+                  <span className="w-10 sm:w-16 text-right text-gray-300 select-none shrink-0 tabular-nums">
                     {line.lineNumber}
                   </span>
-                  <span className="w-24 text-gray-400 flex-shrink-0 text-[12px] hidden sm:inline">
+                  <span className="w-24 text-gray-400 shrink-0 text-[12px] hidden sm:inline">
                     {line.timestamp ? formatTimestamp(line.timestamp) : "—"}
                   </span>
                   <span
@@ -615,8 +615,8 @@ export function LogViewer({ job }: LogViewerProps) {
             <div className="flex flex-col items-center justify-center h-full gap-3 text-gray-400">
               {isWaiting ? (
                 <>
-                  <div className="w-12 h-12 border border-gray-200 bg-white flex items-center justify-center">
-                    <Clock className="w-6 h-6 text-gray-400" />
+                  <div className="size-12 border border-gray-200 bg-white flex items-center justify-center">
+                    <Clock className="size-6 text-gray-400" />
                   </div>
                   <p className="text-sm text-gray-500">
                     waiting for job to start
@@ -631,15 +631,15 @@ export function LogViewer({ job }: LogViewerProps) {
                 </>
               ) : isStreaming ? (
                 <>
-                  <div className="w-12 h-12 border border-gray-200 bg-white flex items-center justify-center">
-                    <Terminal className="w-6 h-6 text-gray-400" />
+                  <div className="size-12 border border-gray-200 bg-white flex items-center justify-center">
+                    <Terminal className="size-6 text-gray-400" />
                   </div>
                   <p className="text-sm text-gray-500">waiting for output...</p>
                 </>
               ) : (
                 <>
-                  <div className="w-12 h-12 border border-gray-200 bg-white flex items-center justify-center">
-                    <Terminal className="w-6 h-6 text-gray-400" />
+                  <div className="size-12 border border-gray-200 bg-white flex items-center justify-center">
+                    <Terminal className="size-6 text-gray-400" />
                   </div>
                   <p className="text-sm text-gray-500">no logs available</p>
                 </>

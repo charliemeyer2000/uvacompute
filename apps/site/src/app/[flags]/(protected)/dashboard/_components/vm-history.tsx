@@ -32,9 +32,9 @@ function VMCard({ vm }: { vm: VM }) {
             {vm.vmId}
           </p>
         </div>
-        <div className="flex items-center gap-1.5 flex-shrink-0 ml-3">
+        <div className="flex items-center gap-1.5 shrink-0 ml-3">
           <span
-            className={`w-2 h-2 rounded-full ${getStatusDotColor(vm.status)}`}
+            className={`size-2 rounded-full ${getStatusDotColor(vm.status)}`}
           />
           <span className="text-xs text-gray-600">
             {formatStatus(vm.status)}
@@ -130,7 +130,7 @@ export default function VMHistory({ userId }: { userId: string }) {
               </div>
               <div className="border-t border-gray-100 pt-3 space-y-1.5">
                 <div className="h-3 w-full bg-gray-100 animate-pulse" />
-                <div className="h-3 w-3/4 bg-gray-100 animate-pulse" />
+                <div className="size-3/4 bg-gray-100 animate-pulse" />
               </div>
             </div>
           ))}
@@ -214,8 +214,8 @@ export default function VMHistory({ userId }: { userId: string }) {
         </>
       ) : (
         <div className="border border-gray-200 bg-white p-12 text-center">
-          <div className="mx-auto w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center mb-4">
-            <Archive className="w-6 h-6 text-gray-400" />
+          <div className="mx-auto size-12 bg-gray-100 rounded-lg flex items-center justify-center mb-4">
+            <Archive className="size-6 text-gray-400" />
           </div>
           <p className="text-gray-500 text-sm">no vm history</p>
           <p className="text-xs text-gray-400 mt-1">

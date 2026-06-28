@@ -157,13 +157,13 @@ export default function VMDetailPageClient({
           href="/vms"
           className="inline-flex items-center gap-2 text-sm text-gray-500 hover:text-black transition-colors"
         >
-          <ArrowLeft className="h-4 w-4" />
+          <ArrowLeft className="size-4" />
           back to vms
         </Link>
 
         <div className="border border-gray-200 bg-white p-6 sm:p-12 text-center">
-          <div className="mx-auto w-12 h-12 bg-gray-100 flex items-center justify-center mb-4">
-            <Monitor className="w-6 h-6 text-gray-400" />
+          <div className="mx-auto size-12 bg-gray-100 flex items-center justify-center mb-4">
+            <Monitor className="size-6 text-gray-400" />
           </div>
           <h2 className="text-lg font-semibold text-black mb-2">
             vm not found
@@ -188,7 +188,7 @@ export default function VMDetailPageClient({
         href="/vms"
         className="inline-flex items-center gap-2 text-sm text-gray-500 hover:text-black transition-colors"
       >
-        <ArrowLeft className="h-4 w-4" />
+        <ArrowLeft className="size-4" />
         vms / {vm.name || vm.vmId}
       </Link>
 
@@ -200,7 +200,7 @@ export default function VMDetailPageClient({
             </h1>
             <div className="flex items-center gap-1.5">
               <span
-                className={`w-2 h-2 rounded-full ${getStatusDotColor(vm.status)}`}
+                className={`size-2 rounded-full ${getStatusDotColor(vm.status)}`}
               />
               <span
                 className={`text-sm font-medium ${getStatusTextColor(vm.status)}`}
@@ -237,7 +237,7 @@ export default function VMDetailPageClient({
         <div className="grid grid-cols-2 lg:grid-cols-4 divide-y lg:divide-y-0 lg:divide-x divide-gray-200">
           <div className="p-4">
             <div className="flex items-center gap-2 text-gray-400 text-xs uppercase tracking-wide mb-1">
-              <Cpu className="h-3.5 w-3.5 flex-shrink-0" />
+              <Cpu className="size-3.5 shrink-0" />
               cpu
             </div>
             <p className="text-lg font-medium text-black truncate">
@@ -246,7 +246,7 @@ export default function VMDetailPageClient({
           </div>
           <div className="p-4">
             <div className="flex items-center gap-2 text-gray-400 text-xs uppercase tracking-wide mb-1">
-              <MemoryStick className="h-3.5 w-3.5 flex-shrink-0" />
+              <MemoryStick className="size-3.5 shrink-0" />
               ram
             </div>
             <p className="text-lg font-medium text-black truncate">
@@ -255,7 +255,7 @@ export default function VMDetailPageClient({
           </div>
           <div className="p-4">
             <div className="flex items-center gap-2 text-gray-400 text-xs uppercase tracking-wide mb-1">
-              <HardDrive className="h-3.5 w-3.5 flex-shrink-0" />
+              <HardDrive className="size-3.5 shrink-0" />
               disk
             </div>
             <p className="text-lg font-medium text-black truncate">
@@ -264,7 +264,7 @@ export default function VMDetailPageClient({
           </div>
           <div className="p-4">
             <div className="flex items-center gap-2 text-gray-400 text-xs uppercase tracking-wide mb-1">
-              <Zap className="h-3.5 w-3.5 flex-shrink-0" />
+              <Zap className="size-3.5 shrink-0" />
               gpu
             </div>
             <p className="text-lg font-medium text-black truncate">
@@ -290,9 +290,9 @@ export default function VMDetailPageClient({
               className="h-10"
             >
               {sshCopied ? (
-                <Check className="h-4 w-4 text-green-600" />
+                <Check className="size-4 text-green-600" />
               ) : (
-                <Copy className="h-4 w-4" />
+                <Copy className="size-4" />
               )}
             </Button>
           </div>
@@ -313,14 +313,14 @@ export default function VMDetailPageClient({
               className="h-10"
             >
               {endpointCopied ? (
-                <Check className="h-4 w-4 text-green-600" />
+                <Check className="size-4 text-green-600" />
               ) : (
-                <Copy className="h-4 w-4" />
+                <Copy className="size-4" />
               )}
             </Button>
             <Button variant="outline" size="sm" asChild className="h-10">
               <a href={vm.exposeUrl} target="_blank" rel="noopener noreferrer">
-                <ExternalLink className="h-4 w-4" />
+                <ExternalLink className="size-4" />
               </a>
             </Button>
           </div>
@@ -392,7 +392,7 @@ export default function VMDetailPageClient({
             >
               {isDeleting ? (
                 <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <Loader2 className="size-4 animate-spin" />
                   deleting...
                 </>
               ) : (
@@ -446,7 +446,7 @@ export default function VMDetailPageClient({
             <Button onClick={handleExtend} disabled={isExtending}>
               {isExtending ? (
                 <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <Loader2 className="size-4 animate-spin" />
                   extending...
                 </>
               ) : (

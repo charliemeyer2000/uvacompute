@@ -40,7 +40,7 @@ function JobCard({ job }: { job: Job }) {
           <div className="flex items-center gap-1.5">
             {job.source === "github" && (
               <span title="GitHub Actions runner">
-                <Github className="h-3.5 w-3.5 text-gray-400 flex-shrink-0" />
+                <Github className="size-3.5 text-gray-400 shrink-0" />
               </span>
             )}
             <h3 className="text-sm font-semibold text-black truncate group-hover:text-orange-accent transition-colors">
@@ -51,10 +51,10 @@ function JobCard({ job }: { job: Job }) {
             {job.jobId}
           </p>
         </div>
-        <div className="flex items-center gap-2 flex-shrink-0 ml-3">
+        <div className="flex items-center gap-2 shrink-0 ml-3">
           <div className="flex items-center gap-1.5">
             <span
-              className={`w-2 h-2 rounded-full ${getStatusDotColor(job.status)}`}
+              className={`size-2 rounded-full ${getStatusDotColor(job.status)}`}
             />
             <span className="text-xs text-gray-600">
               {formatJobStatus(job.status)}
@@ -65,17 +65,17 @@ function JobCard({ job }: { job: Job }) {
               <Button
                 variant="ghost"
                 size="icon-sm"
-                className="h-6 w-6 cursor-pointer"
+                className="size-6 cursor-pointer"
                 onClick={(e) => e.preventDefault()}
               >
-                <MoreVertical className="h-4 w-4" />
+                <MoreVertical className="size-4" />
                 <span className="sr-only">open menu</span>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem asChild className="cursor-pointer">
                 <Link href={`/jobs/${job.jobId}`}>
-                  <ExternalLink className="h-4 w-4 mr-2" />
+                  <ExternalLink className="size-4 mr-2" />
                   view details
                 </Link>
               </DropdownMenuItem>
@@ -215,7 +215,7 @@ export default function JobHistory({ userId }: { userId: string }) {
               </div>
               <div className="border-t border-gray-100 pt-3 space-y-1.5">
                 <div className="h-3 w-full bg-gray-100 animate-pulse" />
-                <div className="h-3 w-3/4 bg-gray-100 animate-pulse" />
+                <div className="size-3/4 bg-gray-100 animate-pulse" />
               </div>
             </div>
           ))}
@@ -299,8 +299,8 @@ export default function JobHistory({ userId }: { userId: string }) {
         </>
       ) : (
         <div className="border border-gray-200 bg-white p-12 text-center">
-          <div className="mx-auto w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center mb-4">
-            <Archive className="w-6 h-6 text-gray-400" />
+          <div className="mx-auto size-12 bg-gray-100 rounded-lg flex items-center justify-center mb-4">
+            <Archive className="size-6 text-gray-400" />
           </div>
           <p className="text-gray-500 text-sm">no job history</p>
           <p className="text-xs text-gray-400 mt-1">

@@ -79,7 +79,7 @@ export function FooterStatus() {
   if (loading) {
     return (
       <div className="flex items-center gap-2 text-sm">
-        <div className="w-2 h-2 bg-gray-300 rounded-full" />
+        <div className="size-2 bg-gray-300 rounded-full" />
         <span className="text-muted-foreground">checking status...</span>
       </div>
     );
@@ -98,7 +98,7 @@ export function FooterStatus() {
       rel="noopener noreferrer"
       className="flex items-center gap-2 text-sm hover:opacity-80 transition-opacity"
     >
-      <div className={`w-2 h-2 rounded-full ${config.dot}`} />
+      <div className={`size-2 rounded-full ${config.dot}`} />
       <span>{config.text}</span>
     </Link>
   );
