@@ -1,4 +1,7 @@
 import { VMExtendResponseSchema, VMStatus } from "./vm-schemas";
+import { formatDate, formatStatus, formatTimeRemaining } from "./format";
+
+export { formatDate, formatStatus, formatTimeRemaining };
 
 export interface VM {
   _id: string;
@@ -20,31 +23,6 @@ export interface VM {
   exposePort?: number;
   exposeSubdomain?: string;
   exposeUrl?: string;
-}
-
-export function formatDate(timestamp: number): string {
-  return new Date(timestamp).toLocaleString();
-}
-
-export function formatTimeRemaining(expiresAt: number): string {
-  const now = Date.now();
-  const remaining = expiresAt - now;
-
-  if (remaining <= 0) {
-    return "Expired";
-  }
-
-  const hours = Math.floor(remaining / (1000 * 60 * 60));
-  const minutes = Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60));
-
-  if (hours > 0) {
-    return `${hours}h ${minutes}m remaining`;
-  }
-  return `${minutes}m remaining`;
-}
-
-export function formatStatus(status: VMStatus): string {
-  return status.replace(/_/g, " ");
 }
 
 export function getSshCommand(vm: VM): string {

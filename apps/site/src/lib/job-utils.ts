@@ -1,4 +1,11 @@
 import { JobStatus } from "./job-schemas";
+import {
+  formatDate,
+  formatStatus,
+  formatDuration as formatDurationMs,
+} from "./format";
+
+export { formatDate };
 
 export interface Job {
   _id: string;
@@ -32,43 +39,16 @@ export interface Job {
   };
 }
 
-export function formatDate(timestamp: number): string {
-  return new Date(timestamp).toLocaleString();
-}
-
 export function formatJobStatus(status: JobStatus): string {
-  return status.replace(/_/g, " ");
+  return formatStatus(status);
 }
 
 export function formatDuration(
   startedAt?: number,
   completedAt?: number,
 ): string {
-  if (!startedAt) {
-    return "-";
-  }
-
-  const endTime = completedAt || Date.now();
-  const durationMs = endTime - startedAt;
-
-  if (durationMs < 1000) {
-    return `${durationMs}ms`;
-  }
-
-  const seconds = Math.floor(durationMs / 1000);
-  if (seconds < 60) {
-    return `${seconds}s`;
-  }
-
-  const minutes = Math.floor(seconds / 60);
-  const remainingSeconds = seconds % 60;
-  if (minutes < 60) {
-    return `${minutes}m ${remainingSeconds}s`;
-  }
-
-  const hours = Math.floor(minutes / 60);
-  const remainingMinutes = minutes % 60;
-  return `${hours}h ${remainingMinutes}m`;
+  if (!startedAt) return "-";
+  return formatDurationMs((completedAt || Date.now()) - startedAt);
 }
 
 export function isJobActive(status: JobStatus): boolean {
