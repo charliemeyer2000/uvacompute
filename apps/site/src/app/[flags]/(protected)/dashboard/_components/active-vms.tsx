@@ -404,7 +404,7 @@ export default function ActiveVMs({ userId }: { userId: string }) {
               </div>
               <div className="border-t border-gray-100 pt-3 space-y-1.5">
                 <div className="h-3 w-full bg-gray-100 animate-pulse" />
-                <div className="size-3/4 bg-gray-100 animate-pulse" />
+                <div className="h-3 w-3/4 bg-gray-100 animate-pulse" />
               </div>
             </div>
           ))}
