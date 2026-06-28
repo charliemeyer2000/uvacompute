@@ -102,7 +102,7 @@ export default function JobDetailPage() {
   if (!job) {
     return (
       <div className="flex items-center justify-center h-[60vh]">
-        <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+        <Loader2 className="size-6 animate-spin text-gray-400" />
       </div>
     );
   }
@@ -113,7 +113,7 @@ export default function JobDetailPage() {
       <div className="flex flex-col items-center justify-center h-[60vh] gap-4">
         <p className="text-gray-500">job not found</p>
         <Button variant="outline" onClick={() => router.push("/jobs")}>
-          <ArrowLeft className="h-4 w-4" />
+          <ArrowLeft className="size-4" />
           back to jobs
         </Button>
       </div>
@@ -129,13 +129,13 @@ export default function JobDetailPage() {
             href="/jobs"
             className="text-gray-400 hover:text-black transition-colors"
           >
-            <ArrowLeft className="h-4 w-4" />
+            <ArrowLeft className="size-4" />
           </Link>
           <div>
             <div className="flex items-center gap-3">
               {job.source === "github" && (
                 <span title="GitHub Actions runner">
-                  <Github className="h-5 w-5 text-gray-400 flex-shrink-0" />
+                  <Github className="size-5 text-gray-400 shrink-0" />
                 </span>
               )}
               <h1 className="text-2xl font-semibold text-black">
@@ -160,7 +160,7 @@ export default function JobDetailPage() {
               onClick={() => setShowCancelDialog(true)}
               className="text-red-600 border-red-200 hover:bg-red-50 hover:border-red-300"
             >
-              <X className="h-4 w-4" />
+              <X className="size-4" />
               cancel job
             </Button>
           )}
@@ -175,7 +175,7 @@ export default function JobDetailPage() {
             image
           </p>
           <div className="flex items-center gap-2">
-            <Terminal className="h-4 w-4 text-orange-accent flex-shrink-0" />
+            <Terminal className="size-4 text-orange-accent shrink-0" />
             <p className="text-sm text-black font-mono truncate">{job.image}</p>
           </div>
         </div>
@@ -187,21 +187,21 @@ export default function JobDetailPage() {
           </p>
           <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
             <div className="flex items-center gap-1.5 min-w-0">
-              <Cpu className="h-3.5 w-3.5 text-gray-400 flex-shrink-0" />
+              <Cpu className="size-3.5 text-gray-400 shrink-0" />
               <span className="text-black truncate">{job.cpus} vCPU</span>
             </div>
             <div className="flex items-center gap-1.5 min-w-0">
-              <HardDrive className="h-3.5 w-3.5 text-gray-400 flex-shrink-0" />
+              <HardDrive className="size-3.5 text-gray-400 shrink-0" />
               <span className="text-black truncate">{job.ram} GB</span>
             </div>
             <div className="flex items-center gap-1.5 min-w-0">
-              <Zap className="h-3.5 w-3.5 text-gray-400 flex-shrink-0" />
+              <Zap className="size-3.5 text-gray-400 shrink-0" />
               <span className="text-black truncate">
                 {job.gpus > 0 ? `${job.gpus}x GPU` : "no GPU"}
               </span>
             </div>
             <div className="flex items-center gap-1.5 min-w-0">
-              <Database className="h-3.5 w-3.5 text-gray-400 flex-shrink-0" />
+              <Database className="size-3.5 text-gray-400 shrink-0" />
               <span className="text-black truncate">
                 {job.disk ? `${job.disk} GB` : "no scratch"}
               </span>
@@ -249,7 +249,7 @@ export default function JobDetailPage() {
           ) : (
             <div className="flex items-center gap-2">
               <span
-                className={`w-2 h-2 rounded-full ${getStatusDotColor(job.status)}`}
+                className={`size-2 rounded-full ${getStatusDotColor(job.status)}`}
               />
               <span className={`text-sm ${getStatusColor(job.status)}`}>
                 {formatJobStatus(job.status)}
@@ -287,7 +287,7 @@ export default function JobDetailPage() {
       {job.githubMeta && (
         <div className="bg-white border border-gray-200 p-4">
           <div className="flex items-center gap-2 mb-2">
-            <Github className="h-4 w-4 text-gray-400" />
+            <Github className="size-4 text-gray-400" />
             <p className="text-xs text-gray-400 uppercase tracking-wide">
               github actions
             </p>
@@ -325,7 +325,7 @@ export default function JobDetailPage() {
       {hasEndpoint && (
         <div className="bg-white border border-gray-200 border-l-4 border-l-orange-accent p-4">
           <div className="flex items-center gap-2 mb-2">
-            <Globe className="h-4 w-4 text-orange-accent" />
+            <Globe className="size-4 text-orange-accent" />
             <p className="text-xs text-gray-400 uppercase tracking-wide">
               endpoint
             </p>
@@ -341,14 +341,14 @@ export default function JobDetailPage() {
               className="h-9"
             >
               {endpointCopied ? (
-                <Check className="h-4 w-4 text-green-600" />
+                <Check className="size-4 text-green-600" />
               ) : (
-                <Copy className="h-4 w-4" />
+                <Copy className="size-4" />
               )}
             </Button>
             <Button variant="outline" size="sm" asChild className="h-9">
               <a href={job.exposeUrl} target="_blank" rel="noopener noreferrer">
-                <ExternalLink className="h-4 w-4" />
+                <ExternalLink className="size-4" />
               </a>
             </Button>
           </div>

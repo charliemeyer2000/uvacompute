@@ -120,7 +120,7 @@ export default function MyNodesPage() {
             >
               <div className="flex justify-between items-center">
                 <div className="flex items-center gap-4">
-                  <div className="h-5 w-5 bg-gray-100 animate-pulse rounded" />
+                  <div className="size-5 bg-gray-100 animate-pulse rounded" />
                   <div>
                     <div className="h-5 w-32 bg-gray-100 animate-pulse mb-1" />
                     <div className="h-3 w-48 bg-gray-100 animate-pulse" />
@@ -152,17 +152,17 @@ export default function MyNodesPage() {
         {nodes.length > 0 && (
           <div className="flex items-center gap-3 sm:gap-6 text-sm">
             <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-green-500" />
+              <span className="size-2 rounded-full bg-green-500" />
               <span className="text-gray-500">{onlineCount} online</span>
             </div>
             {drainingCount > 0 && (
               <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-yellow-500" />
+                <span className="size-2 rounded-full bg-yellow-500" />
                 <span className="text-gray-500">{drainingCount} draining</span>
               </div>
             )}
             <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-red-500" />
+              <span className="size-2 rounded-full bg-red-500" />
               <span className="text-gray-500">{offlineCount} offline</span>
             </div>
           </div>
@@ -171,8 +171,8 @@ export default function MyNodesPage() {
 
       {nodes.length === 0 ? (
         <div className="border border-gray-200 bg-white p-6 sm:p-12 text-center">
-          <div className="mx-auto w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center mb-4">
-            <Server className="w-6 h-6 text-gray-400" />
+          <div className="mx-auto size-12 bg-gray-100 rounded-lg flex items-center justify-center mb-4">
+            <Server className="size-6 text-gray-400" />
           </div>
           <h2 className="text-lg font-semibold text-black mb-2">
             no nodes yet
@@ -201,9 +201,9 @@ export default function MyNodesPage() {
                   <div className="flex items-center gap-4">
                     <span className="text-gray-400">
                       {expandedNode === node.nodeId ? (
-                        <ChevronDown className="w-5 h-5" />
+                        <ChevronDown className="size-5" />
                       ) : (
-                        <ChevronRight className="w-5 h-5" />
+                        <ChevronRight className="size-5" />
                       )}
                     </span>
                     <div className="flex-1 min-w-0">
@@ -252,7 +252,7 @@ export default function MyNodesPage() {
                       )}
                     <div className="flex items-center gap-1.5">
                       <span
-                        className={`w-2 h-2 rounded-full ${getStatusDotColor(node.status)}`}
+                        className={`size-2 rounded-full ${getStatusDotColor(node.status)}`}
                       />
                       <span className="text-xs text-gray-600">
                         {node.status}
@@ -285,7 +285,7 @@ export default function MyNodesPage() {
                             }}
                             className="text-yellow-700 border-yellow-200 hover:bg-yellow-50"
                           >
-                            <Pause className="w-3.5 h-3.5 mr-1.5" />
+                            <Pause className="size-3.5 mr-1.5" />
                             pause node
                           </Button>
                         )}
@@ -299,7 +299,7 @@ export default function MyNodesPage() {
                             }}
                             className="text-green-700 border-green-200 hover:bg-green-50"
                           >
-                            <Play className="w-3.5 h-3.5 mr-1.5" />
+                            <Play className="size-3.5 mr-1.5" />
                             resume node
                           </Button>
                         )}

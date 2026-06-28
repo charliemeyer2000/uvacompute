@@ -161,9 +161,9 @@ export default function LoginPage() {
                       className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-black cursor-pointer"
                     >
                       {showPassword ? (
-                        <EyeOff className="h-4 w-4" />
+                        <EyeOff className="size-4" />
                       ) : (
-                        <Eye className="h-4 w-4" />
+                        <Eye className="size-4" />
                       )}
                     </button>
                   </div>
@@ -214,7 +214,7 @@ export default function LoginPage() {
               ) : (
                 <>
                   <svg
-                    className="w-5 h-5"
+                    className="size-5"
                     fill="currentColor"
                     viewBox="0 0 24 24"
                   >
@@ -236,7 +236,7 @@ export default function LoginPage() {
                 <span className="text-gray-500">loading...</span>
               ) : (
                 <>
-                  <svg className="w-5 h-5" viewBox="0 0 24 24">
+                  <svg className="size-5" viewBox="0 0 24 24">
                     <path
                       fill="#4285F4"
                       d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"

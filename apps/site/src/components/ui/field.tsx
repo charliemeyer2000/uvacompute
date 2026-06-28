@@ -2,7 +2,7 @@ import * as React from "react";
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
-const fieldVariants = cva("space-y-2", {
+const fieldVariants = cva("flex flex-col gap-2", {
   variants: {
     orientation: {
       vertical: "flex flex-col",
@@ -16,46 +16,65 @@ const fieldVariants = cva("space-y-2", {
   },
 });
 
-const Field = React.forwardRef<
-  HTMLDivElement,
-  React.HTMLAttributes<HTMLDivElement> & VariantProps<typeof fieldVariants>
->(({ className, orientation, ...props }, ref) => (
-  <div
-    ref={ref}
-    className={cn(fieldVariants({ orientation }), className)}
-    {...props}
-  />
-));
-Field.displayName = "Field";
+function Field({
+  className,
+  orientation,
+  ref,
+  ...props
+}: React.HTMLAttributes<HTMLDivElement> &
+  VariantProps<typeof fieldVariants> & {
+    ref?: React.Ref<HTMLDivElement>;
+  }) {
+  return (
+    <div
+      ref={ref}
+      className={cn(fieldVariants({ orientation }), className)}
+      {...props}
+    />
+  );
+}
 
-const FieldLabel = React.forwardRef<
-  HTMLLabelElement,
-  React.LabelHTMLAttributes<HTMLLabelElement>
->(({ className, ...props }, ref) => (
-  <label
-    ref={ref}
-    className={cn("text-sm font-medium font-mono", className)}
-    {...props}
-  />
-));
-FieldLabel.displayName = "FieldLabel";
+function FieldLabel({
+  className,
+  ref,
+  ...props
+}: React.LabelHTMLAttributes<HTMLLabelElement> & {
+  ref?: React.Ref<HTMLLabelElement>;
+}) {
+  return (
+    <label
+      ref={ref}
+      className={cn("text-sm font-medium font-mono", className)}
+      {...props}
+    />
+  );
+}
 
-const FieldDescription = React.forwardRef<
-  HTMLParagraphElement,
-  React.HTMLAttributes<HTMLParagraphElement>
->(({ className, ...props }, ref) => (
-  <p
-    ref={ref}
-    className={cn("text-sm text-gray-500 font-mono", className)}
-    {...props}
-  />
-));
-FieldDescription.displayName = "FieldDescription";
+function FieldDescription({
+  className,
+  ref,
+  ...props
+}: React.HTMLAttributes<HTMLParagraphElement> & {
+  ref?: React.Ref<HTMLParagraphElement>;
+}) {
+  return (
+    <p
+      ref={ref}
+      className={cn("text-sm text-gray-500 font-mono", className)}
+      {...props}
+    />
+  );
+}
 
-const FieldError = React.forwardRef<
-  HTMLParagraphElement,
-  React.HTMLAttributes<HTMLParagraphElement> & { errors?: string[] }
->(({ className, errors, ...props }, ref) => {
+function FieldError({
+  className,
+  errors,
+  ref,
+  ...props
+}: React.HTMLAttributes<HTMLParagraphElement> & {
+  errors?: string[];
+  ref?: React.Ref<HTMLParagraphElement>;
+}) {
   if (!errors || errors.length === 0) return null;
 
   return (
@@ -67,51 +86,78 @@ const FieldError = React.forwardRef<
       {errors.join(", ")}
     </p>
   );
-});
-FieldError.displayName = "FieldError";
+}
 
-const FieldGroup = React.forwardRef<
-  HTMLDivElement,
-  React.HTMLAttributes<HTMLDivElement>
->(({ className, ...props }, ref) => (
-  <div ref={ref} className={cn("space-y-4", className)} {...props} />
-));
-FieldGroup.displayName = "FieldGroup";
+function FieldGroup({
+  className,
+  ref,
+  ...props
+}: React.HTMLAttributes<HTMLDivElement> & {
+  ref?: React.Ref<HTMLDivElement>;
+}) {
+  return (
+    <div
+      ref={ref}
+      className={cn("flex flex-col gap-4", className)}
+      {...props}
+    />
+  );
+}
 
-const FieldSet = React.forwardRef<
-  HTMLFieldSetElement,
-  React.FieldsetHTMLAttributes<HTMLFieldSetElement>
->(({ className, ...props }, ref) => (
-  <fieldset ref={ref} className={cn("space-y-4", className)} {...props} />
-));
-FieldSet.displayName = "FieldSet";
+function FieldSet({
+  className,
+  ref,
+  ...props
+}: React.FieldsetHTMLAttributes<HTMLFieldSetElement> & {
+  ref?: React.Ref<HTMLFieldSetElement>;
+}) {
+  return (
+    <fieldset
+      ref={ref}
+      className={cn("flex flex-col gap-4", className)}
+      {...props}
+    />
+  );
+}
 
-const FieldLegend = React.forwardRef<
-  HTMLLegendElement,
-  React.HTMLAttributes<HTMLLegendElement> & {
-    variant?: "label" | "default";
-  }
->(({ className, variant = "default", ...props }, ref) => (
-  <legend
-    ref={ref}
-    className={cn(
-      "font-mono",
-      variant === "label" && "text-sm font-medium",
-      variant === "default" && "text-base font-semibold",
-      className,
-    )}
-    {...props}
-  />
-));
-FieldLegend.displayName = "FieldLegend";
+function FieldLegend({
+  className,
+  variant = "default",
+  ref,
+  ...props
+}: React.HTMLAttributes<HTMLLegendElement> & {
+  variant?: "label" | "default";
+  ref?: React.Ref<HTMLLegendElement>;
+}) {
+  return (
+    <legend
+      ref={ref}
+      className={cn(
+        "font-mono",
+        variant === "label" && "text-sm font-medium",
+        variant === "default" && "text-base font-semibold",
+        className,
+      )}
+      {...props}
+    />
+  );
+}
 
-const FieldContent = React.forwardRef<
-  HTMLDivElement,
-  React.HTMLAttributes<HTMLDivElement>
->(({ className, ...props }, ref) => (
-  <div ref={ref} className={cn("space-y-1", className)} {...props} />
-));
-FieldContent.displayName = "FieldContent";
+function FieldContent({
+  className,
+  ref,
+  ...props
+}: React.HTMLAttributes<HTMLDivElement> & {
+  ref?: React.Ref<HTMLDivElement>;
+}) {
+  return (
+    <div
+      ref={ref}
+      className={cn("flex flex-col gap-1", className)}
+      {...props}
+    />
+  );
+}
 
 export {
   Field,

@@ -154,7 +154,7 @@ export default function ProfilePage() {
         </div>
         <div className="bg-white border border-gray-200 p-4 sm:p-6">
           <div className="flex items-start gap-4">
-            <div className="w-16 h-16 bg-gray-100 animate-pulse" />
+            <div className="size-16 bg-gray-100 animate-pulse" />
             <div className="flex-1">
               <div className="h-6 w-40 bg-gray-100 animate-pulse mb-2" />
               <div className="h-4 w-56 bg-gray-100 animate-pulse" />
@@ -192,7 +192,7 @@ export default function ProfilePage() {
       {/* Profile Header Card */}
       <div className="bg-white border border-gray-200 p-4 sm:p-6">
         <div className="flex items-start gap-4">
-          <div className="w-16 h-16 bg-orange-accent flex items-center justify-center flex-shrink-0">
+          <div className="size-16 bg-orange-accent flex items-center justify-center shrink-0">
             <span className="text-white text-xl font-semibold">
               {getInitials(user.name)}
             </span>
@@ -207,7 +207,7 @@ export default function ProfilePage() {
               </span>
               {user.emailVerified && (
                 <span className="flex items-center gap-1 text-xs text-green-600">
-                  <CheckCircle className="w-3.5 h-3.5" />
+                  <CheckCircle className="size-3.5" />
                   verified
                 </span>
               )}
@@ -283,7 +283,7 @@ export default function ProfilePage() {
               size="sm"
               onClick={() => setShowCreateForm(true)}
             >
-              <Plus className="w-3.5 h-3.5" />
+              <Plus className="size-3.5" />
               create key
             </Button>
           )}
@@ -317,7 +317,7 @@ export default function ProfilePage() {
                     setNewGithubToken("");
                   }}
                 >
-                  <X className="w-4 h-4" />
+                  <X className="size-4" />
                 </Button>
               </div>
               <div>
@@ -345,7 +345,7 @@ export default function ProfilePage() {
               <Button onClick={handleCreateKey} disabled={isCreating} size="sm">
                 {isCreating ? (
                   <>
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <Loader2 className="size-3.5 animate-spin" />
                     creating...
                   </>
                 ) : (
@@ -368,7 +368,7 @@ export default function ProfilePage() {
                 size="icon-sm"
                 onClick={() => setCreatedKey(null)}
               >
-                <X className="w-4 h-4" />
+                <X className="size-4" />
               </Button>
             </div>
             <div className="space-y-3">
@@ -386,9 +386,9 @@ export default function ProfilePage() {
                     onClick={() => handleCopy(createdKey.key, "key")}
                   >
                     {copiedField === "key" ? (
-                      <Check className="w-3.5 h-3.5 text-green-600" />
+                      <Check className="size-3.5 text-green-600" />
                     ) : (
-                      <Copy className="w-3.5 h-3.5" />
+                      <Copy className="size-3.5" />
                     )}
                   </Button>
                 </div>
@@ -409,9 +409,9 @@ export default function ProfilePage() {
                     }
                   >
                     {copiedField === "secret" ? (
-                      <Check className="w-3.5 h-3.5 text-green-600" />
+                      <Check className="size-3.5 text-green-600" />
                     ) : (
-                      <Copy className="w-3.5 h-3.5" />
+                      <Copy className="size-3.5" />
                     )}
                   </Button>
                 </div>
@@ -436,16 +436,16 @@ export default function ProfilePage() {
                     }
                   >
                     {copiedField === "url" ? (
-                      <Check className="w-3.5 h-3.5 text-green-600" />
+                      <Check className="size-3.5 text-green-600" />
                     ) : (
-                      <Copy className="w-3.5 h-3.5" />
+                      <Copy className="size-3.5" />
                     )}
                   </Button>
                 </div>
               </div>
               {createdKey.githubTokenStatus && (
                 <div className="flex items-center gap-2 pt-1">
-                  <Github className="w-3.5 h-3.5 text-green-600" />
+                  <Github className="size-3.5 text-green-600" />
                   <span className="text-xs text-green-600">
                     token verified — {createdKey.githubTokenStatus.username} (
                     {createdKey.githubTokenStatus.tokenType})
@@ -464,7 +464,7 @@ export default function ProfilePage() {
           </div>
         ) : apiKeys.length === 0 && !createdKey ? (
           <div className="text-sm text-gray-400 py-4 text-center">
-            <Key className="w-5 h-5 mx-auto mb-2 text-gray-300" />
+            <Key className="size-5 mx-auto mb-2 text-gray-300" />
             no api keys. create one to use github actions runners.
           </div>
         ) : (
@@ -505,7 +505,7 @@ export default function ProfilePage() {
                       )}
                       {key.hasGithubToken ? (
                         <span className="flex items-center gap-1 text-xs text-green-600">
-                          <Github className="w-3 h-3" />
+                          <Github className="size-3" />
                           token set
                         </span>
                       ) : (
@@ -516,13 +516,13 @@ export default function ProfilePage() {
                             setEditGithubToken("");
                           }}
                         >
-                          <Github className="w-3 h-3" />
+                          <Github className="size-3" />
                           add github token
                         </button>
                       )}
                       {tokenUpdateResult?.keyId === key._id && (
                         <span className="flex items-center gap-1 text-xs text-green-600">
-                          <Check className="w-3 h-3" />
+                          <Check className="size-3" />
                           verified — {tokenUpdateResult.username}
                         </span>
                       )}
@@ -598,7 +598,7 @@ export default function ProfilePage() {
                       onClick={() => handleUpdateToken(key._id)}
                     >
                       {isUpdatingToken ? (
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        <Loader2 className="size-3.5 animate-spin" />
                       ) : (
                         "save"
                       )}
@@ -611,7 +611,7 @@ export default function ProfilePage() {
                         setEditGithubToken("");
                       }}
                     >
-                      <X className="w-4 h-4" />
+                      <X className="size-4" />
                     </Button>
                   </div>
                 )}

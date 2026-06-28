@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext } from "react";
+import { createContext, use } from "react";
 
 const EarlyAccessContext = createContext<{
   earlyAccessEnabled: boolean;
@@ -23,6 +23,6 @@ export function EarlyAccessProvider({
 }
 
 export function useEarlyAccessEnabled() {
-  const context = useContext(EarlyAccessContext);
+  const context = use(EarlyAccessContext);
   return context.earlyAccessEnabled;
 }

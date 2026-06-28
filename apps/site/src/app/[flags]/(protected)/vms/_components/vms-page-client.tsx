@@ -102,8 +102,8 @@ export default function VMsPageClient({
 
         {/* Empty State */}
         <div className="border border-gray-200 bg-white p-6 sm:p-12 text-center">
-          <div className="mx-auto w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center mb-4">
-            <Monitor className="w-6 h-6 text-gray-400" />
+          <div className="mx-auto size-12 bg-gray-100 rounded-lg flex items-center justify-center mb-4">
+            <Monitor className="size-6 text-gray-400" />
           </div>
           <h2 className="text-lg font-semibold text-black mb-2">no vms yet</h2>
           <p className="text-sm text-gray-500 mb-6 max-w-md mx-auto">
@@ -147,13 +147,13 @@ export default function VMsPageClient({
         {/* Stats Summary */}
         <div className="flex items-center gap-3 sm:gap-6 text-sm">
           <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-green-500" />
+            <span className="size-2 rounded-full bg-green-500" />
             <span className="text-gray-500">
               {activeVMs?.length ?? "—"} active
             </span>
           </div>
           <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-gray-300" />
+            <span className="size-2 rounded-full bg-gray-300" />
             <span className="text-gray-500">
               {inactiveVMs?.length ?? "—"} historical
             </span>

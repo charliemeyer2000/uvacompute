@@ -135,17 +135,17 @@ function VMCard({ vm, isActive }: { vm: VM; isActive: boolean }) {
               {vm.vmId}
             </p>
           </div>
-          <div className="flex items-center gap-2 flex-shrink-0 ml-3">
+          <div className="flex items-center gap-2 shrink-0 ml-3">
             <div className="flex items-center gap-1.5">
               <span
-                className={`w-2 h-2 rounded-full ${getStatusDotColor(vm.status)}`}
+                className={`size-2 rounded-full ${getStatusDotColor(vm.status)}`}
               />
               <span className="text-xs text-gray-600">
                 {formatStatus(vm.status)}
               </span>
               {vm.status === "ready" && vm.exposeUrl && (
                 <span title="Endpoint exposed">
-                  <Globe className="h-3.5 w-3.5 text-orange-accent" />
+                  <Globe className="size-3.5 text-orange-accent" />
                 </span>
               )}
             </div>
@@ -156,9 +156,9 @@ function VMCard({ vm, isActive }: { vm: VM; isActive: boolean }) {
                     <Button
                       variant="ghost"
                       size="icon-sm"
-                      className="h-6 w-6 cursor-pointer"
+                      className="size-6 cursor-pointer"
                     >
-                      <MoreVertical className="h-4 w-4" />
+                      <MoreVertical className="size-4" />
                       <span className="sr-only">open menu</span>
                     </Button>
                   </DropdownMenuTrigger>
@@ -170,12 +170,12 @@ function VMCard({ vm, isActive }: { vm: VM; isActive: boolean }) {
                       >
                         {sshCopied ? (
                           <>
-                            <Check className="h-4 w-4 mr-2" />
+                            <Check className="size-4 mr-2" />
                             copied!
                           </>
                         ) : (
                           <>
-                            <Copy className="h-4 w-4 mr-2" />
+                            <Copy className="size-4 mr-2" />
                             copy ssh command
                           </>
                         )}
@@ -293,7 +293,7 @@ function VMCard({ vm, isActive }: { vm: VM; isActive: boolean }) {
             >
               {isDeleting ? (
                 <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <Loader2 className="size-4 animate-spin" />
                   deleting...
                 </>
               ) : (
@@ -347,7 +347,7 @@ function VMCard({ vm, isActive }: { vm: VM; isActive: boolean }) {
             <Button onClick={handleExtend} disabled={isExtending}>
               {isExtending ? (
                 <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <Loader2 className="size-4 animate-spin" />
                   extending...
                 </>
               ) : (
@@ -497,8 +497,8 @@ export default function ActiveVMs({ userId }: { userId: string }) {
         </>
       ) : (
         <div className="border border-gray-200 bg-white p-12 text-center">
-          <div className="mx-auto w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center mb-4">
-            <Monitor className="w-6 h-6 text-gray-400" />
+          <div className="mx-auto size-12 bg-gray-100 rounded-lg flex items-center justify-center mb-4">
+            <Monitor className="size-6 text-gray-400" />
           </div>
           <p className="text-gray-500 mb-2 text-sm">no active vms</p>
           <p className="text-xs text-gray-400 mb-4">
