@@ -962,9 +962,10 @@ async function callUnregisterApi(): Promise<{
   if (secret) {
     const body = "";
     const timestamp = Math.floor(Date.now() / 1000).toString();
+    const requestPath = `/api/nodes/${nodeId}`;
     const payload = useNodeAuth
       ? `${nodeId}:${timestamp}:${body}`
-      : `${timestamp}:${body}`;
+      : `DELETE:${requestPath}:${timestamp}:${body}`;
     const signature = createHmac("sha256", secret)
       .update(payload)
       .digest("hex");

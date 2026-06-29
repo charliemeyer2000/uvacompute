@@ -160,10 +160,10 @@ func (c *CallbackClient) makeRequest(method string, url string, body string) err
 	return c.makeRequestWithContentType(method, url, body, "application/json")
 }
 
-func (c *CallbackClient) makeRequestWithContentType(method string, url string, body string, contentType string) error {
+func (c *CallbackClient) makeRequestWithContentType(method string, rawURL string, body string, contentType string) error {
 	timestamp := strconv.FormatInt(time.Now().Unix(), 10)
 
-	req, err := http.NewRequest(method, url, strings.NewReader(body))
+	req, err := http.NewRequest(method, rawURL, strings.NewReader(body))
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
@@ -171,7 +171,7 @@ func (c *CallbackClient) makeRequestWithContentType(method string, url string, b
 	req.Header.Set("Content-Type", contentType)
 	req.Header.Set("X-Timestamp", timestamp)
 
-	signature := c.signRequest(timestamp, body)
+	signature := c.signRequest(method, req.URL.Path, timestamp, body)
 	req.Header.Set("X-Signature", signature)
 
 	resp, err := c.httpClient.Do(req)
@@ -187,8 +187,8 @@ func (c *CallbackClient) makeRequestWithContentType(method string, url string, b
 	return nil
 }
 
-func (c *CallbackClient) signRequest(timestamp string, body string) string {
-	payload := fmt.Sprintf("%s:%s", timestamp, body)
+func (c *CallbackClient) signRequest(method string, path string, timestamp string, body string) string {
+	payload := fmt.Sprintf("%s:%s:%s:%s", method, path, timestamp, body)
 	h := hmac.New(sha256.New, []byte(c.sharedSecret))
 	h.Write([]byte(payload))
 	return hex.EncodeToString(h.Sum(nil))
@@ -246,8 +246,7 @@ func (c *CallbackClient) FetchActiveVMs() ([]ConvexVM, error) {
 	}
 
 	req.Header.Set("X-Timestamp", timestamp)
-	// For GET requests, body is empty
-	signature := c.signRequest(timestamp, "")
+	signature := c.signRequest("GET", req.URL.Path, timestamp, "")
 	req.Header.Set("X-Signature", signature)
 
 	log.Printf("Fetching active VMs from Convex...")
@@ -282,8 +281,7 @@ func (c *CallbackClient) FetchActiveJobs() ([]ConvexJob, error) {
 	}
 
 	req.Header.Set("X-Timestamp", timestamp)
-	// For GET requests, body is empty
-	signature := c.signRequest(timestamp, "")
+	signature := c.signRequest("GET", req.URL.Path, timestamp, "")
 	req.Header.Set("X-Signature", signature)
 
 	log.Printf("Fetching active jobs from Convex...")
@@ -318,7 +316,7 @@ func (c *CallbackClient) FetchQueuedJobs() ([]ConvexJob, error) {
 	}
 
 	req.Header.Set("X-Timestamp", timestamp)
-	signature := c.signRequest(timestamp, "")
+	signature := c.signRequest("GET", req.URL.Path, timestamp, "")
 	req.Header.Set("X-Signature", signature)
 
 	resp, err := c.httpClient.Do(req)

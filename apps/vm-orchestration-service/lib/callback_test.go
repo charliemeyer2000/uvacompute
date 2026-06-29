@@ -132,8 +132,8 @@ func TestSignRequest_Deterministic(t *testing.T) {
 	t.Parallel()
 	client := NewCallbackClient("https://example.com", "test-secret")
 
-	sig1 := client.signRequest("12345", `{"test":true}`)
-	sig2 := client.signRequest("12345", `{"test":true}`)
+	sig1 := client.signRequest("POST", "/test", "12345", `{"test":true}`)
+	sig2 := client.signRequest("POST", "/test", "12345", `{"test":true}`)
 
 	if sig1 != sig2 {
 		t.Error("signRequest should produce deterministic signatures")
@@ -144,8 +144,8 @@ func TestSignRequest_DifferentBodies(t *testing.T) {
 	t.Parallel()
 	client := NewCallbackClient("https://example.com", "test-secret")
 
-	sig1 := client.signRequest("12345", "body1")
-	sig2 := client.signRequest("12345", "body2")
+	sig1 := client.signRequest("POST", "/test", "12345", "body1")
+	sig2 := client.signRequest("POST", "/test", "12345", "body2")
 
 	if sig1 == sig2 {
 		t.Error("different bodies should produce different signatures")
@@ -156,8 +156,8 @@ func TestSignRequest_DifferentTimestamps(t *testing.T) {
 	t.Parallel()
 	client := NewCallbackClient("https://example.com", "test-secret")
 
-	sig1 := client.signRequest("12345", "body")
-	sig2 := client.signRequest("12346", "body")
+	sig1 := client.signRequest("POST", "/test", "12345", "body")
+	sig2 := client.signRequest("POST", "/test", "12346", "body")
 
 	if sig1 == sig2 {
 		t.Error("different timestamps should produce different signatures")
@@ -169,8 +169,8 @@ func TestSignRequest_DifferentSecrets(t *testing.T) {
 	client1 := NewCallbackClient("https://example.com", "secret-1")
 	client2 := NewCallbackClient("https://example.com", "secret-2")
 
-	sig1 := client1.signRequest("12345", "body")
-	sig2 := client2.signRequest("12345", "body")
+	sig1 := client1.signRequest("POST", "/test", "12345", "body")
+	sig2 := client2.signRequest("POST", "/test", "12345", "body")
 
 	if sig1 == sig2 {
 		t.Error("different secrets should produce different signatures")
@@ -181,7 +181,7 @@ func TestSignRequest_EmptyBody(t *testing.T) {
 	t.Parallel()
 	client := NewCallbackClient("https://example.com", "test-secret")
 
-	sig := client.signRequest("12345", "")
+	sig := client.signRequest("GET", "/test", "12345", "")
 	if sig == "" {
 		t.Error("signRequest should produce non-empty signature for empty body")
 	}

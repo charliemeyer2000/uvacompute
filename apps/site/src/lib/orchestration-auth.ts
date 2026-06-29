@@ -55,7 +55,9 @@ export function verifyRequest(request: NextRequest, body: string): boolean {
     return false;
   }
 
-  const payload = `${timestamp}:${body}`;
+  const method = request.method;
+  const path = request.nextUrl.pathname;
+  const payload = `${method}:${path}:${timestamp}:${body}`;
   const expectedSignature = crypto
     .createHmac("sha256", secret)
     .update(payload)

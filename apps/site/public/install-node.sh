@@ -942,7 +942,9 @@ LEGACY_SECRET_FILE="/etc/uvacompute/orchestration-secret"
 # Payload format: nodeId:timestamp:body (for node auth)
 # Returns: auth_type:timestamp:signature
 sign_node_request() {
-    local body="\$1"
+    local method="\$1"
+    local path="\$2"
+    local body="\$3"
     local timestamp=\$(date +%s)
     local secret
 
@@ -956,7 +958,7 @@ sign_node_request() {
     # Fall back to legacy shared secret
     elif [[ -f "\${LEGACY_SECRET_FILE}" ]]; then
         secret=\$(cat "\${LEGACY_SECRET_FILE}")
-        local payload="\${timestamp}:\${body}"
+        local payload="\${method}:\${path}:\${timestamp}:\${body}"
         local signature=\$(echo -n "\${payload}" | openssl dgst -sha256 -hmac "\${secret}" | awk '{print \$2}')
         echo "shared:\${timestamp}:\${signature}"
     else
@@ -967,7 +969,7 @@ sign_node_request() {
 
 # Helper: Check for active GPU workloads
 check_gpu_workloads() {
-    local auth=\$(sign_node_request "")
+    local auth=\$(sign_node_request "GET" "/api/nodes/\${NODE_ID}/gpu-mode" "")
     if [[ -z "\${auth}" ]]; then
         echo "Warning: No authentication secret found, skipping workload check"
         return 0
@@ -1015,7 +1017,7 @@ report_gpu_mode() {
     local verified="\$2"
 
     local body="{\"gpuMode\":\"\${mode}\",\"verified\":\${verified}}"
-    local auth=\$(sign_node_request "\${body}")
+    local auth=\$(sign_node_request "POST" "/api/nodes/\${NODE_ID}/gpu-mode" "\${body}")
     if [[ -z "\${auth}" ]]; then
         echo "Warning: No authentication secret found, skipping mode report"
         return 0
@@ -1140,7 +1142,9 @@ LEGACY_SECRET_FILE="/etc/uvacompute/orchestration-secret"
 # Payload format: nodeId:timestamp:body (for node auth)
 # Returns: auth_type:timestamp:signature
 sign_node_request() {
-    local body="\$1"
+    local method="\$1"
+    local path="\$2"
+    local body="\$3"
     local timestamp=\$(date +%s)
     local secret
 
@@ -1154,7 +1158,7 @@ sign_node_request() {
     # Fall back to legacy shared secret
     elif [[ -f "\${LEGACY_SECRET_FILE}" ]]; then
         secret=\$(cat "\${LEGACY_SECRET_FILE}")
-        local payload="\${timestamp}:\${body}"
+        local payload="\${method}:\${path}:\${timestamp}:\${body}"
         local signature=\$(echo -n "\${payload}" | openssl dgst -sha256 -hmac "\${secret}" | awk '{print \$2}')
         echo "shared:\${timestamp}:\${signature}"
     else
@@ -1165,7 +1169,7 @@ sign_node_request() {
 
 # Helper: Check for active GPU workloads
 check_gpu_workloads() {
-    local auth=\$(sign_node_request "")
+    local auth=\$(sign_node_request "GET" "/api/nodes/\${NODE_ID}/gpu-mode" "")
     if [[ -z "\${auth}" ]]; then
         echo "Warning: No authentication secret found, skipping workload check"
         return 0
@@ -1213,7 +1217,7 @@ report_gpu_mode() {
     local verified="\$2"
 
     local body="{\"gpuMode\":\"\${mode}\",\"verified\":\${verified}}"
-    local auth=\$(sign_node_request "\${body}")
+    local auth=\$(sign_node_request "POST" "/api/nodes/\${NODE_ID}/gpu-mode" "\${body}")
     if [[ -z "\${auth}" ]]; then
         echo "Warning: No authentication secret found, skipping mode report"
         return 0
