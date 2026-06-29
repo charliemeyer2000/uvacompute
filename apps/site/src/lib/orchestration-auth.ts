@@ -61,7 +61,10 @@ export function verifyRequest(request: NextRequest, body: string): boolean {
     .update(payload)
     .digest("hex");
 
-  return signature === expectedSignature;
+  return crypto.timingSafeEqual(
+    Buffer.from(signature),
+    Buffer.from(expectedSignature),
+  );
 }
 
 export function parseOrchestrationError(
@@ -114,5 +117,8 @@ export async function verifyNodeRequest(
     .update(payload)
     .digest("hex");
 
-  return signature === expectedSignature;
+  return crypto.timingSafeEqual(
+    Buffer.from(signature),
+    Buffer.from(expectedSignature),
+  );
 }
