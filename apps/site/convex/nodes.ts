@@ -457,6 +457,17 @@ export const forceCleanup = mutation({
     nodeId: v.string(),
   },
   handler: async (ctx, args) => {
+    const user = await authComponent.getAuthUser(ctx);
+    if (!user?.email) {
+      throw new Error("Not authenticated");
+    }
+
+    const adminUsers =
+      process.env.ADMIN_USERS?.split(",").map((email) => email.trim()) || [];
+    if (!adminUsers.includes(user.email)) {
+      throw new Error("Admin access required");
+    }
+
     const vms = await ctx.db
       .query("vms")
       .withIndex("by_nodeId", (q) => q.eq("nodeId", args.nodeId))
