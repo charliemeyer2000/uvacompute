@@ -2231,26 +2231,32 @@ async function nodeWorkloadsRemote(nodeId: string): Promise<void> {
 export function registerNodeCommands(program: Command) {
   const node = program
     .command("node")
-    .description("Manage this machine as a uvacompute contributor node");
+    .description("Set up and manage this machine as a compute node");
 
   node
     .command("prepare")
     .description(
-      "Prepare the system by installing NVIDIA drivers and checking IOMMU",
+      "Check GPU drivers and I/O virtualization; install drivers if needed",
     )
-    .option("--check", "Show what would be done without making changes")
-    .option("--skip-iommu", "Skip IOMMU verification checks")
+    .option("--check", "Dry run — show what would change without applying")
+    .option("--skip-iommu", "Skip I/O virtualization (IOMMU) checks")
     .action((options) => nodePrepare(options));
 
   node
     .command("install")
-    .description("Install k3s, KubeVirt, and configure as a contributor node")
+    .description("Install Kubernetes and VM runtime, then register as a node")
     .option(
       "--cpus <count>",
-      "Number of CPUs to contribute (default: total - 4)",
+      "CPUs to share with the cluster (default: total minus 4)",
     )
-    .option("--ram <gb>", "RAM in GB to contribute (default: total - 4)")
-    .option("--storage <gb>", "Storage allocation in GB for VM disks")
+    .option(
+      "--ram <gb>",
+      "RAM in GB to share with the cluster (default: total minus 4)",
+    )
+    .option(
+      "--storage <gb>",
+      "Disk space in GB reserved for VM storage (default: auto)",
+    )
     .action((options) => nodeInstall(options));
 
   node
@@ -2261,14 +2267,12 @@ export function registerNodeCommands(program: Command) {
   node
     .command("list")
     .alias("ls")
-    .description("List your contributed nodes (remote)")
+    .description("List your registered contributor nodes")
     .action(nodeListRemote);
 
   node
     .command("status [nodeId]")
-    .description(
-      "Show node status (local if no nodeId, remote if nodeId provided)",
-    )
+    .description("Show node status; local without nodeId, remote with one")
     .action((nodeId?: string) => {
       if (nodeId) {
         nodeStatusRemote(nodeId);
@@ -2279,9 +2283,7 @@ export function registerNodeCommands(program: Command) {
 
   node
     .command("pause [nodeId]")
-    .description(
-      "Pause node - stop accepting workloads (local if no nodeId, remote if nodeId provided)",
-    )
+    .description("Stop accepting new workloads; existing ones keep running")
     .action((nodeId?: string) => {
       if (nodeId) {
         nodePauseRemote(nodeId);
@@ -2292,9 +2294,7 @@ export function registerNodeCommands(program: Command) {
 
   node
     .command("resume [nodeId]")
-    .description(
-      "Resume node - start accepting workloads (local if no nodeId, remote if nodeId provided)",
-    )
+    .description("Resume accepting new workloads after a pause")
     .action((nodeId?: string) => {
       if (nodeId) {
         nodeResumeRemote(nodeId);
@@ -2305,13 +2305,15 @@ export function registerNodeCommands(program: Command) {
 
   node
     .command("workloads <nodeId>")
-    .description("Show active workloads on a remote node")
+    .description("List running VMs and jobs on a node")
     .action(nodeWorkloadsRemote);
 
   // GPU mode subcommands (local only)
   const gpuMode = node
     .command("gpu-mode")
-    .description("Manage GPU driver mode (must run on node)");
+    .description(
+      "Switch GPU between container and VM passthrough drivers (run on node)",
+    );
 
   gpuMode
     .command("status")
@@ -2320,23 +2322,23 @@ export function registerNodeCommands(program: Command) {
 
   gpuMode
     .command("nvidia")
-    .description("Switch to nvidia driver (container mode)")
+    .description("Bind GPU to the nvidia driver for container workloads")
     .action(nodeGpuModeSwitch("nvidia"));
 
   gpuMode
     .command("vfio")
-    .description("Switch to vfio-pci driver (VM passthrough mode)")
+    .description("Bind GPU to vfio-pci for direct VM passthrough")
     .action(nodeGpuModeSwitch("vfio"));
 
   // Token subcommands for admin use
   const token = node
     .command("token")
-    .description("Manage node registration tokens (admin)");
+    .description("Create and list node registration tokens (admin only)");
 
   token
     .command("create")
-    .description("Create a new node registration token")
-    .option("-n, --name <name>", "Optional name/description for the token")
+    .description("Generate a single-use token valid for 24 hours")
+    .option("-n, --name <name>", "Label or description for the token")
     .action(nodeTokenCreate);
 
   token

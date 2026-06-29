@@ -182,7 +182,7 @@ export function registerApiKeyCommands(program: Command) {
 
   apiKey
     .command("create")
-    .description("Create a new API key")
+    .description("Create a new API key and display the secret (shown once)")
     .argument("[name]", "Friendly name for the key", "Unnamed Key")
     .action(createApiKey);
 
@@ -195,7 +195,7 @@ export function registerApiKeyCommands(program: Command) {
   apiKey
     .command("revoke")
     .alias("rm")
-    .description("Revoke an API key")
+    .description("Permanently revoke an API key (cannot be undone)")
     .argument("<keyId>", "API key ID to revoke")
     .option("-f, --force", "Skip confirmation prompt")
     .action(revokeApiKey);

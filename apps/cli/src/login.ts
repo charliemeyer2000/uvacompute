@@ -207,8 +207,8 @@ async function pollForToken(
 export function registerLoginCommand(program: Command) {
   program
     .command("login")
-    .description("Login to uvacompute")
-    .option("--force", "Force re-authentication even if already logged in")
+    .description("Authenticate with uvacompute via browser-based device flow")
+    .option("--force", "Re-authenticate even if already logged in")
     .action(async (options) => {
       try {
         if (!options.force) {

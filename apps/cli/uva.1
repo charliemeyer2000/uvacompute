@@ -8,26 +8,26 @@ uva \- command-line interface for managing uvacompute virtual machines
 [\fIoptions\fR] [\fIarguments\fR]
 .SH DESCRIPTION
 .B uva
-is the command-line interface for uvacompute, a cloud computing platform for provisioning and managing virtual machines with flexible resource configurations including CPU, RAM, disk, and GPU resources.
+is the command-line interface for uvacompute. It manages VMs, container jobs, SSH keys, API keys, and contributor nodes.
 .PP
-The CLI uses OAuth 2.0 device authorization flow for authentication and communicates with the uvacompute API to manage virtual machine lifecycles, SSH keys, and user sessions.
+Authentication uses the OAuth 2.0 device flow (browser-based).
 .SH COMMANDS
 .SS Authentication
 .TP
 .B login
-Authenticate with uvacompute using OAuth 2.0 device flow. Opens a browser window and prompts for authorization code entry.
+Authenticate with uvacompute via browser-based device flow. Opens a browser and prompts for authorization code entry.
 .RS
 .TP
 .B \-\-force
-Force re-authentication even if already logged in. Invalidates existing token and initiates new device authorization flow.
+Re-authenticate even if already logged in. Invalidates existing token and initiates a new device authorization flow.
 .RE
 .TP
 .B logout
-Log out from uvacompute by removing the stored authentication token from local configuration.
+Remove the stored auth token and log out.
 .SS User Information
 .TP
 .B whoami
-Display currently authenticated user information including name and email address.
+Show the logged-in user's name and email.
 .SS Virtual Machine Management
 .TP
 .B vm create
@@ -35,10 +35,10 @@ Create a new virtual machine with specified resource allocation.
 .RS
 .TP
 .BR \-h ", " \-\-hours " \fIhours\fR"
-(Required) Number of hours to run the VM. Must be a positive integer. VM will be automatically terminated after this duration.
+(Required) Hours until the VM auto-terminates. Must be a positive integer.
 .TP
 .BR \-c ", " \-\-cpus " \fIcpus\fR"
-Number of virtual CPUs (default: 1). Must be a power of 2. Maximum: 128.
+Number of vCPUs to allocate (default: 1). Must be a power of 2. Maximum: 128.
 .TP
 .BR \-r ", " \-\-ram " \fIram\fR"
 RAM allocation in gigabytes (default: 8). Must be a power of 2. Maximum: 512.
@@ -47,25 +47,25 @@ RAM allocation in gigabytes (default: 8). Must be a power of 2. Maximum: 512.
 Disk size in gigabytes (default: 64). Must be a power of 2. Maximum: 1000.
 .TP
 .BR \-g ", " \-\-gpus " \fIgpus\fR"
-Number of GPUs to allocate (default: 0). Maximum: 1.
+Number of GPUs to attach (default: 0). Maximum: 1.
 .TP
 .BR \-t ", " \-\-gpu-type " \fItype\fR"
-GPU type (default: 5090). Currently only supports NVIDIA RTX 5090.
+GPU model to use (default: 5090). Currently only supports NVIDIA RTX 5090.
 .TP
 .BR \-n ", " \-\-name " \fIname\fR"
-Optional friendly name for the VM. Used for identification and SSH connection. If a VM with this name already exists, the CLI prompts for confirmation before creating a duplicate.
+Friendly name for the VM. Used for identification and SSH connection. If a VM with this name already exists, the CLI prompts for confirmation before creating a duplicate.
 .TP
 .BR \-s ", " \-\-startup-script " \fIpath\fR"
-Path to a bash script to run on first boot via cloud-init. Script executes as root during VM initialization. Maximum file size: 1MB. Mutually exclusive with
+Path to a bash script to run on first boot (max 1MB). Cannot combine with
 .BR \-\-cloud-init .
 .TP
 .BR \-\-cloud-init " \fIpath\fR"
-Path to a custom cloud-init configuration file in YAML format. File must begin with '#cloud-config' header. SSH keys are automatically merged into the configuration. Maximum file size: 100KB. Mutually exclusive with
+Path to a cloud-init YAML config (max 100KB). File must begin with '#cloud-config'. SSH keys are automatically merged. Cannot combine with
 .BR \-\-startup-script .
 .RE
 .TP
 .B vm delete \fInameOrVmId\fR
-Delete a virtual machine by its ID or name. Immediately terminates and removes the VM. If multiple VMs share the same name, presents an interactive selection menu with an option to delete all matching VMs.
+Delete a VM by name or ID. If multiple VMs share the name, presents an interactive selection menu with an option to delete all matches.
 .TP
 .B vm rm \fInameOrVmId\fR
 Alias for
@@ -73,18 +73,18 @@ Alias for
 Accepts VM ID or name. Supports interactive selection for duplicate names.
 .TP
 .B vm extend \fInameOrVmId\fR
-Extend a running VM's expiration time by the specified number of hours. Only VMs in running state can be extended.
+Add hours to a running VM's expiration. Only VMs in running state can be extended.
 .RS
 .TP
 .BR \-\-hours " \fIhours\fR"
-(Required) Number of hours to extend the VM. Must be a positive integer.
+(Required) Hours to add to the VM's lifetime. Must be a positive integer.
 .RE
 .TP
 .B vm status \fIvmId\fR
-Display current status and detailed information about a virtual machine including state, configuration, and any error messages.
+Show the current status of a VM including state, configuration, and any error messages.
 .TP
 .B vm list
-List all running virtual machines owned by the authenticated user.
+List your VMs (active only by default).
 .RS
 .TP
 .BR \-a ", " \-\-all
@@ -97,57 +97,57 @@ Alias for
 Accepts same options.
 .TP
 .B vm ssh \fInameOrVmId\fR
-Connect to a virtual machine via SSH. Accepts either the VM ID or friendly name. If multiple VMs share the same name, presents an interactive selection menu. VM must be in running state. Requires SSH key to be configured.
+Open an SSH session to a running VM by name or ID. If multiple VMs share the name, presents an interactive selection menu. Requires an SSH key to be configured.
 .SS SSH Key Management
 .TP
 .B ssh-key add \fIpath\fR
-Add an SSH public key for VM access. Reads public key from specified file path. ED25519 keys are recommended for better security and performance.
+Register an SSH public key for VM access. Reads the key from the specified file. ED25519 keys are recommended.
 .RS
 .TP
 .BR \-n ", " \-\-name " \fIname\fR"
-Friendly name for the SSH key (default: "Unnamed Key"). Used for identification in key listings.
+Label for the key (default: "Unnamed Key"). Used for identification in key listings.
 .RE
 .TP
 .B ssh-key list
-Display all SSH public keys associated with the authenticated user. Shows key ID, name, fingerprint, creation date, and primary status.
+List your registered SSH keys, showing ID, name, fingerprint, creation date, and primary status.
 .TP
 .B ssh-key ls
 Alias for
 .BR "ssh-key list" .
 .TP
 .B ssh-key remove \fIkeyId\fR
-Remove an SSH public key by its ID. Prevents future use of this key for VM access.
+Remove an SSH key by its ID.
 .TP
 .B ssh-key rm \fIkeyId\fR
 Alias for
 .BR "ssh-key remove" .
 .TP
 .B ssh-key set-primary \fIkeyId\fR
-Set specified SSH key as the primary key. Primary key is used by default for new VM deployments.
+Set a key as the default for new VMs.
 .SS Container Job Management
 .TP
 .B run \fIimage\fR [\fIcommand...\fR]
-Run a container job with the specified image. The optional command arguments are passed to the container.
+Run a container image as a job. Optional command arguments are passed to the container.
 .RS
 .TP
 .BR \-g ", " \-\-gpu
-Request a GPU for the job. Allocates 1 GPU to the container.
+Attach one GPU to the job.
 .TP
 .BR \-c ", " \-\-cpu " \fIcpus\fR"
-Number of CPUs to allocate (default: 1). Maximum: 128.
+Number of vCPUs to allocate (default: 1). Maximum: 128.
 .TP
 .BR \-r ", " \-\-ram " \fIram\fR"
 RAM allocation in gigabytes (default: 4). Maximum: 512.
 .TP
 .BR \-e ", " \-\-env " \fIKEY=VALUE\fR"
-Set an environment variable in the container. Can be specified multiple times for multiple variables.
+Set an environment variable as KEY=VALUE (repeatable).
 .TP
 .BR \-n ", " \-\-name " \fIname\fR"
-Optional friendly name for the job. Used for identification in job listings.
+Friendly name for the job.
 .RE
 .TP
 .B jobs
-List active container jobs (pending, scheduled, pulling, or running).
+List your jobs (active only by default).
 .RS
 .TP
 .BR \-a ", " \-\-all
@@ -158,35 +158,35 @@ Filter jobs by status. Valid values: pending, scheduled, pulling, running, compl
 .RE
 .TP
 .B logs \fIjobId\fR
-Display logs from a container job.
+Show logs for a job by ID or name.
 .RS
 .TP
 .BR \-t ", " \-\-tail " \fIlines\fR"
 Show only the last N lines of log output.
 .TP
 .BR \-\-no-follow
-Don't follow log output (this is currently the default behavior; streaming will be added in a future release).
+Print current logs and exit without streaming.
 .RE
 .TP
 .B cancel \fIjobId\fR
-Cancel a running or pending job. Jobs in terminal states (completed, failed, cancelled) cannot be cancelled.
+Cancel a running or pending job.
 .SS Management
 .TP
 .B completion install
-Install shell tab completion for the uva command. Supports Bash and Zsh shells. Automatically detects the current shell and configures completion scripts in the appropriate shell configuration file. After installation, restart your shell or source the configuration file to enable tab completion.
+Add tab-completion to your current shell (bash or zsh). Automatically detects the shell and configures completion scripts. Restart your shell or source the config file to enable.
 .TP
 .B completion uninstall
-Remove shell tab completion for the uva command. Cleans up completion scripts from shell configuration files and the tabtab directory.
+Remove tab-completion scripts and shell config entries.
 .TP
 .B upgrade
-Upgrade the uvacompute CLI to the latest version. Checks the API for available updates, displays version comparison, and presents an interactive confirmation prompt (default: Yes) before downloading and installing the update. Automatically handles the upgrade process by running the official installation script. If binary replacement requires elevated permissions, provides instructions for using sudo.
+Check for updates and upgrade the CLI to the latest version. Displays a version comparison and prompts before installing. If elevated permissions are needed, provides instructions for using sudo.
 .TP
 .B uninstall
-Uninstall the uvacompute CLI. Removes the CLI binary from the system and deletes all configuration data including authentication tokens. Presents an interactive confirmation prompt (default: No) before proceeding. If binary removal requires elevated permissions, displays instructions for manual removal.
+Remove the uva binary and all local config. Prompts for confirmation (default: No). If elevated permissions are needed, displays instructions for manual removal.
 .SS Node Management
 .TP
 .B node prepare [\-\-check] [\-\-skip\-iommu]
-Prepare the system for node installation by installing NVIDIA drivers and checking IOMMU.
+Check GPU drivers and I/O virtualization; install drivers if needed.
 .RS
 .IP \(bu 2
 Detects operating system (Ubuntu, Debian, Arch, Fedora, Gentoo)
@@ -202,17 +202,17 @@ Options:
 .RS
 .TP
 .B \-\-check
-Show what would be done without making changes (dry-run mode).
+Dry run \(em show what would change without applying.
 .TP
 .B \-\-skip\-iommu
-Skip IOMMU verification checks.
+Skip I/O virtualization (IOMMU) checks.
 .RE
 .IP
 Requires root privileges (sudo) for driver installation. A system reboot is typically required after driver installation before proceeding with
 .BR "node install" .
 .TP
 .B node install
-Install k3s, KubeVirt, and configure the machine as a uvacompute contributor node. Requires that
+Install Kubernetes and VM runtime, then register as a contributor node. Requires that
 .BR "node prepare"
 has been run and the system rebooted if drivers were installed. Downloads and executes the installation script which handles:
 .RS
@@ -228,13 +228,13 @@ GPU mode switching scripts generation
 Node configuration state storage
 .TP
 .BR \-\-cpus " \fIcount\fR"
-Number of CPUs to contribute to the cluster (default: total \- 4). Remaining CPUs are reserved for system use via kubelet system\-reserved.
+CPUs to share with the cluster (default: total minus 4). Remaining CPUs are reserved for system use.
 .TP
 .BR \-\-ram " \fIgb\fR"
-RAM in GB to contribute to the cluster (default: total \- 4). Remaining RAM is reserved for system use via kubelet system\-reserved.
+RAM in GB to share with the cluster (default: total minus 4). Remaining RAM is reserved for system use.
 .TP
 .BR \-\-storage " \fIgb\fR"
-Storage allocation in GB for VM disks (default: auto).
+Disk space in GB reserved for VM storage (default: auto).
 .RE
 .IP
 Requires root privileges (sudo). Only Ubuntu and Debian are currently supported.
@@ -245,7 +245,7 @@ Remove all node components installed by
 This includes k3s, KubeVirt resources, GPU scripts, and configuration files. The nvidia-container-toolkit package is not removed automatically.
 .TP
 .B node status
-Display current node status including:
+Show node status including:
 .RS
 .IP \(bu 2
 Installation state and date
@@ -262,10 +262,10 @@ Running workloads (VMs and Jobs)
 .RE
 .TP
 .B node pause
-Stop accepting new workloads on this node. Existing workloads continue running. Uses kubectl cordon under the hood.
+Stop accepting new workloads; existing ones keep running.
 .TP
 .B node resume
-Resume accepting new workloads on this node after being paused. Uses kubectl uncordon under the hood.
+Resume accepting new workloads after a pause.
 .TP
 .B node config
 Interactively configure resource sharing settings. Prompts for:
@@ -282,35 +282,35 @@ Configuration is saved to ~/.uvacompute/node/config.yaml.
 .SS Remote Node Management
 .TP
 .B node list
-List all nodes you have contributed to the uvacompute network. Displays node ID, name, status, resources, and last heartbeat.
+List your registered contributor nodes.
 .TP
 .B node ls
 Alias for
 .BR "node list" .
 .TP
 .B node status \fInodeId\fR
-Display status and detailed information about a specific remote node you own. Without a nodeId argument, shows local node status instead.
+Show node status; local without nodeId, remote with one.
 .TP
 .B node pause \fInodeId\fR
-Pause a remote node to stop accepting new workloads. Existing workloads continue running. Without a nodeId argument, pauses the local node instead.
+Stop accepting new workloads on a node. Existing workloads keep running.
 .TP
 .B node resume \fInodeId\fR
-Resume a remote node to start accepting workloads again. Without a nodeId argument, resumes the local node instead.
+Resume accepting new workloads after a pause.
 .TP
 .B node workloads \fInodeId\fR
-Display active workloads (VMs and jobs) running on a specific remote node.
+List running VMs and jobs on a node.
 .SS Node Registration Tokens
 .TP
 .B node token create
-Create a new node registration token for adding nodes to the network. Tokens are single-use and expire after 24 hours.
+Generate a single-use registration token valid for 24 hours.
 .RS
 .TP
 .BR \-n ", " \-\-name " \fIname\fR"
-Optional name or description for the token.
+Label or description for the token.
 .RE
 .TP
 .B node token list
-List all registration tokens you have created, showing status (active, used, expired), assigned port, and creation date.
+List all registration tokens, showing status (active, used, expired), port, and creation date.
 .TP
 .B node token ls
 Alias for

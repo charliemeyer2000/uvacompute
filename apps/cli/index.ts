@@ -23,8 +23,8 @@ async function main() {
   program
     .version(require("./package.json").version)
     .name("uva")
-    .description("uvacompute cli")
-    .option("-y, --yes", "Skip all confirmation prompts");
+    .description("CLI for managing uvacompute VMs, jobs, and nodes")
+    .option("-y, --yes", "Auto-confirm all prompts (useful for scripts)");
 
   program.hook("preAction", (thisCommand) => {
     const opts = thisCommand.optsWithGlobals();

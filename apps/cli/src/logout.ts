@@ -32,6 +32,6 @@ async function logout(): Promise<void> {
 export function registerLogoutCommand(program: Command) {
   program
     .command("logout")
-    .description("Logout from uvacompute")
+    .description("Remove stored auth token and log out")
     .action(logout);
 }

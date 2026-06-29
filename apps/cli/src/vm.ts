@@ -1208,52 +1208,52 @@ export function registerVMCommands(program: Command) {
 
   vm.command("create")
     .description("Create a new VM")
-    .requiredOption("-h, --hours <hours>", "Number of hours to run the VM")
-    .option("-c, --cpus <cpus>", "Number of CPUs (default: 1)")
+    .requiredOption("-h, --hours <hours>", "Hours until the VM auto-terminates")
+    .option("-c, --cpus <cpus>", "Number of vCPUs to allocate (default: 1)")
     .option("-r, --ram <ram>", "RAM in GB (default: 8)")
     .option("-d, --disk <disk>", "Disk size in GB (default: 64)")
-    .option("-g, --gpus <gpus>", "Number of GPUs (default: 0)")
-    .option("-t, --gpu-type <type>", "GPU type (default: 5090)")
-    .option("-n, --name <name>", "VM name (optional)")
+    .option("-g, --gpus <gpus>", "Number of GPUs to attach (default: 0)")
+    .option("-t, --gpu-type <type>", "GPU model to use (default: 5090)")
+    .option("-n, --name <name>", "Friendly name for the VM")
     .option(
       "-s, --startup-script <path>",
-      "Path to startup script (runs on first boot)",
+      "Path to a bash script to run on first boot (max 1MB; cannot combine with --cloud-init)",
     )
     .option(
       "--cloud-init <path>",
-      "Path to cloud-init config file (mutually exclusive with --startup-script)",
+      "Path to a cloud-init YAML config (max 100KB; cannot combine with --startup-script)",
     )
     .option(
       "-e, --expose <port>",
-      "Expose port via HTTPS endpoint (e.g., --expose 8000)",
+      "Expose a port as a public HTTPS endpoint (1-65535)",
     )
     .action(createVM);
 
   vm.command("delete")
     .alias("rm")
-    .description("Delete a VM")
+    .description("Delete a VM by name or ID")
     .argument("<nameOrVmId>", "VM name or VM ID")
     .action(deleteVM);
 
   vm.command("extend")
-    .description("Extend a VM's expiration time")
+    .description("Add hours to a running VM's expiration")
     .argument("<nameOrVmId>", "VM name or VM ID")
-    .requiredOption("--hours <hours>", "Number of hours to extend")
+    .requiredOption("--hours <hours>", "Hours to add to the VM's lifetime")
     .action(extendVM);
 
   vm.command("status")
-    .description("Get VM status")
+    .description("Show the current status of a VM")
     .argument("<vmId>", "VM ID to check")
     .action(getVMStatus);
 
   vm.command("list")
     .alias("ls")
-    .description("List VMs")
+    .description("List your VMs (active only by default)")
     .option("-a, --all", "Show all VMs (including expired)")
     .action(listVMs);
 
   vm.command("ssh")
-    .description("Connect to VM via SSH")
+    .description("Open an SSH session to a running VM")
     .argument("<nameOrVmId>", "VM name or VM ID")
     .action(sshToVM);
 }

@@ -47,6 +47,6 @@ async function whoami(): Promise<void> {
 export function registerUserCommands(program: Command) {
   program
     .command("whoami")
-    .description("Display current user information")
+    .description("Show the logged-in user's name and email")
     .action(whoami);
 }
