@@ -1,16 +1,30 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { authClient } from "@/lib/auth-client";
 
-const VMPROXY_KEY = `-----BEGIN OPENSSH PRIVATE KEY-----
-b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW
-QyNTUxOQAAACDSdQzkZqeBPt2jYI6bvYVAIG6SgK5nE7bzJU2sfFruhwAAAJjUr3PK1K9z
-ygAAAAtzc2gtZWQyNTUxOQAAACDSdQzkZqeBPt2jYI6bvYVAIG6SgK5nE7bzJU2sfFruhw
-AAAEDEOzqp5yLhgf1tNZUNbm2pNMB1C4o++9o/BQNp0RtWP9J1DORmp4E+3aNgjpu9hUAg
-bpKArmcTtvMlTax8Wu6HAAAADnZtcHJveHktYWNjZXNzAQIDBAUGBw==
------END OPENSSH PRIVATE KEY-----
-`;
+export async function GET(request: NextRequest) {
+  const { data: session, error } = await authClient.getSession({
+    fetchOptions: {
+      headers: request.headers,
+    },
+  });
 
-export async function GET() {
-  return new NextResponse(VMPROXY_KEY, {
+  if (error || !session) {
+    return NextResponse.json(
+      { error: error?.message || "Unauthorized" },
+      { status: 401 },
+    );
+  }
+
+  const vmproxyKey = process.env.VMPROXY_PRIVATE_KEY;
+  if (!vmproxyKey) {
+    console.error("VMPROXY_PRIVATE_KEY environment variable not set");
+    return NextResponse.json(
+      { error: "Server configuration error: vmproxy key not configured" },
+      { status: 500 },
+    );
+  }
+
+  return new NextResponse(vmproxyKey, {
     headers: {
       "Content-Type": "text/plain",
     },
