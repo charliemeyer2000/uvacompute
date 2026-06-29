@@ -1,28 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { fetchMutation, fetchQuery } from "convex/nextjs";
 import { api } from "../../../../../convex/_generated/api";
-import { authClient } from "@/lib/auth-client";
+import { requireAdmin } from "@/lib/admin-auth";
 
 export async function POST(request: NextRequest) {
-  // Require authentication for token creation (admin only in future)
-  const { data: session, error } = await authClient.getSession({
-    fetchOptions: {
-      headers: request.headers,
-    },
-  });
-
-  if (error || !session) {
-    return NextResponse.json(
-      { error: "Unauthorized - login required" },
-      { status: 401 },
-    );
+  const authResult = await requireAdmin(request);
+  if (authResult instanceof NextResponse) {
+    return authResult;
   }
 
   try {
     const body = await request.json().catch(() => ({}));
 
     const result = await fetchMutation(api.nodeTokens.createToken, {
-      createdBy: session.user.id,
+      createdBy: authResult.user.id,
     });
 
     return NextResponse.json(result, { status: 201 });
@@ -36,18 +27,9 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET(request: NextRequest) {
-  // Require authentication for listing tokens
-  const { data: session, error } = await authClient.getSession({
-    fetchOptions: {
-      headers: request.headers,
-    },
-  });
-
-  if (error || !session) {
-    return NextResponse.json(
-      { error: "Unauthorized - login required" },
-      { status: 401 },
-    );
+  const authResult = await requireAdmin(request);
+  if (authResult instanceof NextResponse) {
+    return authResult;
   }
 
   try {
