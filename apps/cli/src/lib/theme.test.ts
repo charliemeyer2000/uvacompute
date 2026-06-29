@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach, mock } from "bun:test";
+import { describe, it, expect } from "bun:test";
 import {
   formatAge,
   formatExpiresAt,
@@ -46,17 +46,17 @@ describe("formatExpiresAt", () => {
   });
 
   it("returns minutes for near-future", () => {
-    const result = formatExpiresAt(Date.now() + 30 * 60_000);
+    const result = formatExpiresAt(Date.now() + 30 * 60_000 + 30_000);
     expect(result).toBe("30m");
   });
 
   it("returns hours for multi-hour remaining", () => {
-    const result = formatExpiresAt(Date.now() + 2 * 3600_000);
+    const result = formatExpiresAt(Date.now() + 2 * 3600_000 + 30_000);
     expect(result).toBe("2h");
   });
 
   it("returns days for multi-day remaining", () => {
-    const result = formatExpiresAt(Date.now() + 3 * 86400_000);
+    const result = formatExpiresAt(Date.now() + 3 * 86400_000 + 30_000);
     expect(result).toBe("3d");
   });
 });
