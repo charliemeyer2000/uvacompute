@@ -835,27 +835,30 @@ export function registerJobCommands(program: Command) {
 
   jobs
     .command("run")
-    .description("Run a container job")
+    .description("Run a container image as a job")
     .argument("<image>", "Container image to run")
     .argument("[command...]", "Command to run in the container")
-    .option("-g, --gpu", "Request a GPU for the job")
-    .option("-c, --cpu <cpus>", "Number of CPUs (default: 1)")
+    .option("-g, --gpu", "Attach one GPU to the job")
+    .option("-c, --cpu <cpus>", "Number of vCPUs to allocate (default: 1)")
     .option("-r, --ram <ram>", "RAM in GB (default: 4)")
     .option(
       "-d, --disk <disk>",
-      "Scratch disk in GB (default: 0, mounted at /scratch)",
+      "Scratch disk in GB, mounted at /scratch (default: none)",
     )
     .option(
       "-e, --env <KEY=VALUE>",
-      "Environment variable (can be used multiple times)",
+      "Set an environment variable as KEY=VALUE (repeatable)",
       (value: string, previous: string[]) => [...previous, value],
       [] as string[],
     )
-    .option("-n, --name <name>", "Job name (optional)")
-    .option("--no-follow", "Don't stream logs after job starts")
+    .option("-n, --name <name>", "Friendly name for the job")
+    .option(
+      "--no-follow",
+      "Exit after the job starts instead of streaming logs",
+    )
     .option(
       "--expose <port>",
-      "Expose port via HTTPS endpoint (e.g., --expose 8000)",
+      "Expose a port as a public HTTPS endpoint (1-65535)",
     )
     .action(
       (
@@ -879,21 +882,21 @@ export function registerJobCommands(program: Command) {
   jobs
     .command("list")
     .alias("ls")
-    .description("List jobs")
+    .description("List your jobs (active only by default)")
     .option("-a, --all", "Show all jobs (including completed)")
     .action(listJobs);
 
   jobs
     .command("logs")
-    .description("Get job logs")
+    .description("Show logs for a job by ID or name")
     .argument("<jobId>", "Job ID or name")
     .option("-t, --tail <lines>", "Show only the last N lines")
-    .option("--no-follow", "Don't follow log output (default behavior)")
+    .option("--no-follow", "Print current logs and exit without streaming")
     .action(getJobLogs);
 
   jobs
     .command("cancel")
-    .description("Cancel a running job")
+    .description("Cancel a running or pending job")
     .argument("<jobId>", "Job ID or name to cancel")
     .option("-f, --force", "Skip confirmation prompt")
     .action(cancelJob);

@@ -641,15 +641,15 @@ export function registerCompletionCommands(program: Command): void {
 
   const completion = program
     .command("completion")
-    .description("Manage shell completion");
+    .description("Set up or remove shell tab-completion (bash/zsh)");
 
   completion
     .command("install")
-    .description("Install shell completion for uva")
+    .description("Add tab-completion to your current shell (bash or zsh)")
     .action(installCompletion);
 
   completion
     .command("uninstall")
-    .description("Uninstall shell completion for uva")
+    .description("Remove tab-completion scripts and shell config entries")
     .action(uninstallCompletion);
 }

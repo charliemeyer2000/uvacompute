@@ -220,28 +220,28 @@ export function registerSSHKeyCommands(program: Command) {
 
   sshKey
     .command("add")
-    .description("Add a new SSH public key")
+    .description("Register an SSH public key for VM access")
     .argument("<path>", "Path to SSH public key file")
-    .option("-n, --name <name>", "Friendly name for the key")
+    .option("-n, --name <name>", 'Label for the key (default: "Unnamed Key")')
     .action(addSSHKey);
 
   sshKey
     .command("list")
     .alias("ls")
-    .description("List all SSH keys")
+    .description("List your registered SSH keys")
     .action(listSSHKeys);
 
   sshKey
     .command("remove")
     .alias("rm")
-    .description("Remove an SSH key")
+    .description("Remove an SSH key by its ID")
     .argument("<keyId>", "SSH key ID to remove")
     .option("-f, --force", "Skip confirmation prompt")
     .action(removeSSHKey);
 
   sshKey
     .command("set-primary")
-    .description("Set an SSH key as primary")
+    .description("Set a key as the default for new VMs")
     .argument("<keyId>", "SSH key ID to set as primary")
     .action(setPrimaryKey);
 }

@@ -134,6 +134,6 @@ async function upgrade(): Promise<void> {
 export function registerUpgradeCommand(program: Command) {
   program
     .command("upgrade")
-    .description("Upgrade the uvacompute CLI to the latest version")
+    .description("Check for updates and upgrade the CLI to the latest version")
     .action(upgrade);
 }

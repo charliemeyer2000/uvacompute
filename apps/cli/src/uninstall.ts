@@ -96,6 +96,6 @@ async function uninstall(): Promise<void> {
 export function registerUninstallCommand(program: Command) {
   program
     .command("uninstall")
-    .description("Uninstall the uvacompute CLI")
+    .description("Remove the uva binary and all local config")
     .action(uninstall);
 }
