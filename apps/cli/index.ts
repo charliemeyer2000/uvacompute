@@ -26,6 +26,17 @@ async function main() {
     .description("uvacompute cli")
     .option("-y, --yes", "Skip all confirmation prompts");
 
+  program.addHelpText(
+    "after",
+    `
+Examples:
+  $ uva vm create -h 4 -n dev-box              # Spin up a VM for 4 hours
+  $ uva vm create -h 12 -c 8 -r 32 -g 1        # Create a GPU VM with 8 CPUs and 32 GB RAM
+  $ uva vm list --all                           # List all VMs including stopped/expired
+  $ uva vm ssh dev-box                          # SSH into a VM by name
+  $ uva run --gpu pytorch/pytorch python train.py  # Run a GPU container job`,
+  );
+
   program.hook("preAction", (thisCommand) => {
     const opts = thisCommand.optsWithGlobals();
     if (opts.yes || !process.stdout.isTTY) {
