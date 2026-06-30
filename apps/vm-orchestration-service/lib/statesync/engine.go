@@ -113,9 +113,9 @@ func (e *StateSyncEngine) ResourceKey(rt ResourceType, id string) string {
 
 func (e *StateSyncEngine) EnqueueVM(vmID, status, nodeID string) {
 	key := e.ResourceKey(ResourceVM, vmID)
-	gen := e.genCounter.Add(1)
 
 	e.mu.Lock()
+	gen := e.genCounter.Add(1)
 	if _, existed := e.outbox[key]; existed {
 		e.totalCoalesced.Add(1)
 	}
@@ -135,9 +135,9 @@ func (e *StateSyncEngine) EnqueueVM(vmID, status, nodeID string) {
 
 func (e *StateSyncEngine) EnqueueJob(jobID, status string, exitCode *int, errorMsg, nodeID string) {
 	key := e.ResourceKey(ResourceJob, jobID)
-	gen := e.genCounter.Add(1)
 
 	e.mu.Lock()
+	gen := e.genCounter.Add(1)
 	if _, existed := e.outbox[key]; existed {
 		e.totalCoalesced.Add(1)
 	}
@@ -230,12 +230,16 @@ func (e *StateSyncEngine) drainOutbox(ctx context.Context) {
 			continue
 		}
 		if ackedGen := e.genMap[key]; entry.Generation <= ackedGen {
-			delete(e.outbox, key)
+			if current, ok := e.outbox[key]; ok && current.Generation <= ackedGen {
+				delete(e.outbox, key)
+			}
 			e.mu.Unlock()
 			continue
 		}
 		e.inflight[key] = true
-		delete(e.outbox, key)
+		if current, ok := e.outbox[key]; ok && current.Generation <= entry.Generation {
+			delete(e.outbox, key)
+		}
 		e.mu.Unlock()
 
 		wg.Add(1)
