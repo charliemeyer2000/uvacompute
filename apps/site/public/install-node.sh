@@ -260,7 +260,6 @@ register_node() {
     K3S_TOKEN=$(echo "${response}" | jq -r '.k3sToken')
     VMPROXY_PUBLIC_KEY=$(echo "${response}" | jq -r '.vmproxyPublicKey')
     HUB_KUBECONFIG_B64=$(echo "${response}" | jq -r '.hubKubeconfig')
-    ORCHESTRATION_SECRET=$(echo "${response}" | jq -r '.orchestrationSecret')
     NODE_SECRET=$(echo "${response}" | jq -r '.nodeSecret')
 
     if [[ -z "${K3S_URL}" || "${K3S_URL}" == "null" ]]; then
@@ -279,26 +278,15 @@ register_node() {
         die "Invalid response from bootstrap API: missing hubKubeconfig"
     fi
 
-    if [[ -z "${ORCHESTRATION_SECRET}" || "${ORCHESTRATION_SECRET}" == "null" ]]; then
-        die "Invalid response from bootstrap API: missing orchestrationSecret"
-    fi
-
     if [[ -z "${NODE_SECRET}" || "${NODE_SECRET}" == "null" ]]; then
         die "Invalid response from bootstrap API: missing nodeSecret"
     fi
 
-    # Store secrets for API authentication
+    # Store per-node secret for API authentication
     mkdir -p /etc/uvacompute
-
-    # Store per-node secret for node-specific API calls (preferred)
     echo "${NODE_SECRET}" > /etc/uvacompute/node-secret
     chmod 600 /etc/uvacompute/node-secret
     log_info "Node secret stored at /etc/uvacompute/node-secret"
-
-    # Store orchestration secret for legacy compatibility
-    echo "${ORCHESTRATION_SECRET}" > /etc/uvacompute/orchestration-secret
-    chmod 600 /etc/uvacompute/orchestration-secret
-    log_info "Orchestration secret stored at /etc/uvacompute/orchestration-secret"
 
     log_success "Node registered successfully!"
     log_info "  Tunnel Host: ${TUNNEL_HOST}"

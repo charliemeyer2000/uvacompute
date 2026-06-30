@@ -93,18 +93,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const orchestrationSecret = process.env.ORCHESTRATION_SHARED_SECRET;
-    if (!orchestrationSecret) {
-      console.error("ORCHESTRATION_SHARED_SECRET environment variable not set");
-      return NextResponse.json(
-        {
-          error:
-            "Server configuration error: orchestration secret not configured",
-        },
-        { status: 500 },
-      );
-    }
-
     return NextResponse.json(
       {
         success: true,
@@ -116,7 +104,6 @@ export async function POST(request: NextRequest) {
         k3sToken: k3sAgentToken,
         vmproxyPublicKey: vmproxyPublicKey,
         hubKubeconfig: hubKubeconfig,
-        orchestrationSecret: orchestrationSecret,
         nodeSecret: nodeSecret,
       },
       { status: 200 },
