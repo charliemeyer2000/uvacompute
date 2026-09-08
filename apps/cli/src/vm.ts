@@ -1033,13 +1033,15 @@ interface ConnectionInfo {
   token: string;
 }
 
-async function ensureProxyKey(): Promise<string> {
+async function ensureProxyKey(token: string): Promise<string> {
   const uvaDir = join(homedir(), ".uva");
   const keyPath = join(uvaDir, "vmproxy-key");
 
   if (!existsSync(keyPath)) {
     // Download the key from the site
-    const response = await fetch(`${BASE_URL}/api/vmproxy-key`);
+    const response = await fetch(`${BASE_URL}/api/vmproxy-key`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
     if (!response.ok) {
       throw new Error("Failed to download proxy key");
     }
@@ -1160,7 +1162,7 @@ async function sshToVM(nameOrVmId: string): Promise<void> {
     }
 
     spinner.text = "Setting up secure connection...";
-    const proxyKeyPath = await ensureProxyKey();
+    const proxyKeyPath = await ensureProxyKey(token);
 
     spinner.succeed(theme.success("Connecting to VM..."));
 
